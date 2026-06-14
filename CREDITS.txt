@@ -1,19 +1,61 @@
 === Age of Shadows — Asset Credits ===
 
 ICONS (game-icons.net, CC BY 3.0 — https://creativecommons.org/licenses/by/3.0/)
+- Wood/Wood-beam icon by Delapouite — https://game-icons.net/1x1/delapouite/wood-beam.html
 - Food/Meat icon by Lorc — https://game-icons.net/1x1/lorc/meat.html
-
-(Add remaining icons below as downloaded: wood, water, gold, stone)
-
+- Water/Water-bottle icon by Delapouite — https://game-icons.net/1x1/delapouite/water-bottle.html
+- Gold/Gold-stack icon by Delapouite — https://game-icons.net/1x1/delapouite/gold-stack.html
+- Stone/Stone-crafting icon by Lorc — https://game-icons.net/1x1/lorc/stone-crafting.html
 
 CHARACTER MODEL
-- balkan__cs2_agent_model_dragomir (see model source/license)
+- balkan__cs2_agent_model_dragomir (CS2 game asset — used for non-commercial development only)
 
 TREE MODEL
 - "Pine trees pack (lowpoly, game ready, LODs)" by LOLIPOP
   https://skfb.ly/pxNLU
   Licensed under Creative Commons Attribution 4.0 — http://creativecommons.org/licenses/by/4.0/
 
+CHICKEN MODEL
+- "ANIMAL & FOOD | Chicken Model (CS2)" by gettan
+  https://skfb.ly/oSJV7
+  Licensed under Creative Commons Attribution 4.0 — http://creativecommons.org/licenses/by/4.0/
+
+DEER MODEL
+- "deer" by neighbor
+  https://skfb.ly/oD9LY
+  Licensed under Creative Commons Attribution 4.0 — http://creativecommons.org/licenses/by/4.0/
+
 SOUNDS
 - Move confirm sound: pensieri_profondi_scuba-ok (freesound.org)
 - Chop sound: procedurally generated (no attribution needed)
+- Mine sound: procedurally generated (no attribution needed)
+
+MUSIC (all tracks from Pixabay — https://pixabay.com)
+1.  "The Ballad of My Sweet Fair Maiden" by Paul Winter (kaazoom)
+    https://pixabay.com/music/?utm_content=358306
+2.  "Background Music New Age Nature" by Dvir Silverstone (sonican)
+    https://pixabay.com/music/?utm_content=465069
+3.  "Ancient Empire" by Dmitrii Kolesnikov (the_mountain)
+    https://pixabay.com/music/?utm_content=142301
+4.  "No Copyright Music" by Oleksii Holubiev (loksii)
+    https://pixabay.com/music/?utm_content=211881
+5.  "Lofi Beats" by mirostar
+    https://pixabay.com/music/?utm_content=531504
+6.  "Lofi Study Calm Peaceful Chill Hop" by FASSounds
+    https://pixabay.com/music/?utm_content=112191
+7.  "Medieval Folk Music" by Watermelon Beats
+    https://pixabay.com/music/?utm_content=505203
+8.  "Medieval Ambient" by Vlad Bakutov (deuslower) [DEFAULT]
+    https://pixabay.com/music/?utm_content=236809
+9.  "Interstellar Piano" by Ivan Luzan
+    https://pixabay.com/music/?utm_content=157094
+10. "Time" by Zakhar Valaha (good_b_music)
+    https://pixabay.com/music/?utm_content=166273
+11. "Western Cowboy Music" by Ievgen Poltavskyi (hitslab)
+    https://pixabay.com/music/?utm_content=543089
+12. "Medieval Kingdom Loop" by Ebunny
+    https://pixabay.com/music/?utm_content=366815
+
+TEXTURES
+- Grass texture: "grass_path_2" from Poly Haven — https://polyhaven.com (CC0)
+- Dirt road texture: "brown_mud_02" from Poly Haven — https://polyhaven.com (CC0)
