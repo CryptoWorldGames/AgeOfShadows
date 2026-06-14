@@ -1,0 +1,19 @@
+=== Age of Shadows — Asset Credits ===
+
+ICONS (game-icons.net, CC BY 3.0 — https://creativecommons.org/licenses/by/3.0/)
+- Food/Meat icon by Lorc — https://game-icons.net/1x1/lorc/meat.html
+
+(Add remaining icons below as downloaded: wood, water, gold, stone)
+
+
+CHARACTER MODEL
+- balkan__cs2_agent_model_dragomir (see model source/license)
+
+TREE MODEL
+- "Pine trees pack (lowpoly, game ready, LODs)" by LOLIPOP
+  https://skfb.ly/pxNLU
+  Licensed under Creative Commons Attribution 4.0 — http://creativecommons.org/licenses/by/4.0/
+
+SOUNDS
+- Move confirm sound: pensieri_profondi_scuba-ok (freesound.org)
+- Chop sound: procedurally generated (no attribution needed)
