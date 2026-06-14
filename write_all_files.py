@@ -1,3 +1,185 @@
+import os
+
+base = r'C:\Users\mycry\games\AgeOfShadows'
+src = base + r'\client\src\modules'
+
+files = {}
+
+# ============================================================
+# Settings.js
+# ============================================================
+files[src + r'\Settings.js'] = '''
+export const SETTINGS = {
+  tree: { hitsToKill: 10, pickupInterval: 10, yield: 10, respawnTime: 3600 },
+  stone: { hitsToKill: 50, pickupInterval: 50, yield: 6, respawnTime: 7200 },
+  gold: { hitsToKill: 100, pickupInterval: 100, yield: 3, respawnTime: 10800 },
+  chicken: { hitsToKill: 3, pickupInterval: 10, yield: 5, respawnTime: 3600, minOnMap: 5 },
+  deer: { hitsToKill: 15, pickupInterval: 15, yield: 20, respawnTime: 7200 },
+  water: { refillInterval: 10, bottleCapacity: 10, maxWater: 100 },
+  drain: { foodInterval: 2160, waterInterval: 2160 },
+  unit: {
+    speed: 2.4, swingInterval: 0.7, chopRange: 1.8, gatherRange: 1.6,
+    carryWood: 10, carryStone: 5, carryGold: 2, carryFood: 10
+  },
+  building: {
+    townCenter: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 30, tearDownTime: 60, label: 'Town Center' },
+    house: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 60, tearDownTime: 120, label: 'House', maxUnits: 10, storageMax: 1000, decayInterval: 3600 },
+    woodFence: { woodCost: 10, stoneCost: 0, goldCost: 0, buildTime: 60, hitsToDestroy: 25, label: 'Wood Fence' },
+    stoneFence: { woodCost: 0, stoneCost: 50, goldCost: 0, buildTime: 120, hitsToDestroy: 100, label: 'Stone Fence' },
+    farm: { woodCost: 40, stoneCost: 0, goldCost: 0, buildTime: 15, label: 'Farm' },
+    lumberMill: { woodCost: 80, stoneCost: 10, goldCost: 0, buildTime: 25, label: 'Lumber Mill' },
+    mine: { woodCost: 60, stoneCost: 30, goldCost: 0, buildTime: 40, label: 'Mine' },
+    barracks: { woodCost: 100, stoneCost: 50, goldCost: 20, buildTime: 60, label: 'Barracks' },
+    tower: { woodCost: 50, stoneCost: 60, goldCost: 10, buildTime: 45, label: 'Watch Tower' },
+    market: { woodCost: 80, stoneCost: 40, goldCost: 30, buildTime: 50, label: 'Market' },
+    blacksmith: { woodCost: 60, stoneCost: 80, goldCost: 50, buildTime: 60, label: 'Blacksmith' }
+  },
+  garden: { seedCost: 1, yield: 100, tickInterval: 300, size: 10 },
+  healing: { hpPerMin: 1.67 },
+  loot: { groundExpiry: 86400 },
+  animal: {
+    chicken: { wanderSpeed: 0.8, wanderRange: 15, respawnTime: 3600 },
+    deer: { wanderSpeed: 3.5, wanderRange: 40, canKill: true }
+  },
+  spawn: { trees: 20, chickens: 5, deer: 4, stoneDeposits: 8, goldDeposits: 4 },
+  weapons: { axe: { label: 'Axe', damage: 1, attackInterval: 0.7, available: true } }
+};
+'''.strip()
+
+# ============================================================
+# GameScene writer
+# ============================================================
+files[base + r'\write_gamescene.py'] = '''
+content = """import React, { useEffect, useRef } from 'react';
+import * as THREE from 'three';
+import { createEnvironment } from './modules/Environment';
+import { createHuman } from './modules/Human';
+import { createTree } from './modules/Tree';
+import { createUI } from './modules/UI';
+import { createControls } from './modules/Controls';
+import { createTownCenter } from './modules/Building';
+import { createChicken, createDeer } from './modules/Animal';
+import { createStone } from './modules/Stone';
+import { createGold } from './modules/Gold';
+export default function GameScene({ playerId, gameState }) {
+  const containerRef = useRef(null);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 25, 35);
+    camera.lookAt(0, 0, 0);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    containerRef.current.appendChild(renderer.domElement);
+    const env = createEnvironment(scene);
+    const ui = createUI(playerId, gameState);
+    const resources = { wood: 10000, food: 10000, water: 10000, gold: 10000, stone: 10000 };
+    const world = {
+      camera, units: [], trees: [], buildings: [],
+      animals: [], stones: [], golds: [], resources, ui,
+      pondPosition: env.pondPosition
+    };
+    world.units.push(createHuman(scene, { x: -8, y: 0, z: 8 }, { team: 'red' }));
+    world.units.push(createHuman(scene, { x: 8, y: 0, z: 8 }, { team: 'blue' }));
+    const usedSpots = [];
+    function isTooClose(x, z, minDist) {
+      return usedSpots.some((s) => Math.sqrt((x-s.x)**2 + (z-s.z)**2) < minDist);
+    }
+    function addSpot(x, z) { usedSpots.push({ x, z }); }
+    let attempts = 0;
+    while (world.trees.length < 20 && attempts < 300) {
+      attempts++;
+      const x = (Math.random() - 0.5) * 120;
+      const z = (Math.random() - 0.5) * 120;
+      if (Math.sqrt(x*x + z*z) < 12) continue;
+      if (isTooClose(x, z, 5)) continue;
+      addSpot(x, z);
+      world.trees.push(createTree(scene, { x, y: 0, z }));
+    }
+    attempts = 0;
+    while (world.stones.length < 8 && attempts < 300) {
+      attempts++;
+      const x = (Math.random() - 0.5) * 120;
+      const z = (Math.random() - 0.5) * 120;
+      if (Math.sqrt(x*x + z*z) < 15) continue;
+      if (isTooClose(x, z, 8)) continue;
+      addSpot(x, z);
+      world.stones.push(createStone(scene, { x, y: 0, z }));
+    }
+    attempts = 0;
+    while (world.golds.length < 4 && attempts < 300) {
+      attempts++;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 30 + Math.random() * 90;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      if (isTooClose(x, z, 10)) continue;
+      addSpot(x, z);
+      world.golds.push(createGold(scene, { x, y: 0, z }));
+    }
+    const startTC = createTownCenter(scene, false);
+    startTC.setPosition(0, 0);
+    startTC.place();
+    world.buildings.push(startTC);
+    world.animals.push(createChicken(scene, { x: 6, y: 0, z: 6 }));
+    world.animals.push(createChicken(scene, { x: -6, y: 0, z: 6 }));
+    world.animals.push(createChicken(scene, { x: 6, y: 0, z: -6 }));
+    world.animals.push(createChicken(scene, { x: -6, y: 0, z: -6 }));
+    world.animals.push(createChicken(scene, { x: 0, y: 0, z: 8 }));
+    for (let i = 0; i < 4; i++) {
+      const ang = (i / 4) * Math.PI * 2;
+      const r = 35 + Math.random() * 15;
+      world.animals.push(createDeer(scene, { x: Math.cos(ang) * r, y: 0, z: Math.sin(ang) * r }));
+    }
+    const { update, dispose } = createControls(camera, renderer, scene, world);
+    let last = performance.now();
+    let time = 0;
+    const animate = () => {
+      requestAnimationFrame(animate);
+      const now = performance.now();
+      let dt = (now - last) / 1000;
+      last = now;
+      if (dt > 0.1) dt = 0.1;
+      time += dt;
+      update(time, dt);
+      if (env.waterUpdate) env.waterUpdate(dt);
+      world.trees.forEach((t) => t.update(dt));
+      world.stones.forEach((s) => s.update(dt));
+      world.golds.forEach((g) => g.update(dt));
+      world.animals.forEach((a) => a.update(dt, world));
+      world.units.forEach((u) => { u.update(dt, world); u.animate(dt); });
+      ui.setResources(resources);
+      renderer.render(scene, camera);
+    };
+    animate();
+    const handleResize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      dispose();
+      if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
+        containerRef.current.removeChild(renderer.domElement);
+      }
+    };
+  }, [playerId]);
+  return React.createElement('div', { ref: containerRef, style: { width: '100%', height: '100vh', overflow: 'hidden' } });
+}"""
+with open(r'C:\\Users\\mycry\\games\\AgeOfShadows\\client\\src\\GameScene.js', 'w', encoding='utf-8') as f:
+    f.write(content)
+print('Done!')
+'''.strip()
+
+# ============================================================
+# Controls.js
+# ============================================================
+files[src + r'\Controls.js'] = '''
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createTownCenter } from './Building.js';
@@ -314,3 +496,15 @@ export function createControls(camera, renderer, scene, world) {
 
   return { update, dispose };
 }
+'''.strip()
+
+# ============================================================
+# Write all files
+# ============================================================
+for path, content in files.items():
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    print('Wrote:', path)
+
+print('\nAll done! Now run: python write_gamescene.py')

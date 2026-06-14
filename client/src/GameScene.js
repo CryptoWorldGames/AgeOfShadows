@@ -7,6 +7,8 @@ import { createUI } from './modules/UI';
 import { createControls } from './modules/Controls';
 import { createTownCenter } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
+import { createStone } from './modules/Stone';
+import { createGold } from './modules/Gold';
 export default function GameScene({ playerId, gameState }) {
   const containerRef = useRef(null);
   useEffect(() => {
@@ -25,25 +27,46 @@ export default function GameScene({ playerId, gameState }) {
     const resources = { wood: 10000, food: 10000, water: 10000, gold: 10000, stone: 10000 };
     const world = {
       camera, units: [], trees: [], buildings: [],
-      animals: [], resources, ui,
+      animals: [], stones: [], golds: [], resources, ui,
       pondPosition: env.pondPosition
     };
     world.units.push(createHuman(scene, { x: -8, y: 0, z: 8 }, { team: 'red' }));
     world.units.push(createHuman(scene, { x: 8, y: 0, z: 8 }, { team: 'blue' }));
     const usedSpots = [];
+    function isTooClose(x, z, minDist) {
+      return usedSpots.some((s) => Math.sqrt((x-s.x)**2 + (z-s.z)**2) < minDist);
+    }
+    function addSpot(x, z) { usedSpots.push({ x, z }); }
     let attempts = 0;
-    while (world.trees.length < 20 && attempts < 200) {
+    while (world.trees.length < 20 && attempts < 300) {
       attempts++;
       const x = (Math.random() - 0.5) * 120;
       const z = (Math.random() - 0.5) * 120;
       if (Math.sqrt(x*x + z*z) < 12) continue;
-      let tooClose = false;
-      for (const s of usedSpots) {
-        if (Math.sqrt((x-s.x)**2 + (z-s.z)**2) < 5) { tooClose = true; break; }
-      }
-      if (tooClose) continue;
-      usedSpots.push({ x, z });
+      if (isTooClose(x, z, 5)) continue;
+      addSpot(x, z);
       world.trees.push(createTree(scene, { x, y: 0, z }));
+    }
+    attempts = 0;
+    while (world.stones.length < 8 && attempts < 300) {
+      attempts++;
+      const x = (Math.random() - 0.5) * 120;
+      const z = (Math.random() - 0.5) * 120;
+      if (Math.sqrt(x*x + z*z) < 15) continue;
+      if (isTooClose(x, z, 8)) continue;
+      addSpot(x, z);
+      world.stones.push(createStone(scene, { x, y: 0, z }));
+    }
+    attempts = 0;
+    while (world.golds.length < 4 && attempts < 300) {
+      attempts++;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 30 + Math.random() * 90;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      if (isTooClose(x, z, 10)) continue;
+      addSpot(x, z);
+      world.golds.push(createGold(scene, { x, y: 0, z }));
     }
     const startTC = createTownCenter(scene, false);
     startTC.setPosition(0, 0);
@@ -57,11 +80,7 @@ export default function GameScene({ playerId, gameState }) {
     for (let i = 0; i < 4; i++) {
       const ang = (i / 4) * Math.PI * 2;
       const r = 35 + Math.random() * 15;
-      world.animals.push(createDeer(scene, {
-        x: Math.cos(ang) * r,
-        y: 0,
-        z: Math.sin(ang) * r
-      }));
+      world.animals.push(createDeer(scene, { x: Math.cos(ang) * r, y: 0, z: Math.sin(ang) * r }));
     }
     const { update, dispose } = createControls(camera, renderer, scene, world);
     let last = performance.now();
@@ -76,6 +95,8 @@ export default function GameScene({ playerId, gameState }) {
       update(time, dt);
       if (env.waterUpdate) env.waterUpdate(dt);
       world.trees.forEach((t) => t.update(dt));
+      world.stones.forEach((s) => s.update(dt));
+      world.golds.forEach((g) => g.update(dt));
       world.animals.forEach((a) => a.update(dt, world));
       world.units.forEach((u) => { u.update(dt, world); u.animate(dt); });
       ui.setResources(resources);
