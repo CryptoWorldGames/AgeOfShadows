@@ -5,6 +5,7 @@ import { SETTINGS } from './Settings.js';
 
 const loader = new GLTFLoader();
 let chickenLoadPromise = null;
+let deerLoadPromise = null;
 
 function getChickenGLTF() {
   if (chickenLoadPromise) return chickenLoadPromise;
@@ -14,6 +15,28 @@ function getChickenGLTF() {
   return chickenLoadPromise;
 }
 
+function getDeerGLTF() {
+  if (deerLoadPromise) return deerLoadPromise;
+  deerLoadPromise = new Promise((resolve, reject) => {
+    loader.load('/models/deer.glb', resolve, undefined, reject);
+  });
+  return deerLoadPromise;
+}
+
+function createMeatPile(scene, x, z) {
+  const meatMat = new THREE.MeshStandardMaterial({ color: 0xc0584f, roughness: 0.9, flatShading: true });
+  const pile = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.1 + Math.random() * 0.08, 5, 4), meatMat);
+    m.position.set((Math.random() - 0.5) * 0.3, 0.08, (Math.random() - 0.5) * 0.3);
+    m.scale.set(1, 0.6, 1); pile.add(m);
+  }
+  pile.position.set(x, 0, z);
+  scene.add(pile);
+  return pile;
+}
+
+// ===== CHICKEN =====
 export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
   const group = new THREE.Group();
   group.position.set(position.x, 0, position.z);
@@ -30,10 +53,10 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
   let mixer = null;
   let walkAction = null;
   let scaredAction = null;
-  let liveMeshes = [];   // Object_7 chicken_catalan_tan
-  let deadMeshes = [];   // Object_63 chicken_roasted
+  let liveMeshes = [];
+  let deadMeshes = [];
   let isMoving = false;
-  let meatPileGroup = null;
+  let meatPile = null;
 
   getChickenGLTF().then((gltf) => {
     const model = SkeletonClone(gltf.scene);
@@ -48,20 +71,16 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
 
     model.traverse((c) => {
       if (c.isMesh) {
-        c.castShadow = true; c.receiveShadow = true;
+        c.castShadow = true; c.receiveShadow = true; c.visible = true;
         if (c.material) {
           const mats = Array.isArray(c.material) ? c.material : [c.material];
-          mats.forEach((mat) => { mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; mat.needsUpdate = true; });
+          mats.forEach((mat) => { mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; mat.visible = true; mat.needsUpdate = true; });
         }
         const matName = c.material?.name || (Array.isArray(c.material) ? c.material[0]?.name : '');
         if (matName.includes('chicken_roasted')) {
-          // Dead chicken mesh — hide it at start
-          c.visible = false;
-          deadMeshes.push(c);
+          c.visible = false; deadMeshes.push(c);
         } else {
-          // Live chicken mesh — show it
-          c.visible = true;
-          liveMeshes.push(c);
+          c.visible = true; liveMeshes.push(c);
         }
       }
     });
@@ -69,7 +88,6 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
 
     mixer = new THREE.AnimationMixer(model);
     mixer.stopAllAction();
-
     const clips = gltf.animations || [];
     const clipMap = {};
     clips.forEach((clip) => { clipMap[clip.name.toLowerCase()] = clip; });
@@ -80,14 +98,12 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
     if (walkClip) {
       walkAction = mixer.clipAction(THREE.AnimationClip.parse(THREE.AnimationClip.toJSON(walkClip)));
       walkAction.loop = THREE.LoopRepeat;
-      walkAction.play();
-      walkAction.paused = true;
+      walkAction.play(); walkAction.paused = true;
     }
     if (scaredClip) {
       scaredAction = mixer.clipAction(THREE.AnimationClip.parse(THREE.AnimationClip.toJSON(scaredClip)));
       scaredAction.loop = THREE.LoopRepeat;
     }
-    console.log('Chicken ready. live meshes:', liveMeshes.length, 'dead meshes:', deadMeshes.length);
   }).catch((err) => {
     console.warn('Chicken GLB failed, fallback:', err);
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf5e6c8, roughness: 0.9, flatShading: true });
@@ -117,12 +133,10 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
     walkAction.paused = !walking;
     if (walking && scaredAction) scaredAction.stop();
   }
-
   function setScared() {
     if (walkAction) walkAction.paused = true;
     if (scaredAction) scaredAction.reset().play();
   }
-
   function takeDamage(d) {
     if (state !== 'wandering') return;
     hp -= d;
@@ -131,7 +145,6 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
     setScared();
     if (hp <= 0) { hp = 0; state = 'dying'; dyingT = 0; }
   }
-
   function reset() {
     hp = S.hitsToKill; food = S.yield; state = 'wandering';
     respawnTimer = 0; dyingT = 0; scaredTimer = 0;
@@ -141,39 +154,28 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
     group.rotation.y = Math.random() * Math.PI * 2;
     group.rotation.z = 0; group.position.y = 0;
     group.visible = true;
-    if (meatPileGroup) { scene.remove(meatPileGroup); meatPileGroup = null; }
+    if (meatPile) { scene.remove(meatPile); meatPile = null; }
     liveMeshes.forEach((m) => { m.visible = true; });
     deadMeshes.forEach((m) => { m.visible = false; });
     if (walkAction) { walkAction.reset().play(); walkAction.paused = true; }
   }
-
   function update(dt, world) {
     if (mixer) mixer.update(dt);
-
     if (state === 'wandering') {
-      if (scaredTimer > 0) {
-        scaredTimer -= dt;
-        if (scaredTimer <= 0) setWalking(isMoving);
-      }
+      if (scaredTimer > 0) { scaredTimer -= dt; if (scaredTimer <= 0) setWalking(isMoving); }
       wanderTimer -= dt;
       if (wanderTimer <= 0) {
         wanderTimer = 2 + Math.random() * 4;
         wanderDir.set(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
-        if (group.position.distanceTo(spawnPos) > cfg.wanderRange) {
-          wanderDir.subVectors(spawnPos, group.position).normalize();
-        }
+        if (group.position.distanceTo(spawnPos) > cfg.wanderRange) wanderDir.subVectors(spawnPos, group.position).normalize();
       }
       const moving = wanderTimer > 1.5;
-      if (moving !== isMoving) {
-        isMoving = moving;
-        if (scaredTimer <= 0) setWalking(moving);
-      }
+      if (moving !== isMoving) { isMoving = moving; if (scaredTimer <= 0) setWalking(moving); }
       if (moving) {
         group.position.x += wanderDir.x * cfg.wanderSpeed * dt;
         group.position.z += wanderDir.z * cfg.wanderSpeed * dt;
         group.rotation.y = Math.atan2(wanderDir.x, wanderDir.z);
       }
-
     } else if (state === 'dying') {
       dyingT += dt;
       const f = Math.min(1, dyingT / 1.0);
@@ -181,14 +183,11 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
       group.position.y = -f * 0.1;
       if (f >= 1) {
         group.rotation.z = 0; group.position.y = 0;
-        // Hide live chicken, show roasted chicken at death spot
         liveMeshes.forEach((m) => { m.visible = false; });
         deadMeshes.forEach((m) => { m.visible = true; });
         if (mixer) mixer.stopAllAction();
-        food = S.yield;
-        state = 'meatpile';
+        food = S.yield; state = 'meatpile';
       }
-
     } else if (state === 'respawning') {
       respawnTimer += dt;
       if (respawnTimer >= cfg.respawnTime) reset();
@@ -205,78 +204,128 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
     takeFood(n) {
       const give = Math.min(n, food);
       food -= give;
-      if (food <= 0) {
-        state = 'respawning';
-        deadMeshes.forEach((m) => { m.visible = false; });
-      }
+      if (food <= 0) { state = 'respawning'; deadMeshes.forEach((m) => { m.visible = false; }); }
       return give;
     },
     update
   };
 }
 
+// ===== DEER =====
 export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
   const group = new THREE.Group();
   group.position.set(position.x, 0, position.z);
+  group.rotation.y = Math.random() * Math.PI * 2;
   scene.add(group);
 
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8b5e3c, roughness: 0.9, flatShading: true });
-  const bellyMat = new THREE.MeshStandardMaterial({ color: 0xc8a882, roughness: 0.9, flatShading: true });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 7, 5), bodyMat);
-  body.position.y = 0.75; body.scale.set(1, 0.7, 1.5); body.castShadow = true; group.add(body);
-  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 4), bellyMat);
-  belly.position.set(0, 0.55, 0.1); belly.scale.set(0.8, 0.5, 1.2); group.add(belly);
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.5, 6), bodyMat);
-  neck.position.set(0, 1.05, 0.45); neck.rotation.x = -0.5; neck.castShadow = true; group.add(neck);
-  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 5), bodyMat);
-  headMesh.position.set(0, 1.32, 0.7); headMesh.scale.set(0.85, 0.9, 1.1); headMesh.castShadow = true; group.add(headMesh);
-  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.12, 5, 4), bellyMat);
-  snout.position.set(0, 1.25, 0.9); snout.scale.set(0.8, 0.6, 0.8); group.add(snout);
-  const earMat = new THREE.MeshStandardMaterial({ color: 0x7a4e2d, roughness: 0.9, flatShading: true });
-  const earL = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 4), earMat);
-  earL.position.set(-0.18, 1.52, 0.65); earL.rotation.z = -0.3; group.add(earL);
-  const earR = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 4), earMat);
-  earR.position.set(0.18, 1.52, 0.65); earR.rotation.z = 0.3; group.add(earR);
-  const antlerMat = new THREE.MeshStandardMaterial({ color: 0x5a3a1a, roughness: 1.0 });
-  [[-0.12, -0.2], [0.12, 0.2]].forEach(([ox, rz]) => {
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.35, 4), antlerMat);
-    base.position.set(ox, 1.72, 0.62); base.rotation.z = rz; group.add(base);
-    const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.22, 4), antlerMat);
-    branch.position.set(ox * 1.6, 1.9, 0.58); branch.rotation.z = rz * 3.5; group.add(branch);
+  // Hitbox for future killing
+  const hitbox = new THREE.Mesh(
+    new THREE.BoxGeometry(1.0, 1.2, 1.6),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  hitbox.position.y = 0.6;
+  group.add(hitbox);
+
+  let mixer = null;
+  let walkAction = null;
+  let runAction = null;
+  let idleAction = null;
+  let modelMeshes = [];
+  let isRunning = false;
+
+  getDeerGLTF().then((gltf) => {
+    const model = SkeletonClone(gltf.scene);
+
+    // Auto-scale to 1.2 units tall
+    const bbox = new THREE.Box3().setFromObject(model);
+    const size = bbox.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const autoScale = 1.2 / maxDim;
+    model.scale.setScalar(autoScale);
+    model.updateMatrixWorld(true);
+    const bbox2 = new THREE.Box3().setFromObject(model);
+    model.position.y = -bbox2.min.y;
+
+    model.traverse((c) => {
+      if (c.isMesh) {
+        c.castShadow = true; c.receiveShadow = true; c.visible = true;
+        if (c.material) {
+          const mats = Array.isArray(c.material) ? c.material : [c.material];
+          mats.forEach((mat) => { mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; mat.needsUpdate = true; });
+        }
+        modelMeshes.push(c);
+      }
+    });
+    group.add(model);
+
+    mixer = new THREE.AnimationMixer(model);
+    mixer.stopAllAction();
+
+    const clips = gltf.animations || [];
+    console.log('Deer animations:', clips.map(c => c.name));
+    const clipMap = {};
+    clips.forEach((clip) => { clipMap[clip.name.toLowerCase()] = clip; });
+
+    // Try common animation names
+    const idleClip = clipMap['idle'] || clipMap['idle01'] || clipMap['stand'] || clips[0];
+    const walkClip = clipMap['walk'] || clipMap['walk01'] || clipMap['walking'];
+    const runClip = clipMap['run'] || clipMap['run01'] || clipMap['gallop'] || clipMap['trot'];
+
+    if (idleClip) {
+      idleAction = mixer.clipAction(idleClip);
+      idleAction.loop = THREE.LoopRepeat;
+      idleAction.play();
+    }
+    if (walkClip) {
+      walkAction = mixer.clipAction(walkClip);
+      walkAction.loop = THREE.LoopRepeat;
+    }
+    if (runClip) {
+      runAction = mixer.clipAction(runClip);
+      runAction.loop = THREE.LoopRepeat;
+    }
+  }).catch((err) => {
+    console.warn('Deer GLB failed:', err);
   });
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x7a4e2d, roughness: 0.9, flatShading: true });
-  const legs = [];
-  [[-0.22, 0.3], [0.22, 0.3], [-0.22, -0.3], [0.22, -0.3]].forEach(([lx, lz]) => {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.75, 5), legMat);
-    leg.position.set(lx, 0.38, lz); leg.castShadow = true; group.add(leg); legs.push(leg);
-  });
-  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.1, 4, 4), bellyMat);
-  tail.position.set(0, 0.85, -0.72); group.add(tail);
 
   const cfg = SETTINGS.animal.deer;
   let wanderTimer = Math.random() * 3;
   let wanderDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
-  let walkClock = 0;
-  let isRunning = false;
   let runTimer = 0;
   const spawnPos = new THREE.Vector3(position.x, 0, position.z);
 
+  function setAnim(type) {
+    if (!mixer) return;
+    const stop = (a) => { if (a && a.isRunning()) a.fadeOut(0.3); };
+    const play = (a) => { if (a) a.reset().fadeIn(0.3).play(); };
+    if (type === 'run') { stop(idleAction); stop(walkAction); play(runAction || walkAction); }
+    else if (type === 'walk') { stop(idleAction); stop(runAction); play(walkAction || idleAction); }
+    else { stop(walkAction); stop(runAction); play(idleAction); }
+  }
+
   function update(dt, world) {
-    walkClock += dt * (isRunning ? 12 : 5);
-    const s = Math.sin(walkClock);
-    legs[0].rotation.x = s * 0.5; legs[1].rotation.x = -s * 0.5;
-    legs[2].rotation.x = -s * 0.4; legs[3].rotation.x = s * 0.4;
-    headMesh.position.y = 1.32 + Math.abs(s) * 0.03;
+    if (mixer) mixer.update(dt);
+
     let flee = false;
     if (world && world.units) {
       world.units.forEach((u) => {
         const dx = group.position.x - u.group.position.x;
         const dz = group.position.z - u.group.position.z;
-        if (Math.sqrt(dx * dx + dz * dz) < 8) { wanderDir.set(dx, 0, dz).normalize(); flee = true; }
+        if (Math.sqrt(dx * dx + dz * dz) < 10) {
+          wanderDir.set(dx, 0, dz).normalize();
+          flee = true;
+        }
       });
     }
-    if (flee) { isRunning = true; runTimer = 3; }
-    else if (runTimer > 0) { runTimer -= dt; if (runTimer <= 0) isRunning = false; }
+
+    if (flee) {
+      if (!isRunning) { isRunning = true; setAnim('run'); }
+      runTimer = 3;
+    } else if (runTimer > 0) {
+      runTimer -= dt;
+      if (runTimer <= 0) { isRunning = false; setAnim('walk'); }
+    }
+
     wanderTimer -= dt;
     if (wanderTimer <= 0 && !flee) {
       wanderTimer = 3 + Math.random() * 5;
@@ -284,8 +333,10 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
       if (group.position.distanceTo(spawnPos) > cfg.wanderRange) {
         wanderDir.subVectors(spawnPos, group.position).normalize();
       }
+      setAnim(isRunning ? 'run' : 'walk');
     }
-    const spd = isRunning ? cfg.wanderSpeed : cfg.wanderSpeed * 0.3;
+
+    const spd = isRunning ? cfg.wanderSpeed : cfg.wanderSpeed * 0.25;
     group.position.x += wanderDir.x * spd * dt;
     group.position.z += wanderDir.z * spd * dt;
     group.rotation.y = Math.atan2(wanderDir.x, wanderDir.z);
