@@ -14,7 +14,7 @@ export function createUI(playerId, gameState) {
   hudContainer.innerHTML = `<div style="opacity:0.6;font-size:11px;">WASD move · Q/E up/down · L-drag select · R-click move/work</div>`;
   document.body.appendChild(hudContainer);
 
-  // ===== Resource bar (top center) =====
+  // ===== Resource bar =====
   const resDefs = [
     { key: 'wood',  img: '/icons/wood2.png',  color: '#c79a5b' },
     { key: 'food',  img: '/icons/meat2.png',  color: '#e57373' },
@@ -42,7 +42,7 @@ export function createUI(playerId, gameState) {
   resourceBar.appendChild(selSpan);
   document.body.appendChild(resourceBar);
 
-  // ===== Build button (top left) =====
+  // ===== Build button =====
   const buildBar = document.createElement('div');
   buildBar.style.cssText = `position:absolute;top:14px;left:14px;z-index:100;`;
   const tcButton = document.createElement('button');
@@ -58,7 +58,7 @@ export function createUI(playerId, gameState) {
   buildBar.appendChild(tcButton);
   document.body.appendChild(buildBar);
 
-  // ===== Music player (top right, collapsible) =====
+  // ===== Music player =====
   const tracks = [
     { file: 'kaazoom-the-ballad-of-my-sweet-fair-maiden-medieval-style-music-358306.mp3', label: 'Ballad' },
     { file: 'sonican-background-music-new-age-nature-465069.mp3', label: 'Nature' },
@@ -75,7 +75,7 @@ export function createUI(playerId, gameState) {
   ];
   const DEFAULT_TRACK = 7;
 
-  // Collapsed tab (always visible)
+  // Tab (always visible)
   const musicTab = document.createElement('div');
   musicTab.style.cssText = `
     position: absolute; top: 14px; right: 14px;
@@ -89,79 +89,113 @@ export function createUI(playerId, gameState) {
   musicTab.innerHTML = `🎵 <span id="music-tab-label">Music</span>`;
   document.body.appendChild(musicTab);
 
-  // Expanded panel (hidden by default)
+  // Panel
   const musicPanel = document.createElement('div');
   musicPanel.style.cssText = `
     position: absolute; top: 48px; right: 14px;
-    background: rgba(0,0,0,0.85); border-radius: 10px;
+    background: rgba(0,0,0,0.88); border-radius: 10px;
     border: 1px solid rgba(255,255,255,0.15);
     padding: 12px; z-index: 100;
     font-family: 'Segoe UI', sans-serif; color: #fff;
-    width: 210px; display: none;
+    width: 220px; display: none;
   `;
 
-  // On/off + now playing row
+  // Top row — ON/OFF + now playing
   const topRow = document.createElement('div');
-  topRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+  topRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
   const nowPlaying = document.createElement('div');
   nowPlaying.style.cssText = 'font-size:11px;opacity:0.75;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
   nowPlaying.textContent = tracks[DEFAULT_TRACK].label;
   const toggleBtn = document.createElement('button');
   toggleBtn.textContent = 'ON';
-  toggleBtn.style.cssText = `
-    background: #16a34a; border: none; border-radius: 4px;
-    color: #fff; font-size: 11px; font-weight: 700;
-    padding: 2px 8px; cursor: pointer; margin-left: 8px; flex-shrink: 0;
-  `;
-  topRow.appendChild(nowPlaying);
-  topRow.appendChild(toggleBtn);
+  toggleBtn.style.cssText = `background:#16a34a;border:none;border-radius:4px;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;cursor:pointer;margin-left:8px;flex-shrink:0;`;
+  topRow.appendChild(nowPlaying); topRow.appendChild(toggleBtn);
   musicPanel.appendChild(topRow);
 
-  // 12 track circles
+  // 12 track circles with mute button per track
   const circlesRow = document.createElement('div');
-  circlesRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;';
+  circlesRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;';
   const circles = [];
+  const mutedTracks = new Set();
+
   tracks.forEach((t, i) => {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:2px;';
+
     const dot = document.createElement('button');
     dot.title = t.label;
     dot.style.cssText = `
       width: 26px; height: 26px; border-radius: 50%;
       background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.25);
       cursor: pointer; font-size: 10px; color: #fff; font-weight: 700;
-      transition: all 0.15s;
+      transition: all 0.15s; position: relative;
     `;
     dot.textContent = i + 1;
-    dot.onmouseenter = () => { if (i !== currentTrack) dot.style.background = 'rgba(255,255,255,0.35)'; };
-    dot.onmouseleave = () => { if (i !== currentTrack) dot.style.background = 'rgba(255,255,255,0.15)'; };
     dot.onclick = () => playTrack(i);
+
+    // Mute toggle (tiny x under circle)
+    const muteBtn = document.createElement('button');
+    muteBtn.title = 'Mute this track';
+    muteBtn.style.cssText = `background:none;border:none;color:rgba(255,255,255,0.4);font-size:9px;cursor:pointer;padding:0;line-height:1;`;
+    muteBtn.textContent = '×';
+    muteBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (mutedTracks.has(i)) {
+        mutedTracks.delete(i);
+        muteBtn.style.color = 'rgba(255,255,255,0.4)';
+        dot.style.textDecoration = 'none';
+      } else {
+        mutedTracks.add(i);
+        muteBtn.style.color = '#ef4444';
+        dot.style.textDecoration = 'line-through';
+        // If currently playing, skip to next
+        if (i === currentTrack) skipToNext();
+      }
+    };
+
+    wrapper.appendChild(dot); wrapper.appendChild(muteBtn);
+    circlesRow.appendChild(wrapper);
     circles.push(dot);
-    circlesRow.appendChild(dot);
   });
   musicPanel.appendChild(circlesRow);
 
-  // Shuffle button
+  // Controls row — Shuffle, Loop, Skip
+  const ctrlRow = document.createElement('div');
+  ctrlRow.style.cssText = 'display:flex;gap:4px;margin-bottom:8px;';
+
   const shuffleBtn = document.createElement('button');
   shuffleBtn.textContent = '⇄ Shuffle';
-  shuffleBtn.style.cssText = `
-    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 4px; color: #fff; font-size: 11px;
-    padding: 3px 8px; cursor: pointer; margin-bottom: 8px; width: 100%;
-  `;
-  musicPanel.appendChild(shuffleBtn);
+  shuffleBtn.style.cssText = `flex:1;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;font-size:10px;padding:4px;cursor:pointer;`;
+
+  const loopBtn = document.createElement('button');
+  loopBtn.textContent = '↻ Loop';
+  loopBtn.style.cssText = `flex:1;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;font-size:10px;padding:4px;cursor:pointer;`;
+
+  const skipBtn = document.createElement('button');
+  skipBtn.textContent = '⏭ Skip';
+  skipBtn.style.cssText = `flex:1;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;font-size:10px;padding:4px;cursor:pointer;`;
+
+  ctrlRow.appendChild(shuffleBtn); ctrlRow.appendChild(loopBtn); ctrlRow.appendChild(skipBtn);
+  musicPanel.appendChild(ctrlRow);
+
+  // Now playing label
+  const nowPlayingFull = document.createElement('div');
+  nowPlayingFull.style.cssText = 'font-size:10px;opacity:0.6;margin-bottom:6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+  nowPlayingFull.textContent = tracks[DEFAULT_TRACK].label;
+  musicPanel.appendChild(nowPlayingFull);
 
   // Volume
   const volRow = document.createElement('div');
   volRow.style.cssText = 'display:flex;align-items:center;gap:6px;';
   volRow.innerHTML = `<span style="font-size:12px;">🔊</span>`;
   const volSlider = document.createElement('input');
-  volSlider.type = 'range';
-  volSlider.min = 0; volSlider.max = 100; volSlider.value = 60;
+  volSlider.type = 'range'; volSlider.min = 0; volSlider.max = 100; volSlider.value = 60;
   volSlider.style.cssText = 'flex:1;accent-color:#00ff88;cursor:pointer;';
   volRow.appendChild(volSlider);
   musicPanel.appendChild(volRow);
   document.body.appendChild(musicPanel);
 
-  // Toggle panel open/close on tab click
+  // Toggle panel
   let panelOpen = false;
   musicTab.onclick = () => {
     panelOpen = !panelOpen;
@@ -171,59 +205,94 @@ export function createUI(playerId, gameState) {
 
   // ===== Audio engine =====
   const audio = new Audio();
-  audio.loop = false;
   audio.volume = 0.6;
   let currentTrack = DEFAULT_TRACK;
   let musicOn = true;
   let shuffleMode = false;
+  let loopMode = false;
+
+  function getNextTrack() {
+    // Build list of non-muted tracks
+    const available = tracks.map((_, i) => i).filter(i => !mutedTracks.has(i));
+    if (available.length === 0) return currentTrack;
+    if (loopMode) return currentTrack;
+    if (shuffleMode) {
+      const others = available.filter(i => i !== currentTrack);
+      if (others.length === 0) return currentTrack;
+      return others[Math.floor(Math.random() * others.length)];
+    }
+    // Sequential — find next non-muted after current
+    const idx = available.indexOf(currentTrack);
+    return available[(idx + 1) % available.length];
+  }
+
+  function skipToNext() {
+    playTrack(getNextTrack());
+  }
 
   function highlightCircle(i) {
     circles.forEach((c, idx) => {
-      c.style.background = idx === i ? '#00ff88' : 'rgba(255,255,255,0.15)';
-      c.style.borderColor = idx === i ? '#00ff88' : 'rgba(255,255,255,0.25)';
-      c.style.color = idx === i ? '#000' : '#fff';
+      if (mutedTracks.has(idx)) {
+        c.style.background = 'rgba(255,0,0,0.2)';
+        c.style.borderColor = '#ef4444';
+        c.style.color = '#ef4444';
+      } else if (idx === i) {
+        c.style.background = '#00ff88';
+        c.style.borderColor = '#00ff88';
+        c.style.color = '#000';
+      } else {
+        c.style.background = 'rgba(255,255,255,0.15)';
+        c.style.borderColor = 'rgba(255,255,255,0.25)';
+        c.style.color = '#fff';
+      }
     });
   }
 
   function playTrack(i) {
+    // If muted, skip to next
+    if (mutedTracks.has(i)) { playTrack(getNextTrack()); return; }
     currentTrack = i;
+    audio.loop = loopMode;
     audio.src = `/sounds/${tracks[i].file}`;
     audio.currentTime = 0;
     if (musicOn) audio.play().catch(() => {});
     highlightCircle(i);
     nowPlaying.textContent = `${i + 1}. ${tracks[i].label}`;
+    nowPlayingFull.textContent = `${i + 1}. ${tracks[i].label}`;
     document.getElementById('music-tab-label').textContent = tracks[i].label;
   }
 
   audio.addEventListener('ended', () => {
-    if (shuffleMode) {
-      let next = Math.floor(Math.random() * tracks.length);
-      while (next === currentTrack) next = Math.floor(Math.random() * tracks.length);
-      playTrack(next);
-    } else {
-      playTrack((currentTrack + 1) % tracks.length);
-    }
+    if (!loopMode) skipToNext();
   });
 
   toggleBtn.onclick = (e) => {
     e.stopPropagation();
     musicOn = !musicOn;
-    if (musicOn) {
-      audio.play().catch(() => {});
-      toggleBtn.textContent = 'ON';
-      toggleBtn.style.background = '#16a34a';
-    } else {
-      audio.pause();
-      toggleBtn.textContent = 'OFF';
-      toggleBtn.style.background = '#dc2626';
-    }
+    if (musicOn) { audio.play().catch(() => {}); toggleBtn.textContent = 'ON'; toggleBtn.style.background = '#16a34a'; }
+    else { audio.pause(); toggleBtn.textContent = 'OFF'; toggleBtn.style.background = '#dc2626'; }
   };
 
   shuffleBtn.onclick = () => {
     shuffleMode = !shuffleMode;
+    if (shuffleMode) loopMode = false; // can't shuffle and loop at same time
     shuffleBtn.style.background = shuffleMode ? 'rgba(0,255,136,0.25)' : 'rgba(255,255,255,0.12)';
+    loopBtn.style.background = 'rgba(255,255,255,0.12)';
     shuffleBtn.textContent = shuffleMode ? '⇄ Shuffle ON' : '⇄ Shuffle';
+    loopBtn.textContent = '↻ Loop';
   };
+
+  loopBtn.onclick = () => {
+    loopMode = !loopMode;
+    if (loopMode) shuffleMode = false;
+    audio.loop = loopMode;
+    loopBtn.style.background = loopMode ? 'rgba(0,255,136,0.25)' : 'rgba(255,255,255,0.12)';
+    shuffleBtn.style.background = 'rgba(255,255,255,0.12)';
+    loopBtn.textContent = loopMode ? '↻ Loop ON' : '↻ Loop';
+    shuffleBtn.textContent = '⇄ Shuffle';
+  };
+
+  skipBtn.onclick = () => skipToNext();
 
   volSlider.oninput = () => { audio.volume = volSlider.value / 100; };
 
@@ -272,13 +341,9 @@ export function createUI(playerId, gameState) {
         if (el) el.textContent = Math.floor(res[k] || 0);
       });
     },
-    setSelectedCount(n) {
-      const el = document.getElementById('unit-count');
-      if (el) el.textContent = n;
-    },
+    setSelectedCount(n) { const el = document.getElementById('unit-count'); if (el) el.textContent = n; },
     showToast(msg, duration = 3000) {
-      toast.textContent = msg;
-      toast.style.display = 'block';
+      toast.textContent = msg; toast.style.display = 'block';
       if (toastTimer) clearTimeout(toastTimer);
       toastTimer = setTimeout(() => { toast.style.display = 'none'; }, duration);
     },
