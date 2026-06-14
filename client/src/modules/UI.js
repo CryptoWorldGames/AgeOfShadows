@@ -54,31 +54,26 @@ export function createUI(playerId, gameState) {
   ];
   const DEFAULT_TRACK = 7;
 
-  // Music tab
   const musicTab = document.createElement('div');
   musicTab.style.cssText = `position:absolute;top:14px;right:14px;background:rgba(0,0,0,0.65);border-radius:8px;border:1px solid rgba(255,255,255,0.15);padding:6px 12px;z-index:101;font-family:'Segoe UI',sans-serif;color:#fff;font-size:13px;font-weight:600;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;`;
   musicTab.innerHTML = `🎵 <span id="music-tab-label">Music</span>`;
   document.body.appendChild(musicTab);
 
-  // Music panel
   const musicPanel = document.createElement('div');
   musicPanel.style.cssText = `position:absolute;top:48px;right:14px;background:rgba(0,0,0,0.88);border-radius:10px;border:1px solid rgba(255,255,255,0.15);padding:12px;z-index:100;font-family:'Segoe UI',sans-serif;color:#fff;width:224px;display:none;`;
 
-  // Row 1: now playing + ON/OFF switch
+  // Row 1: now playing + ON/OFF slider switch
   const topRow = document.createElement('div');
   topRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
-
   const nowPlaying = document.createElement('div');
   nowPlaying.style.cssText = 'font-size:11px;opacity:0.75;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
   nowPlaying.textContent = tracks[DEFAULT_TRACK].label;
 
-  // ON/OFF slider switch
   const onoffSwitch = document.createElement('div');
   onoffSwitch.style.cssText = `width:40px;height:20px;border-radius:10px;background:#16a34a;cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0;margin-left:8px;`;
   const onoffBall = document.createElement('div');
   onoffBall.style.cssText = `width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:22px;transition:left 0.2s;`;
   onoffSwitch.appendChild(onoffBall);
-
   topRow.appendChild(nowPlaying);
   topRow.appendChild(onoffSwitch);
   musicPanel.appendChild(topRow);
@@ -92,7 +87,7 @@ export function createUI(playerId, gameState) {
   tracks.forEach((t, i) => {
     const dot = document.createElement('button');
     dot.title = t.label;
-    dot.style.cssText = `width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.25);cursor:pointer;font-size:10px;color:#fff;font-weight:700;transition:all 0.15s;`;
+    dot.style.cssText = `width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.25);cursor:pointer;font-size:10px;color:#fff;font-weight:700;transition:all 0.15s;position:relative;`;
     dot.textContent = i + 1;
     dot.onclick = () => playTrack(i);
     circlesRow.appendChild(dot);
@@ -100,7 +95,7 @@ export function createUI(playerId, gameState) {
   });
   musicPanel.appendChild(circlesRow);
 
-  // Buttons row: Shuffle, Loop, Skip, Mute
+  // Buttons row
   const ctrlRow = document.createElement('div');
   ctrlRow.style.cssText = 'display:flex;gap:4px;margin-bottom:8px;';
 
@@ -147,37 +142,49 @@ export function createUI(playerId, gameState) {
   let shuffleMode = false;
   let loopMode = false;
 
-  function getNextTrack() {
-    const available = tracks.map((_,i) => i).filter(i => !mutedTracks.has(i));
-    if (available.length === 0) return currentTrack;
-    if (loopMode) return currentTrack;
+  // Fixed: find next AFTER fromIndex (inclusive search forward)
+  function getNextTrack(fromIndex) {
+    const start = (fromIndex !== undefined) ? fromIndex : currentTrack;
+    if (loopMode) return start;
     if (shuffleMode) {
-      const others = available.filter(i => i !== currentTrack);
-      return others.length === 0 ? currentTrack : others[Math.floor(Math.random()*others.length)];
+      const available = tracks.map((_,i)=>i).filter(i => !mutedTracks.has(i) && i !== start);
+      if (available.length === 0) return start;
+      return available[Math.floor(Math.random()*available.length)];
     }
-    const idx = available.indexOf(currentTrack);
-    return available[(idx+1) % available.length];
+    // Sequential: scan forward from start+1, wrap around
+    for (let offset = 1; offset <= tracks.length; offset++) {
+      const idx = (start + offset) % tracks.length;
+      if (!mutedTracks.has(idx)) return idx;
+    }
+    return start;
   }
 
-  function skipToNext() { playTrack(getNextTrack()); }
+  function skipToNext() { playTrack(getNextTrack(currentTrack)); }
 
   function highlightCircle(i) {
     circles.forEach((c, idx) => {
       if (mutedTracks.has(idx)) {
-        c.style.background = 'rgba(100,100,100,0.3)';
-        c.style.borderColor = '#666';
-        c.style.color = '#666';
+        // Fully grayed out with strikethrough number
+        c.style.background = 'rgba(40,40,40,0.8)';
+        c.style.borderColor = '#333';
+        c.style.color = '#444';
+        c.style.textDecoration = 'line-through';
+        c.style.opacity = '0.4';
       } else if (idx === i) {
         c.style.background = '#00ff88';
         c.style.borderColor = '#00ff88';
         c.style.color = '#000';
+        c.style.textDecoration = 'none';
+        c.style.opacity = '1';
       } else {
         c.style.background = 'rgba(255,255,255,0.15)';
         c.style.borderColor = 'rgba(255,255,255,0.25)';
         c.style.color = '#fff';
+        c.style.textDecoration = 'none';
+        c.style.opacity = '1';
       }
     });
-    // Update mute button to reflect current track state
+    // Mute button reflects current track
     if (mutedTracks.has(i)) {
       muteBtn.style.background = '#ef4444';
       muteBtn.style.borderColor = '#ef4444';
@@ -190,7 +197,7 @@ export function createUI(playerId, gameState) {
   }
 
   function playTrack(i) {
-    if (mutedTracks.has(i)) { const next = getNextTrack(); if (next !== i) playTrack(next); return; }
+    if (mutedTracks.has(i)) { playTrack(getNextTrack(i)); return; }
     currentTrack = i;
     audio.loop = loopMode;
     audio.src = `/sounds/${tracks[i].file}`;
@@ -203,30 +210,22 @@ export function createUI(playerId, gameState) {
 
   audio.addEventListener('ended', () => { if (!loopMode) skipToNext(); });
 
-  // ON/OFF switch
   onoffSwitch.onclick = () => {
     musicOn = !musicOn;
-    if (musicOn) {
-      audio.play().catch(()=>{});
-      onoffSwitch.style.background = '#16a34a';
-      onoffBall.style.left = '22px';
-    } else {
-      audio.pause();
-      onoffSwitch.style.background = '#555';
-      onoffBall.style.left = '2px';
-    }
+    if (musicOn) { audio.play().catch(()=>{}); onoffSwitch.style.background='#16a34a'; onoffBall.style.left='22px'; }
+    else { audio.pause(); onoffSwitch.style.background='#555'; onoffBall.style.left='2px'; }
   };
 
   shuffleBtn.onclick = () => {
     shuffleMode = !shuffleMode;
-    if (shuffleMode) { loopMode = false; audio.loop = false; loopBtn.style.background='rgba(255,255,255,0.12)'; loopBtn.textContent='↻ Loop'; }
+    if (shuffleMode) { loopMode=false; audio.loop=false; loopBtn.style.background='rgba(255,255,255,0.12)'; loopBtn.textContent='↻ Loop'; }
     shuffleBtn.style.background = shuffleMode ? 'rgba(0,255,136,0.25)' : 'rgba(255,255,255,0.12)';
     shuffleBtn.textContent = shuffleMode ? '⇄ Shuffle ON' : '⇄ Shuffle';
   };
 
   loopBtn.onclick = () => {
     loopMode = !loopMode;
-    if (loopMode) { shuffleMode = false; shuffleBtn.style.background='rgba(255,255,255,0.12)'; shuffleBtn.textContent='⇄ Shuffle'; }
+    if (loopMode) { shuffleMode=false; shuffleBtn.style.background='rgba(255,255,255,0.12)'; shuffleBtn.textContent='⇄ Shuffle'; }
     audio.loop = loopMode;
     loopBtn.style.background = loopMode ? 'rgba(0,255,136,0.25)' : 'rgba(255,255,255,0.12)';
     loopBtn.textContent = loopMode ? '↻ Loop ON' : '↻ Loop';
@@ -238,11 +237,14 @@ export function createUI(playerId, gameState) {
     const i = currentTrack;
     if (mutedTracks.has(i)) {
       mutedTracks.delete(i);
+      highlightCircle(i);
     } else {
       mutedTracks.add(i);
-      skipToNext(); // skip to next non-muted song immediately
+      highlightCircle(i);
+      // Skip to next AFTER current (not from 0)
+      const next = getNextTrack(i);
+      if (next !== i) playTrack(next);
     }
-    highlightCircle(currentTrack);
   };
 
   volSlider.oninput = () => { audio.volume = volSlider.value/100; };
