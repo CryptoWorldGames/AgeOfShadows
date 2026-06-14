@@ -51,11 +51,13 @@ export default function GameScene({ playerId, gameState }) {
     while (world.golds.length < 4 && attempts < 300) {
       attempts++;
       const angle = Math.random()*Math.PI*2;
-      const r = 15 + Math.random()*40;
+      const r = 15 + Math.random()*30;
       const x = Math.cos(angle)*r; const z = Math.sin(angle)*r;
       if (isTooClose(x, z, 10)) continue;
       addSpot(x, z); world.golds.push(createGold(scene, { x, y:0, z }));
     }
+    // Small test gold deposit right next to TC
+    world.golds.push(createGold(scene, { x: 5, y:0, z: 5 }));
     const startTC = createTownCenter(scene, false);
     startTC.setPosition(0, 0); startTC.place(); world.buildings.push(startTC);
     world.animals.push(createChicken(scene, { x:6, y:0, z:6 }));

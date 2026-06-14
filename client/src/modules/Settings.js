@@ -1,9 +1,9 @@
 export const SETTINGS = {
-  tree: { hitsToKill: 10, pickupInterval: 10, yield: 10, respawnTime: 3600 },
-  stone: { hitsToKill: 50, pickupInterval: 50, yield: 6, respawnTime: 7200 },
-  gold: { hitsToKill: 100, pickupInterval: 100, yield: 3, respawnTime: 10800 },
-  chicken: { hitsToKill: 3, pickupInterval: 10, yield: 5, respawnTime: 3600, minOnMap: 5 },
-  deer: { hitsToKill: 15, pickupInterval: 15, yield: 20, respawnTime: 7200 },
+  tree: { hitsToKill: 10, hitsPerResource: 10, yield: 10, respawnTime: 3600 },
+  stone: { hitsToKill: 200, hitsPerResource: 20, yield: 10, respawnTime: 7200 },
+  gold: { hitsToKill: 400, hitsPerResource: 40, yield: 10, respawnTime: 10800 },
+  chicken: { hitsToKill: 3, pickupInterval: 1, yield: 5, respawnTime: 3600, minOnMap: 5 },
+  deer: { hitsToKill: 15, pickupInterval: 2, yield: 20, respawnTime: 7200 },
   water: { refillInterval: 10, bottleCapacity: 10, maxWater: 100 },
   drain: { foodInterval: 2160, waterInterval: 2160 },
   unit: {

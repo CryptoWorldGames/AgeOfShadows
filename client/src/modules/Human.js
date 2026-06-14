@@ -6,36 +6,41 @@ const MODEL_URL = '/models/balkan__cs2_agent_model_dragomir_no1.glb';
 const SKIN_MATS = ['tm_balkan_v2_head_varianta.001'];
 
 let audioCtx = null;
-function playChop() {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const now = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(160, now); osc.frequency.exponentialRampToValueAtTime(55, now + 0.08);
-    g.gain.setValueAtTime(0.3, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-    osc.connect(g); g.connect(audioCtx.destination); osc.start(now); osc.stop(now + 0.16);
-    const n = Math.floor(audioCtx.sampleRate * 0.05);
-    const buf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
-    const noise = audioCtx.createBufferSource(); noise.buffer = buf;
-    const ng = audioCtx.createGain();
-    ng.gain.setValueAtTime(0.28, now); ng.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    noise.connect(ng); ng.connect(audioCtx.destination); noise.start(now);
-  } catch (e) {}
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
 }
-function playMine() {
+
+function playSound(type, listenerPos, soundPos, camera) {
   try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const now = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(120, now); osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
-    g.gain.setValueAtTime(0.25, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-    osc.connect(g); g.connect(audioCtx.destination); osc.start(now); osc.stop(now + 0.13);
+    const ctx = getAudioCtx();
+    // Distance-based volume
+    const dx = soundPos.x - listenerPos.x;
+    const dz = soundPos.z - listenerPos.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    const maxDist = 30;
+    const vol = Math.max(0, 1 - dist / maxDist) * 0.25;
+    if (vol <= 0.01) return; // too far, silent
+
+    const now = ctx.currentTime;
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(vol, now);
+    gainNode.connect(ctx.destination);
+
+    if (type === 'chop') {
+      const osc = ctx.createOscillator(); const g = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(160, now); osc.frequency.exponentialRampToValueAtTime(55, now + 0.08);
+      g.gain.setValueAtTime(1, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.connect(g); g.connect(gainNode); osc.start(now); osc.stop(now + 0.16);
+    } else if (type === 'mine') {
+      const osc = ctx.createOscillator(); const g = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(120, now); osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+      g.gain.setValueAtTime(1, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.connect(g); g.connect(gainNode); osc.start(now); osc.stop(now + 0.13);
+    }
   } catch (e) {}
 }
 
@@ -44,7 +49,7 @@ function makeHealthBar() {
   const bg = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.16), new THREE.MeshBasicMaterial({ color: 0x222222, depthTest: false, transparent: true }));
   const fill = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.12), new THREE.MeshBasicMaterial({ color: 0xff3333, depthTest: false, transparent: true }));
   fill.position.z = 0.001; g.add(bg); g.add(fill); g.renderOrder = 999;
-  return { group: g, update(frac) { frac = Math.max(0, Math.min(1, frac)); fill.scale.x = frac; fill.position.x = -(1 - frac) * 0.5; } };
+  return { group: g, update(frac) { frac = Math.max(0, Math.min(1, frac)); fill.scale.x = frac; fill.position.x = -(1-frac)*0.5; } };
 }
 
 function makeAxe() {
@@ -108,6 +113,8 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
   let stoneTarget = null; let stoneSlot = null;
   let goldTarget = null; let goldSlot = null;
   let moving = false; let walkClock = 0; let chopPhase = 0;
+  let swingFired = false; // prevent double-fire per swing
+  let stoneHitCount = 0; let goldHitCount = 0; let woodHitCount = 0;
   let gatherTimer = 0; let chopActive = false; let frozen = false;
   let waterDrainTimer = 0; let foodDrainTimer = 0; let waterRefillTimer = 0;
 
@@ -121,20 +128,20 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
   let axeRot = { x: 0.5, y: 0, z: 0.2 };
 
   function resetPose() { for (const key in B) { if (rest[key]) B[key].rotation.copy(rest[key]); } }
-  function distTo(x, z) { const dx = x - group.position.x, dz = z - group.position.z; return Math.sqrt(dx*dx + dz*dz); }
+  function distTo(x, z) { const dx = x-group.position.x, dz = z-group.position.z; return Math.sqrt(dx*dx+dz*dz); }
   function faceToward(tx, tz) {
-    const dx = tx - group.position.x, dz = tz - group.position.z;
+    const dx = tx-group.position.x, dz = tz-group.position.z;
     if (Math.abs(dx) > 1e-4 || Math.abs(dz) > 1e-4) modelHolder.rotation.y = Math.atan2(dx, dz);
   }
   function moveToward(dest, dt, stopDist) {
     const me = group.position;
-    let dx = dest.x - me.x, dz = dest.z - me.z;
-    const dist = Math.sqrt(dx*dx + dz*dz);
+    let dx = dest.x-me.x, dz = dest.z-me.z;
+    const dist = Math.sqrt(dx*dx+dz*dz);
     if (dist <= stopDist) return true;
     dx /= dist; dz /= dist;
-    const step = Math.min(speed * dt, dist - stopDist);
-    me.x += dx * step; me.z += dz * step;
-    faceToward(me.x + dx*10, me.z + dz*10);
+    const step = Math.min(speed*dt, dist-stopDist);
+    me.x += dx*step; me.z += dz*step;
+    faceToward(me.x+dx*10, me.z+dz*10);
     return false;
   }
   function separate(world) {
@@ -142,33 +149,45 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     const me = group.position;
     world.units.forEach((o) => {
       if (o === unit) return;
-      let dx = me.x - o.group.position.x, dz = me.z - o.group.position.z;
-      const dist = Math.sqrt(dx*dx + dz*dz);
-      const minD = radius + o.radius;
-      if (dist > 1e-4 && dist < minD) { const push = (minD-dist)*0.5; me.x += (dx/dist)*push; me.z += (dz/dist)*push; }
+      let dx = me.x-o.group.position.x, dz = me.z-o.group.position.z;
+      const dist = Math.sqrt(dx*dx+dz*dz);
+      const minD = radius+o.radius;
+      if (dist > 1e-4 && dist < minD) { const push=(minD-dist)*0.5; me.x+=(dx/dist)*push; me.z+=(dz/dist)*push; }
     });
   }
   function walkPose(dt) {
-    walkClock += dt * 7; const s = Math.sin(walkClock);
-    if (B.legUL) B.legUL.rotation.x = rest.legUL.x + s * 0.5;
-    if (B.legUR) B.legUR.rotation.x = rest.legUR.x - s * 0.5;
-    if (B.legLL) B.legLL.rotation.x = rest.legLL.x + Math.max(0,-s) * 0.6;
-    if (B.legLR) B.legLR.rotation.x = rest.legLR.x + Math.max(0,s) * 0.6;
-    if (B.armUL) B.armUL.rotation.x = rest.armUL.x - s * 0.35;
-    if (B.armUR) B.armUR.rotation.x = rest.armUR.x + s * 0.35;
-    modelHolder.position.y = Math.abs(Math.sin(walkClock)) * 0.04;
+    walkClock += dt*7; const s = Math.sin(walkClock);
+    if (B.legUL) B.legUL.rotation.x = rest.legUL.x + s*0.5;
+    if (B.legUR) B.legUR.rotation.x = rest.legUR.x - s*0.5;
+    if (B.legLL) B.legLL.rotation.x = rest.legLL.x + Math.max(0,-s)*0.6;
+    if (B.legLR) B.legLR.rotation.x = rest.legLR.x + Math.max(0,s)*0.6;
+    if (B.armUL) B.armUL.rotation.x = rest.armUL.x - s*0.35;
+    if (B.armUR) B.armUR.rotation.x = rest.armUR.x + s*0.35;
+    modelHolder.position.y = Math.abs(Math.sin(walkClock))*0.04;
   }
-  function swingPose(dt, tgt, soundFn) {
+
+  function swingPose(dt, tgt, soundType, world, onHit) {
     chopActive = true;
+    const prevPhase = chopPhase;
     chopPhase += dt / swingInterval;
     const p = chopPhase;
     let armA;
     if (p < 0.55) armA = (p/0.55)*-1.8; else armA = -1.8+((p-0.55)/0.45)*2.3;
     if (B.armUR) B.armUR.rotation.x = rest.armUR.x + armA;
-    if (B.spine) B.spine.rotation.x = rest.spine.x + Math.min(0, armA+0.8)*0.2;
+    if (B.spine) B.spine.rotation.x = rest.spine.x + Math.min(0,armA+0.8)*0.2;
     if (p < 0.55) { const t=p/0.55; axeRot.x=0.5-2.1*t; axeRot.z=0.2+0.6*t; }
     else { const t=(p-0.55)/0.45; axeRot.x=-1.6+2.1*t; axeRot.z=0.8-1.4*t; }
-    if (chopPhase >= 1) { chopPhase=0; tgt.takeDamage(1); soundFn(); }
+
+    // Fire exactly once at peak of swing (phase crosses 0.55)
+    if (prevPhase < 0.55 && chopPhase >= 0.55) {
+      tgt.takeDamage(1);
+      const cam = world.camera;
+      const lp = cam ? { x: cam.position.x, z: cam.position.z } : { x: 0, z: 0 };
+      playSound(soundType, lp, group.position, cam);
+      onHit();
+    }
+
+    if (chopPhase >= 1) { chopPhase = 0; }
   }
 
   function update(dt, world) {
@@ -176,93 +195,123 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     moving = false; chopActive = false; frozen = false;
 
     waterDrainTimer += dt;
-    if (waterDrainTimer >= S.drain.waterInterval) { waterDrainTimer = 0; if (world.resources.water > 0) world.resources.water = Math.max(0, world.resources.water - 1); }
+    if (waterDrainTimer >= S.drain.waterInterval) { waterDrainTimer=0; if (world.resources.water>0) world.resources.water=Math.max(0,world.resources.water-1); }
     foodDrainTimer += dt;
-    if (foodDrainTimer >= S.drain.foodInterval) { foodDrainTimer = 0; if (world.resources.food > 0) world.resources.food = Math.max(0, world.resources.food - 1); }
+    if (foodDrainTimer >= S.drain.foodInterval) { foodDrainTimer=0; if (world.resources.food>0) world.resources.food=Math.max(0,world.resources.food-1); }
 
     if (world.pondPosition) {
       const dPond = distTo(world.pondPosition.x, world.pondPosition.z);
       if (dPond <= 9.0 && world.resources.water < 100) {
         waterRefillTimer += dt;
-        if (waterRefillTimer >= S.water.refillInterval) { waterRefillTimer = 0; world.resources.water = Math.min(100, world.resources.water + 1); }
-      } else waterRefillTimer = 0;
+        if (waterRefillTimer >= S.water.refillInterval) { waterRefillTimer=0; world.resources.water=Math.min(100,world.resources.water+1); }
+      } else waterRefillTimer=0;
     }
 
+    // Animal
     if (animalTarget) {
-      if (animalTarget.isDepleted()) { animalTarget = null; animalSlot = null; }
+      if (animalTarget.isDepleted()) { animalTarget=null; animalSlot=null; }
       else {
         const ap = animalTarget.position(); const st = animalTarget.state();
         if (st === 'meatpile') {
           if (animalTarget.foodRemaining() > 0) {
-            if (distTo(ap.x, ap.z) <= gatherRange) {
-              frozen = true; faceToward(ap.x, ap.z); gatherTimer += dt;
-              if (gatherTimer >= S.chicken.pickupInterval) { gatherTimer = 0; const got = animalTarget.takeFood(1); if (world.resources) world.resources.food += got; }
-            } else { moveToward(animalSlot || ap, dt, 0.8); moving = true; }
-          } else { animalTarget = null; animalSlot = null; }
+            if (distTo(ap.x,ap.z) <= gatherRange) {
+              frozen=true; faceToward(ap.x,ap.z); gatherTimer+=dt;
+              if (gatherTimer >= S.chicken.pickupInterval) { gatherTimer=0; const got=animalTarget.takeFood(1); if (world.resources) world.resources.food+=got; }
+            } else { moveToward(animalSlot||ap,dt,0.8); moving=true; }
+          } else { animalTarget=null; animalSlot=null; }
         } else if (st === 'wandering') {
-          if (distTo(ap.x, ap.z) <= chopRange) { frozen = true; faceToward(ap.x, ap.z); swingPose(dt, animalTarget, playChop); }
-          else { moveToward(animalSlot || ap, dt, 0.15); moving = true; }
-        } else { frozen = true; faceToward(ap.x, ap.z); }
+          if (distTo(ap.x,ap.z) <= chopRange) {
+            frozen=true; faceToward(ap.x,ap.z);
+            swingPose(dt, animalTarget, 'chop', world, () => {});
+          } else { moveToward(animalSlot||ap,dt,0.15); moving=true; }
+        } else { frozen=true; faceToward(ap.x,ap.z); }
       }
-    } else if (chopTarget) {
-      if (chopTarget.isDepleted()) { chopTarget = null; chopSlot = null; }
+    }
+    // Tree
+    else if (chopTarget) {
+      if (chopTarget.isDepleted()) { chopTarget=null; chopSlot=null; }
       else {
-        const tp = chopTarget.position(); const st = chopTarget.state(); const dTree = distTo(tp.x, tp.z);
+        const tp = chopTarget.position(); const st = chopTarget.state(); const dTree = distTo(tp.x,tp.z);
         if (st === 'woodpile') {
           if (chopTarget.woodRemaining() > 0) {
             if (dTree <= gatherRange) {
-              frozen = true; faceToward(tp.x, tp.z); gatherTimer += dt;
-              if (gatherTimer >= S.tree.pickupInterval) { gatherTimer = 0; const got = chopTarget.takeWood(1); if (world.resources) world.resources.wood += got; }
-            } else { moveToward(chopSlot || tp, dt, 0.15); moving = true; }
-          } else { chopTarget = null; chopSlot = null; }
+              frozen=true; faceToward(tp.x,tp.z); gatherTimer+=dt;
+              if (gatherTimer >= S.tree.pickupInterval) { gatherTimer=0; const got=chopTarget.takeWood(1); if (world.resources) world.resources.wood+=got; }
+            } else { moveToward(chopSlot||tp,dt,0.15); moving=true; }
+          } else { chopTarget=null; chopSlot=null; }
         } else {
-          if (dTree <= chopRange) { frozen = true; faceToward(tp.x, tp.z); if (st === 'standing') swingPose(dt, chopTarget, playChop); }
-          else { moveToward(chopSlot || tp, dt, 0.15); moving = true; }
+          if (dTree <= chopRange) {
+            frozen=true; faceToward(tp.x,tp.z);
+            if (st === 'standing') {
+              swingPose(dt, chopTarget, 'chop', world, () => {
+                woodHitCount++;
+                if (woodHitCount >= S.tree.hitsPerResource) {
+                  woodHitCount=0;
+                  if (world.resources) world.resources.wood+=1;
+                }
+              });
+            }
+          } else { moveToward(chopSlot||tp,dt,0.15); moving=true; }
         }
       }
-    } else if (stoneTarget) {
-      if (stoneTarget.isDepleted()) { stoneTarget = null; stoneSlot = null; }
+    }
+    // Stone
+    else if (stoneTarget) {
+      if (stoneTarget.isDepleted()) { stoneTarget=null; stoneSlot=null; }
       else {
-        const sp = stoneTarget.position(); const st = stoneTarget.state(); const dStone = distTo(sp.x, sp.z);
+        const sp = stoneTarget.position(); const st = stoneTarget.state(); const dStone = distTo(sp.x,sp.z);
         if (st === 'pile') {
-          if (stoneTarget.stoneRemaining() > 0) {
-            if (dStone <= gatherRange) {
-              frozen = true; faceToward(sp.x, sp.z); gatherTimer += dt;
-              if (gatherTimer >= S.stone.pickupInterval) { gatherTimer = 0; const got = stoneTarget.takeStone(1); if (world.resources) world.resources.stone += got; }
-            } else { moveToward(stoneSlot || sp, dt, 0.15); moving = true; }
-          } else { stoneTarget = null; stoneSlot = null; }
+          stoneTarget=null; stoneSlot=null; // done gathering
         } else {
-          if (dStone <= chopRange) { frozen = true; faceToward(sp.x, sp.z); if (st === 'standing') swingPose(dt, stoneTarget, playMine); }
-          else { moveToward(stoneSlot || sp, dt, 0.15); moving = true; }
+          if (dStone <= chopRange) {
+            frozen=true; faceToward(sp.x,sp.z);
+            if (st === 'standing') {
+              swingPose(dt, stoneTarget, 'mine', world, () => {
+                stoneHitCount++;
+                if (stoneHitCount >= S.stone.hitsPerResource) {
+                  stoneHitCount=0;
+                  if (world.resources) world.resources.stone+=1;
+                }
+              });
+            }
+          } else { moveToward(stoneSlot||sp,dt,0.15); moving=true; }
         }
       }
-    } else if (goldTarget) {
-      if (goldTarget.isDepleted()) { goldTarget = null; goldSlot = null; }
+    }
+    // Gold
+    else if (goldTarget) {
+      if (goldTarget.isDepleted()) { goldTarget=null; goldSlot=null; }
       else {
-        const gp = goldTarget.position(); const st = goldTarget.state(); const dGold = distTo(gp.x, gp.z);
+        const gp = goldTarget.position(); const st = goldTarget.state(); const dGold = distTo(gp.x,gp.z);
         if (st === 'pile') {
-          if (goldTarget.goldRemaining() > 0) {
-            if (dGold <= gatherRange) {
-              frozen = true; faceToward(gp.x, gp.z); gatherTimer += dt;
-              if (gatherTimer >= S.gold.pickupInterval) { gatherTimer = 0; const got = goldTarget.takeGold(1); if (world.resources) world.resources.gold += got; }
-            } else { moveToward(goldSlot || gp, dt, 0.15); moving = true; }
-          } else { goldTarget = null; goldSlot = null; }
+          goldTarget=null; goldSlot=null;
         } else {
-          if (dGold <= chopRange) { frozen = true; faceToward(gp.x, gp.z); if (st === 'standing') swingPose(dt, goldTarget, playMine); }
-          else { moveToward(goldSlot || gp, dt, 0.15); moving = true; }
+          if (dGold <= chopRange) {
+            frozen=true; faceToward(gp.x,gp.z);
+            if (st === 'standing') {
+              swingPose(dt, goldTarget, 'mine', world, () => {
+                goldHitCount++;
+                if (goldHitCount >= S.gold.hitsPerResource) {
+                  goldHitCount=0;
+                  if (world.resources) world.resources.gold+=1;
+                }
+              });
+            }
+          } else { moveToward(goldSlot||gp,dt,0.15); moving=true; }
         }
       }
-    } else if (target) {
-      const arrived = moveToward(target, dt, 0.05);
-      if (arrived) target = null; else moving = true;
+    }
+    else if (target) {
+      const arrived = moveToward(target,dt,0.05);
+      if (arrived) target=null; else moving=true;
     }
 
-    if (moving) walkPose(dt); else modelHolder.position.y *= 0.7;
+    if (moving) walkPose(dt); else modelHolder.position.y*=0.7;
 
     if (!chopActive) {
-      axeRot.x += (axeRestRot.x - axeRot.x) * 0.3;
-      axeRot.y += (axeRestRot.y - axeRot.y) * 0.3;
-      axeRot.z += (axeRestRot.z - axeRot.z) * 0.3;
+      axeRot.x += (axeRestRot.x-axeRot.x)*0.3;
+      axeRot.y += (axeRestRot.y-axeRot.y)*0.3;
+      axeRot.z += (axeRestRot.z-axeRot.z)*0.3;
     }
 
     separate(world);
@@ -270,24 +319,24 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     if (handR) {
       handR.getWorldPosition(handWorld);
       axeHolder.parent.worldToLocal(axeHolder.position.copy(handWorld));
-      axeHolder.rotation.set(axeRot.x, axeRot.y, axeRot.z);
+      axeHolder.rotation.set(axeRot.x,axeRot.y,axeRot.z);
     }
 
     if (world.camera) healthBar.group.quaternion.copy(world.camera.quaternion);
-    healthBar.update(unit.health / unit.maxHealth);
+    healthBar.update(unit.health/unit.maxHealth);
   }
 
   const unit = {
-    group, type: 'unit', team, radius,
-    health: 100, maxHealth: 100, selected: false,
+    group, type:'unit', team, radius,
+    health:100, maxHealth:100, selected:false,
     getModelCenterY: () => modelCenterY,
-    setSelected(b) { unit.selected = b; },
-    moveTo(v) { target = v.clone(); chopTarget = null; chopSlot = null; animalTarget = null; animalSlot = null; stoneTarget = null; stoneSlot = null; goldTarget = null; goldSlot = null; chopPhase = 0; },
-    chopTree(tree, slot) { chopTarget = tree; chopSlot = slot||null; animalTarget = null; stoneTarget = null; goldTarget = null; target = null; chopPhase = 0; },
-    killAnimal(animal, slot) { animalTarget = animal; animalSlot = slot||null; chopTarget = null; stoneTarget = null; goldTarget = null; target = null; chopPhase = 0; },
-    mineStone(stone, slot) { stoneTarget = stone; stoneSlot = slot||null; chopTarget = null; animalTarget = null; goldTarget = null; target = null; chopPhase = 0; },
-    mineGold(gold, slot) { goldTarget = gold; goldSlot = slot||null; chopTarget = null; animalTarget = null; stoneTarget = null; target = null; chopPhase = 0; },
-    stop() { target = null; chopTarget = null; chopSlot = null; animalTarget = null; animalSlot = null; stoneTarget = null; stoneSlot = null; goldTarget = null; goldSlot = null; },
+    setSelected(b) { unit.selected=b; },
+    moveTo(v) { target=v.clone(); chopTarget=null; chopSlot=null; animalTarget=null; animalSlot=null; stoneTarget=null; stoneSlot=null; goldTarget=null; goldSlot=null; chopPhase=0; stoneHitCount=0; goldHitCount=0; woodHitCount=0; },
+    chopTree(tree,slot) { chopTarget=tree; chopSlot=slot||null; animalTarget=null; stoneTarget=null; goldTarget=null; target=null; chopPhase=0; woodHitCount=0; },
+    killAnimal(animal,slot) { animalTarget=animal; animalSlot=slot||null; chopTarget=null; stoneTarget=null; goldTarget=null; target=null; chopPhase=0; },
+    mineStone(stone,slot) { stoneTarget=stone; stoneSlot=slot||null; chopTarget=null; animalTarget=null; goldTarget=null; target=null; chopPhase=0; stoneHitCount=0; },
+    mineGold(gold,slot) { goldTarget=gold; goldSlot=slot||null; chopTarget=null; animalTarget=null; stoneTarget=null; target=null; chopPhase=0; goldHitCount=0; },
+    stop() { target=null; chopTarget=null; chopSlot=null; animalTarget=null; animalSlot=null; stoneTarget=null; stoneSlot=null; goldTarget=null; goldSlot=null; },
     update, animate() {}
   };
 
