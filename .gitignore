@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+*-keys/
+logs/
+build/
+dist/
+.DS_Store
+*.log
+client/node_modules/
+client/dist/
+public/models/*.glb
+public/models/*.fbx
