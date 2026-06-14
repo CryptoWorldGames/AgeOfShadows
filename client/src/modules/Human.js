@@ -3,6 +3,9 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const MODEL_URL = '/models/balkan__cs2_agent_model_dragomir_no1.glb';
 
+// Meshes that are SKIN — do not tint these
+const SKIN_MATS = ['tm_balkan_v2_head_varianta.001'];
+
 let audioCtx = null;
 function playChop() {
   try {
@@ -61,24 +64,29 @@ function makeAxe() {
     new THREE.CylinderGeometry(0.03, 0.03, 0.7, 6),
     new THREE.MeshStandardMaterial({ color: 0x5a3a1a, roughness: 0.9 })
   );
-  handle.position.y = -0.35;
-  handle.castShadow = true;
-  g.add(handle);
+  handle.position.y = -0.35; handle.castShadow = true; g.add(handle);
   const head = new THREE.Mesh(
     new THREE.BoxGeometry(0.26, 0.16, 0.06),
     new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0.6, roughness: 0.35 })
   );
-  head.position.set(0.13, -0.62, 0);
-  head.castShadow = true;
-  g.add(head);
+  head.position.set(0.13, -0.62, 0); head.castShadow = true; g.add(head);
   return g;
 }
 
+// Team color definitions — applied to CLOTHES only
+export const TEAM_COLORS = {
+  neutral: null,
+  red:    new THREE.Color(1.8, 0.4, 0.4),
+  blue:   new THREE.Color(0.4, 0.5, 2.0),
+  green:  new THREE.Color(0.4, 1.6, 0.4),
+  yellow: new THREE.Color(1.8, 1.5, 0.3),
+  purple: new THREE.Color(1.4, 0.4, 1.8),
+  orange: new THREE.Color(2.0, 0.8, 0.2)
+};
+
 export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}) {
-  const team = options.team || 'red';
-  const tint = team === 'blue'
-    ? new THREE.Color(0.55, 0.6, 1.4)
-    : new THREE.Color(1.4, 0.55, 0.55);
+  const team = options.team || 'neutral';
+  const teamTint = TEAM_COLORS[team] || null;
 
   const group = new THREE.Group();
   group.position.set(position.x, 0, position.z);
@@ -103,85 +111,77 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
   const handWorld = new THREE.Vector3();
 
   const loader = new GLTFLoader();
-  loader.load(
-    MODEL_URL,
-    (gltf) => {
-      const model = gltf.scene;
-      model.traverse((c) => {
-        if (c.isMesh) {
-          c.castShadow = true; c.receiveShadow = true;
-          if (c.material) {
+  loader.load(MODEL_URL, (gltf) => {
+    const model = gltf.scene;
+    model.traverse((c) => {
+      if (c.isMesh) {
+        c.castShadow = true; c.receiveShadow = true;
+        if (c.material && teamTint) {
+          const matName = c.material.name || '';
+          const isSkin = SKIN_MATS.some((s) => matName.includes(s));
+          if (!isSkin) {
+            // Only tint clothes — not face/head/skin
             c.material = c.material.clone();
-            if (c.material.color) c.material.color.multiply(tint);
+            c.material.color.multiply(teamTint);
           }
         }
-      });
-      modelHolder.add(model);
-
-      const bbox = new THREE.Box3().setFromObject(model);
-      modelCenterY = (bbox.min.y + bbox.max.y) / 2;
-
-      const want = {
-        legUL: 'leg_upper_l_65', legLL: 'leg_lower_l_63',
-        legUR: 'leg_upper_r_70', legLR: 'leg_lower_r_68',
-        armUL: 'arm_upper_l_28', armUR: 'arm_upper_r_55',
-        spine: 'spine_2_58'
-      };
-      model.traverse((o) => {
-        if (!o.isBone) return;
-        for (const key in want) {
-          if (o.name === want[key]) {
-            B[key] = o;
-            rest[key] = o.rotation.clone();
-          }
-        }
-        if (o.name === 'hand_r_49') handR = o;
-      });
-
-      console.log('[' + team + '] bones bound:', Object.keys(B).join(', '), '| hand:', handR ? 'yes' : 'no');
-    },
-    undefined,
-    (err) => console.error('Failed to load character:', err)
-  );
+      }
+    });
+    modelHolder.add(model);
+    const bbox = new THREE.Box3().setFromObject(model);
+    modelCenterY = (bbox.min.y + bbox.max.y) / 2;
+    const want = {
+      legUL: 'leg_upper_l_65', legLL: 'leg_lower_l_63',
+      legUR: 'leg_upper_r_70', legLR: 'leg_lower_r_68',
+      armUL: 'arm_upper_l_28', armUR: 'arm_upper_r_55', spine: 'spine_2_58'
+    };
+    model.traverse((o) => {
+      if (!o.isBone) return;
+      for (const key in want) { if (o.name === want[key]) { B[key] = o; rest[key] = o.rotation.clone(); } }
+      if (o.name === 'hand_r_49') handR = o;
+    });
+    console.log('[' + team + '] loaded. Tint:', teamTint ? 'yes' : 'none');
+  }, undefined, (err) => console.error('Failed to load character:', err));
 
   let target = null;
   let chopTarget = null;
   let chopSlot = null;
+  let animalTarget = null;
+  let animalSlot = null;
   let moving = false;
   let walkClock = 0;
   let chopPhase = 0;
   let gatherTimer = 0;
   let chopActive = false;
   let frozen = false;
-
+  let waterDrainTimer = 0;
+  let foodDrainTimer = 0;
+  let waterRefillTimer = 0;
+  const waterDrainInterval = 300;
+  const foodDrainInterval = 300;
+  const waterRefillInterval = 10;
+  const pondRange = 9.0;
   const radius = 0.5;
   const speed = 2.4;
-  const chopRange = 1.8;   // close enough to the tree to start chopping
+  const chopRange = 1.8;
   const gatherRange = 1.6;
   const swingInterval = 0.7;
-  const gatherInterval = 2.0;
-
+  const meatPickupInterval = 1.0;
   const axeRestRot = { x: 0.5, y: 0, z: 0.2 };
   let axeRot = { x: 0.5, y: 0, z: 0.2 };
 
   function resetPose() {
-    for (const key in B) {
-      if (rest[key]) B[key].rotation.copy(rest[key]);
-    }
+    for (const key in B) { if (rest[key]) B[key].rotation.copy(rest[key]); }
   }
 
   function distTo(x, z) {
-    const dx = x - group.position.x;
-    const dz = z - group.position.z;
+    const dx = x - group.position.x, dz = z - group.position.z;
     return Math.sqrt(dx * dx + dz * dz);
   }
 
   function faceToward(tx, tz) {
-    const dx = tx - group.position.x;
-    const dz = tz - group.position.z;
-    if (Math.abs(dx) > 1e-4 || Math.abs(dz) > 1e-4) {
-      modelHolder.rotation.y = Math.atan2(dx, dz);
-    }
+    const dx = tx - group.position.x, dz = tz - group.position.z;
+    if (Math.abs(dx) > 1e-4 || Math.abs(dz) > 1e-4) modelHolder.rotation.y = Math.atan2(dx, dz);
   }
 
   function moveToward(dest, dt, stopDist) {
@@ -201,7 +201,6 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     const me = group.position;
     world.units.forEach((o) => {
       if (o === unit) return;
-      // don't shove a worker who's frozen at a resource
       let dx = me.x - o.group.position.x, dz = me.z - o.group.position.z;
       const dist = Math.sqrt(dx * dx + dz * dz);
       const minD = radius + o.radius;
@@ -236,7 +235,7 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     modelHolder.position.y = Math.abs(Math.sin(walkClock)) * 0.04;
   }
 
-  function chopPose(dt, tree) {
+  function chopPose(dt, tgt) {
     chopActive = true;
     chopPhase += dt / swingInterval;
     let p = chopPhase;
@@ -245,67 +244,74 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     else armA = -1.8 + ((p - 0.55) / 0.45) * 2.3;
     if (B.armUR) B.armUR.rotation.x = rest.armUR.x + armA;
     if (B.spine) B.spine.rotation.x = rest.spine.x + Math.min(0, armA + 0.8) * 0.2;
-
-    if (p < 0.55) {
-      const t = p / 0.55;
-      axeRot.x = 0.5 - 2.1 * t;
-      axeRot.z = 0.2 + 0.6 * t;
-    } else {
-      const t = (p - 0.55) / 0.45;
-      axeRot.x = -1.6 + 2.1 * t;
-      axeRot.z = 0.8 - 1.4 * t;
-    }
-
-    if (chopPhase >= 1) {
-      chopPhase = 0;
-      tree.takeDamage(1);
-      playChop();
-    }
+    if (p < 0.55) { const t = p / 0.55; axeRot.x = 0.5 - 2.1 * t; axeRot.z = 0.2 + 0.6 * t; }
+    else { const t = (p - 0.55) / 0.45; axeRot.x = -1.6 + 2.1 * t; axeRot.z = 0.8 - 1.4 * t; }
+    if (chopPhase >= 1) { chopPhase = 0; tgt.takeDamage(1); playChop(); }
   }
 
   function update(dt, world) {
     resetPose();
-    moving = false;
-    chopActive = false;
-    frozen = false;
+    moving = false; chopActive = false; frozen = false;
 
-    if (chopTarget) {
+    waterDrainTimer += dt;
+    if (waterDrainTimer >= waterDrainInterval) {
+      waterDrainTimer = 0;
+      if (world.resources.water > 0) world.resources.water = Math.max(0, world.resources.water - 1);
+    }
+    foodDrainTimer += dt;
+    if (foodDrainTimer >= foodDrainInterval) {
+      foodDrainTimer = 0;
+      if (world.resources.food > 0) world.resources.food = Math.max(0, world.resources.food - 1);
+    }
+    if (world.pondPosition) {
+      const dPond = distTo(world.pondPosition.x, world.pondPosition.z);
+      if (dPond <= pondRange && world.resources.water < 100) {
+        waterRefillTimer += dt;
+        if (waterRefillTimer >= waterRefillInterval) { waterRefillTimer = 0; world.resources.water = Math.min(100, world.resources.water + 1); }
+      } else waterRefillTimer = 0;
+    }
+
+    if (animalTarget) {
+      if (animalTarget.isDepleted()) { animalTarget = null; animalSlot = null; }
+      else {
+        const ap = animalTarget.position();
+        const st = animalTarget.state();
+        if (st === 'meatpile') {
+          if (animalTarget.foodRemaining() > 0) {
+            const arrived = moveToward(animalSlot || ap, dt, 0.8);
+            if (arrived) {
+              frozen = true; faceToward(ap.x, ap.z);
+              gatherTimer += dt;
+              if (gatherTimer >= meatPickupInterval) {
+                gatherTimer = 0;
+                const got = animalTarget.takeFood(1);
+                if (world.resources) world.resources.food += got;
+              }
+            } else moving = true;
+          } else { animalTarget = null; animalSlot = null; }
+        } else if (st === 'wandering') {
+          const dAnimal = distTo(ap.x, ap.z);
+          if (dAnimal <= chopRange) { frozen = true; faceToward(ap.x, ap.z); chopPose(dt, animalTarget); }
+          else { moveToward(animalSlot || ap, dt, 0.15); moving = true; }
+        } else { frozen = true; faceToward(ap.x, ap.z); }
+      }
+    } else if (chopTarget) {
       if (chopTarget.isDepleted()) { chopTarget = null; chopSlot = null; }
       else {
         const tp = chopTarget.position();
         const st = chopTarget.state();
         const dTree = distTo(tp.x, tp.z);
-
         if (st === 'woodpile') {
           if (chopTarget.woodRemaining() > 0) {
-            // Already close enough? Freeze and gather. Else walk to slot.
             if (dTree <= gatherRange) {
-              frozen = true;
-              faceToward(tp.x, tp.z);
+              frozen = true; faceToward(tp.x, tp.z);
               gatherTimer += dt;
-              if (gatherTimer >= gatherInterval) {
-                gatherTimer = 0;
-                const got = chopTarget.takeWood(1);
-                if (world.resources) world.resources.wood += got;
-              }
-            } else {
-              const dest = chopSlot ? chopSlot : tp;
-              moveToward(dest, dt, 0.15);
-              moving = true;
-            }
+              if (gatherTimer >= 10) { gatherTimer = 0; const got = chopTarget.takeWood(1); if (world.resources) world.resources.wood += got; }
+            } else { moveToward(chopSlot || tp, dt, 0.15); moving = true; }
           } else { chopTarget = null; chopSlot = null; }
         } else {
-          // STANDING tree: freeze as soon as within chopRange of the TREE,
-          // regardless of exact slot — prevents walk-in-place.
-          if (dTree <= chopRange) {
-            frozen = true;
-            faceToward(tp.x, tp.z);
-            if (st === 'standing') chopPose(dt, chopTarget);
-          } else {
-            const dest = chopSlot ? chopSlot : tp;
-            moveToward(dest, dt, 0.15);
-            moving = true;
-          }
+          if (dTree <= chopRange) { frozen = true; faceToward(tp.x, tp.z); if (st === 'standing') chopPose(dt, chopTarget); }
+          else { moveToward(chopSlot || tp, dt, 0.15); moving = true; }
         }
       }
     } else if (target) {
@@ -336,15 +342,14 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
 
   const unit = {
     group, type: 'unit', team, radius,
-    health: 100, maxHealth: 100,
-    selected: false,
+    health: 100, maxHealth: 100, selected: false,
     getModelCenterY: () => modelCenterY,
     setSelected(b) { unit.selected = b; },
-    moveTo(v) { target = v.clone(); chopTarget = null; chopSlot = null; chopPhase = 0; },
-    chopTree(tree, slot) { chopTarget = tree; chopSlot = slot || null; target = null; chopPhase = 0; },
-    stop() { target = null; chopTarget = null; chopSlot = null; },
-    update,
-    animate() {}
+    moveTo(v) { target = v.clone(); chopTarget = null; chopSlot = null; animalTarget = null; animalSlot = null; chopPhase = 0; },
+    chopTree(tree, slot) { chopTarget = tree; chopSlot = slot || null; animalTarget = null; animalSlot = null; target = null; chopPhase = 0; },
+    killAnimal(animal, slot) { animalTarget = animal; animalSlot = slot || null; chopTarget = null; chopSlot = null; target = null; chopPhase = 0; },
+    stop() { target = null; chopTarget = null; chopSlot = null; animalTarget = null; animalSlot = null; },
+    update, animate() {}
   };
 
   return unit;

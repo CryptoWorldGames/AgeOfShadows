@@ -1,0 +1,62 @@
+=== Age of Shadows — Bug Log ===
+
+[BUG-001] Dead chicken sliding with live chickens
+Status: FIXED
+Symptom: Every live chicken had a dead/roasted chicken mesh following it at all times.
+Root cause: The CS2 chicken GLB ("ANIMAL & FOOD | Chicken Model (CS2)") contains TWO meshes:
+  - Object_7 | mat: chicken_catalan_tan  → the LIVE chicken
+  - Object_63 | mat: chicken_roasted     → a dead/cooked chicken BAKED INTO the same GLB
+  Both meshes were visible by default on load.
+Fix: On GLB load, traverse all meshes and check material name.
+  If material name includes 'chicken_roasted' → set c.visible = false (hide at spawn)
+  Store live meshes in liveMeshes[], dead meshes in deadMeshes[]
+  On death: liveMeshes hidden, deadMeshes shown (perfect built-in death animation)
+  On respawn: liveMeshes shown, deadMeshes hidden
+File: client/src/modules/Animal.js
+
+[BUG-002] Chicken animations bleeding between instances
+Status: FIXED
+Symptom: idle01 animation (squat pose) from one chicken applied to all chickens making them look dead.
+Root cause: gltf.scene.clone(true) shares skeleton bones between instances.
+  AnimationMixer on cloned model still references original skeleton.
+Fix: Use SkeletonUtils.clone() instead of gltf.scene.clone(true).
+  Each chicken gets its own AnimationMixer bound to its own properly cloned skeleton.
+  Use walk01 animation paused as default standing pose (upright, not squatting).
+File: client/src/modules/Animal.js
+
+[BUG-003] Chickens not visible at all
+Status: FIXED
+Symptom: Chickens loaded (console confirmed) but invisible in scene.
+Root cause: CS2 model materials had transparent/depthWrite issues in Three.js.
+Fix: On traverse, force all materials: transparent=false, opacity=1, depthWrite=true, visible=true.
+File: client/src/modules/Animal.js
+
+[BUG-004] server.js crash on startup - PathError
+Status: FIXED
+Symptom: nodemon crashed with "Missing parameter name at index 1: *"
+Root cause: Newer Express/path-to-regexp version broke app.get('*', ...) wildcard syntax.
+Fix: Change app.get('*', ...) to app.get('/{*path}', ...)
+File: server.js
+
+[BUG-005] Units spawning inside Town Center
+Status: FIXED
+Symptom: Units appeared inside the building mesh on spawn.
+Root cause: Units spawned at (-2,0) and (2,0) which overlaps Town Center at (0,0).
+Fix: Spawn units at (-8,0,8) and (8,0,8) — clear of all buildings.
+File: write_gamescene.py
+
+[BUG-006] Dirt road texture stretching
+Status: FIXED
+Symptom: Dirt texture stretched along full road length instead of tiling.
+Root cause: Single texture instance shared across all roads with wrong repeat values.
+Fix: Clone texture per road with correct repeat.set() per road dimensions.
+  road1 (5x140): repeat(1,28), road2 (140x5): repeat(28,1), road3 (3.5x70): repeat(1,14)
+File: client/src/modules/Environment.js
+
+[BUG-007] Team color tinting skin/face red
+Status: FIXED
+Symptom: Red team unit had red skin/face, not just clothes.
+Root cause: Color tint applied to ALL meshes including head/face mesh.
+Fix: Skip tinting meshes whose material name includes 'tm_balkan_v2_head_varianta.001'.
+  Only tint: glove_fullfinger.010, tm_balkan_v2_lower_body_variantd.002, tm_balkan_v2_body_variantd.002
+File: client/src/modules/Human.js

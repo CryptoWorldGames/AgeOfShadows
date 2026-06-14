@@ -14,7 +14,6 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-// ===== Shared world state =====
 const world = {
   trees: generateTrees(20),
   buildings: [],
@@ -45,7 +44,6 @@ function generateTrees(n) {
   return trees;
 }
 
-// Tree respawn loop
 setInterval(() => {
   let changed = false;
   world.trees.forEach((t) => {
@@ -61,7 +59,6 @@ setInterval(() => {
   if (changed) io.emit('worldUpdate', { trees: world.trees });
 }, 500);
 
-// Broadcast world state every 100ms
 setInterval(() => {
   io.emit('worldUpdate', {
     trees: world.trees,
@@ -70,7 +67,6 @@ setInterval(() => {
   });
 }, 100);
 
-// ===== Socket.IO =====
 io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
@@ -141,7 +137,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// ===== REST =====
 app.post('/api/join', (req, res) => {
   res.json({ playerId: Date.now().toString() });
 });
@@ -156,9 +151,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Serve built client in production
 app.use(express.static(path.join(__dirname, 'client/dist')));
-app.get('*', (req, res) => {
+app.get('/{*path}', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/dist/index.html'));
 });
 
