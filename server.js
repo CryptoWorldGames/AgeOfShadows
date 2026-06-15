@@ -4,6 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerData, createPasswordResetToken, resetPassword } = require('./auth');
 
 const app = express();
 app.use(cors());
@@ -19,6 +20,9 @@ const world = {
   buildings: [],
   players: {}
 };
+
+// Track userId for each socket to save on disconnect
+const socketUserMap = {};
 
 function generateTrees(n) {
   const trees = [];
@@ -79,21 +83,45 @@ setInterval(() => {
 io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
-  socket.on('join', (data) => {
-    const units = createPlayerUnits(socket.id);
-    const player = {
-      id: socket.id,
-      name: data.name || `Player${Math.floor(Math.random() * 1000)}`,
-      color: data.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
-      resources: { wood: 0, food: 0, water: 0, gold: 0, stone: 0 },
-      units
-    };
-    world.players[socket.id] = player;
-    // Send this player their own data + full world state
-    socket.emit('joined', { playerId: socket.id, player, world });
-    // Tell everyone else a new player joined with their units
-    socket.broadcast.emit('playerJoined', { playerId: socket.id, player });
-    console.log(`${player.name} joined. Players: ${Object.keys(world.players).length}`);
+  socket.on('join', async (data) => {
+    try {
+      // Load saved player data
+      const savedData = await loadPlayerData(data.userId);
+      const user = await getUserById(data.userId);
+
+      let units, resources, buildings;
+      if (savedData) {
+        resources = savedData.resources;
+        buildings = savedData.buildings;
+        units = savedData.units.length > 0 ? savedData.units : createPlayerUnits(socket.id);
+      } else {
+        units = createPlayerUnits(socket.id);
+        resources = { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
+        buildings = [];
+      }
+
+      const player = {
+        id: socket.id,
+        userId: data.userId,
+        name: user?.displayName || `Player${Math.floor(Math.random() * 1000)}`,
+        color: data.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
+        resources,
+        units,
+        buildings
+      };
+
+      world.players[socket.id] = player;
+      socketUserMap[socket.id] = data.userId;
+
+      // Send this player their own data + full world state
+      socket.emit('joined', { playerId: socket.id, player, world });
+      // Tell everyone else a new player joined with their units
+      socket.broadcast.emit('playerJoined', { playerId: socket.id, player });
+      console.log(`${player.name} (userId: ${data.userId}) joined. Players: ${Object.keys(world.players).length}`);
+    } catch (err) {
+      console.error('Error on join:', err);
+      socket.emit('joinError', { error: err.message });
+    }
   });
 
   socket.on('unitMove', (data) => {
@@ -127,23 +155,115 @@ io.on('connection', (socket) => {
   });
 
   socket.on('placeBuilding', (data) => {
+    const player = world.players[socket.id];
+    if (!player) return;
     const building = {
       id: `b_${Date.now()}`,
       type: data.type, x: data.x, z: data.z,
       ownerId: socket.id
     };
     world.buildings.push(building);
+    if (!player.buildings) player.buildings = [];
+    player.buildings.push(building);
     io.emit('buildingPlaced', building);
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     const player = world.players[socket.id];
     if (player) {
+      const userId = socketUserMap[socket.id];
+      if (userId) {
+        try {
+          // Save player data
+          await savePlayerData(userId, player.resources, player.units, player.buildings || []);
+          console.log(`${player.name} saved to storage.`);
+        } catch (err) {
+          console.error(`Failed to save player data for ${player.name}:`, err);
+        }
+      }
       console.log(`${player.name} disconnected.`);
       delete world.players[socket.id];
+      delete socketUserMap[socket.id];
       io.emit('playerLeft', { playerId: socket.id });
     }
   });
+});
+
+// Authentication endpoints
+app.post('/api/register', async (req, res) => {
+  const { email, displayName, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
+  }
+  if (!email.includes('@')) {
+    return res.status(400).json({ error: 'Invalid email address' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  try {
+    const userId = await registerUser(email, displayName, password);
+    res.json({ success: true, userId, email, message: 'Account created' });
+  } catch (err) {
+    if (err.message.includes('already registered')) {
+      res.status(400).json({ error: 'Email already registered' });
+    } else {
+      res.status(500).json({ error: 'Registration failed' });
+    }
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
+  }
+  try {
+    const userId = await authenticateUser(email, password);
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const user = await getUserById(userId);
+    res.json({ success: true, userId, email, displayName: user?.displayName, message: 'Logged in' });
+  } catch (err) {
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+app.post('/api/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email required' });
+  }
+  try {
+    const token = await createPasswordResetToken(email);
+    if (!token) {
+      return res.json({ success: true, message: 'If email exists, reset token sent' });
+    }
+    console.log(`Password reset token for ${email}: ${token}`);
+    res.json({ success: true, message: 'Password reset token sent', token });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+app.post('/api/reset-password', async (req, res) => {
+  const { email, resetToken, newPassword } = req.body;
+  if (!email || !resetToken || !newPassword) {
+    return res.status(400).json({ error: 'Email, token, and new password required' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  try {
+    const success = await resetPassword(email, resetToken, newPassword);
+    if (!success) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Password reset failed' });
+  }
 });
 
 app.post('/api/join', (req, res) => {
