@@ -204,7 +204,7 @@ export function createControls(camera, renderer, scene, world) {
     if (ghostBuilding || selected.size === 0) return;
 
     // Chicken
-    const chicken = raycastGroup(e.clientX, e.clientY, (world.animals || []).filter(a => a.type === 'chicken'));
+    const chicken = raycastGroup(e.clientX, e.clientY, (world.animals || []).filter(a => a.type === 'chicken' || a.type === 'deer'));
     if (chicken) {
       const arr = Array.from(selected);
       const cp = chicken.position();
