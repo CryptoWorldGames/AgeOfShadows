@@ -153,8 +153,8 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
     const size = bbox.getSize(new THREE.Vector3());
     model.scale.setScalar(3.6 / Math.max(size.x, size.y, size.z));
     model.updateMatrixWorld(true);
-    model.rotation.z = 0.15;
-    model.position.y = 0.8;
+    model.rotation.z = 0;
+    model.position.y = 0.65;
     model.rotation.x = 0.08;
     model.traverse((c) => {
       if (c.isMesh) {
@@ -194,9 +194,17 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
       });
     }
     if (flee) {
-      group.position.x += fleeDir.x * 1.2 * dt;
-      group.position.z += fleeDir.z * 1.2 * dt;
-      group.rotation.y = Math.atan2(fleeDir.x, fleeDir.z);
+      // Stand still when unit is close enough to attack — don't slide away
+      const tooClose = world && world.units && world.units.some((u) => {
+        const dx = group.position.x - u.group.position.x;
+        const dz = group.position.z - u.group.position.z;
+        return Math.sqrt(dx*dx+dz*dz) < 2.5;
+      });
+      if (!tooClose) {
+        group.position.x += fleeDir.x * 0.8 * dt;
+        group.position.z += fleeDir.z * 0.8 * dt;
+        group.rotation.y = Math.atan2(fleeDir.x, fleeDir.z);
+      }
     } else {
       wanderTimer -= dt;
       if (wanderTimer <= 0) {
