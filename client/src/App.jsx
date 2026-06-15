@@ -2,40 +2,141 @@ import React, { useState } from 'react';
 import GameScene from './GameScene';
 
 function AuthScreen({ onAuthenticated }) {
-  const [mode, setMode] = useState('login'); // 'login' or 'register'
-  const [username, setUsername] = useState('');
+  const [mode, setMode] = useState('login'); // 'login', 'register', or 'reset'
+  const [email, setEmail] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   async function handleSubmit() {
     setError('');
-    if (!username.trim() || !password.trim()) {
-      setError('Username and password required');
-      return;
-    }
 
-    setLoading(true);
-    try {
-      const endpoint = mode === 'login' ? '/api/login' : '/api/register';
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password })
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error || 'Authentication failed');
-        setLoading(false);
+    if (mode === 'login') {
+      if (!email.trim() || !password.trim()) {
+        setError('Email and password required');
         return;
       }
 
-      // Success - pass userId and username to game
-      onAuthenticated({ userId: data.userId, username: data.username });
-    } catch (err) {
-      setError('Network error: ' + err.message);
-      setLoading(false);
+      setLoading(true);
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          setError(data.error || 'Login failed');
+          setLoading(false);
+          return;
+        }
+
+        onAuthenticated({ userId: data.userId, email: data.email, displayName: data.displayName });
+      } catch (err) {
+        setError('Network error: ' + err.message);
+        setLoading(false);
+      }
+    }
+    else if (mode === 'register') {
+      if (!email.trim() || !password.trim()) {
+        setError('Email and password required');
+        return;
+      }
+      if (!email.includes('@')) {
+        setError('Invalid email address');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), displayName: displayName.trim(), password })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          setError(data.error || 'Registration failed');
+          setLoading(false);
+          return;
+        }
+
+        // Auto-login after registration
+        onAuthenticated({ userId: data.userId, email: data.email, displayName: displayName || email.split('@')[0] });
+      } catch (err) {
+        setError('Network error: ' + err.message);
+        setLoading(false);
+      }
+    }
+    else if (mode === 'reset') {
+      if (!resetToken) {
+        // First step: request reset token
+        if (!email.trim()) {
+          setError('Email required');
+          return;
+        }
+
+        setLoading(true);
+        try {
+          const response = await fetch('/api/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim() })
+          });
+
+          const data = await response.json();
+          setResetSent(true);
+          setError('');
+          setLoading(false);
+        } catch (err) {
+          setError('Network error: ' + err.message);
+          setLoading(false);
+        }
+      } else {
+        // Second step: submit new password with token
+        if (!newPassword.trim()) {
+          setError('New password required');
+          return;
+        }
+        if (newPassword.length < 6) {
+          setError('Password must be at least 6 characters');
+          return;
+        }
+
+        setLoading(true);
+        try {
+          const response = await fetch('/api/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim(), resetToken, newPassword })
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            setError(data.error || 'Password reset failed');
+            setLoading(false);
+            return;
+          }
+
+          setError('');
+          setMode('login');
+          setResetToken('');
+          setResetSent(false);
+          setNewPassword('');
+          setPassword('');
+          setEmail('');
+          setLoading(false);
+        } catch (err) {
+          setError('Network error: ' + err.message);
+          setLoading(false);
+        }
+      }
     }
   }
 
@@ -77,49 +178,50 @@ function AuthScreen({ onAuthenticated }) {
         backdropFilter:'blur(10px)', boxShadow:'0 0 60px rgba(200,168,75,0.1)'
       }}>
         <h2 style={{margin:'0 0 24px', fontSize:'20px', color:'#c8a84b', textAlign:'center'}}>
-          {mode === 'login' ? 'Enter the Realm' : 'Create Account'}
+          {mode === 'login' ? 'Enter the Realm' : mode === 'register' ? 'Create Account' : 'Reset Password'}
         </h2>
 
-        {/* Mode toggle */}
-        <div style={{display:'flex', gap:'8px', marginBottom:'24px', borderBottom:'1px solid rgba(200,168,75,0.2)'}}>
-          <button
-            onClick={() => { setMode('login'); setError(''); }}
-            style={{
-              flex:1, padding:'8px', background:mode==='login'?'rgba(200,168,75,0.2)':'transparent',
-              border:'none', borderBottom:mode==='login'?'2px solid #c8a84b':'none',
-              color:'#c8a84b', fontSize:'13px', fontWeight:'600', cursor:'pointer',
-              fontFamily:"'Segoe UI', sans-serif", letterSpacing:'1px'
-            }}
-          >
-            LOGIN
-          </button>
-          <button
-            onClick={() => { setMode('register'); setError(''); }}
-            style={{
-              flex:1, padding:'8px', background:mode==='register'?'rgba(200,168,75,0.2)':'transparent',
-              border:'none', borderBottom:mode==='register'?'2px solid #c8a84b':'none',
-              color:'#c8a84b', fontSize:'13px', fontWeight:'600', cursor:'pointer',
-              fontFamily:"'Segoe UI', sans-serif", letterSpacing:'1px'
-            }}
-          >
-            REGISTER
-          </button>
-        </div>
+        {/* Mode toggle (login/register only) */}
+        {mode !== 'reset' && (
+          <div style={{display:'flex', gap:'8px', marginBottom:'24px', borderBottom:'1px solid rgba(200,168,75,0.2)'}}>
+            <button
+              onClick={() => { setMode('login'); setError(''); }}
+              style={{
+                flex:1, padding:'8px', background:mode==='login'?'rgba(200,168,75,0.2)':'transparent',
+                border:'none', borderBottom:mode==='login'?'2px solid #c8a84b':'none',
+                color:'#c8a84b', fontSize:'13px', fontWeight:'600', cursor:'pointer',
+                fontFamily:"'Segoe UI', sans-serif", letterSpacing:'1px'
+              }}
+            >
+              LOGIN
+            </button>
+            <button
+              onClick={() => { setMode('register'); setError(''); }}
+              style={{
+                flex:1, padding:'8px', background:mode==='register'?'rgba(200,168,75,0.2)':'transparent',
+                border:'none', borderBottom:mode==='register'?'2px solid #c8a84b':'none',
+                color:'#c8a84b', fontSize:'13px', fontWeight:'600', cursor:'pointer',
+                fontFamily:"'Segoe UI', sans-serif", letterSpacing:'1px'
+              }}
+            >
+              REGISTER
+            </button>
+          </div>
+        )}
 
-        {/* Username field */}
+        {/* Email field */}
         <div style={{marginBottom:'20px'}}>
           <label style={{display:'block', fontSize:'12px', color:'rgba(255,255,255,0.6)', marginBottom:'8px', letterSpacing:'2px'}}>
-            USERNAME
+            EMAIL
           </label>
           <input
-            type="text"
-            value={username}
-            onChange={e=>setUsername(e.target.value)}
+            type="email"
+            value={email}
+            onChange={e=>setEmail(e.target.value)}
             onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
-            placeholder="Enter username..."
-            maxLength={30}
+            placeholder="you@example.com"
+            disabled={loading || (mode === 'reset' && resetSent)}
             autoFocus
-            disabled={loading}
             style={{
               width:'100%', padding:'12px 16px', background:'rgba(255,255,255,0.08)',
               border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
@@ -129,26 +231,96 @@ function AuthScreen({ onAuthenticated }) {
           />
         </div>
 
-        {/* Password field */}
-        <div style={{marginBottom:'20px'}}>
-          <label style={{display:'block', fontSize:'12px', color:'rgba(255,255,255,0.6)', marginBottom:'8px', letterSpacing:'2px'}}>
-            PASSWORD
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={e=>setPassword(e.target.value)}
-            onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
-            placeholder="Enter password..."
-            disabled={loading}
-            style={{
-              width:'100%', padding:'12px 16px', background:'rgba(255,255,255,0.08)',
-              border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
-              color:'#fff', fontSize:'15px', outline:'none', boxSizing:'border-box',
-              fontFamily:"'Segoe UI', sans-serif", opacity: loading ? 0.5 : 1, cursor: loading ? 'not-allowed' : 'text'
-            }}
-          />
-        </div>
+        {/* Display name (register only) */}
+        {mode === 'register' && (
+          <div style={{marginBottom:'20px'}}>
+            <label style={{display:'block', fontSize:'12px', color:'rgba(255,255,255,0.6)', marginBottom:'8px', letterSpacing:'2px'}}>
+              DISPLAY NAME (optional)
+            </label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={e=>setDisplayName(e.target.value)}
+              placeholder="Your warrior name"
+              disabled={loading}
+              style={{
+                width:'100%', padding:'12px 16px', background:'rgba(255,255,255,0.08)',
+                border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
+                color:'#fff', fontSize:'15px', outline:'none', boxSizing:'border-box',
+                fontFamily:"'Segoe UI', sans-serif", opacity: loading ? 0.5 : 1
+              }}
+            />
+          </div>
+        )}
+
+        {/* Password field (login/register only) */}
+        {mode !== 'reset' && (
+          <div style={{marginBottom:'20px'}}>
+            <label style={{display:'block', fontSize:'12px', color:'rgba(255,255,255,0.6)', marginBottom:'8px', letterSpacing:'2px'}}>
+              PASSWORD
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={e=>setPassword(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
+              placeholder="••••••"
+              disabled={loading}
+              style={{
+                width:'100%', padding:'12px 16px', background:'rgba(255,255,255,0.08)',
+                border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
+                color:'#fff', fontSize:'15px', outline:'none', boxSizing:'border-box',
+                fontFamily:"'Segoe UI', sans-serif", opacity: loading ? 0.5 : 1
+              }}
+            />
+          </div>
+        )}
+
+        {/* Reset token field (reset mode) */}
+        {mode === 'reset' && resetSent && (
+          <>
+            <div style={{marginBottom:'20px', padding:'12px', background:'rgba(200,168,75,0.1)', borderRadius:'8px', fontSize:'13px', color:'rgba(255,255,255,0.7)'}}>
+              Check your email for the password reset token
+            </div>
+            <div style={{marginBottom:'20px'}}>
+              <label style={{display:'block', fontSize:'12px', color:'rgba(255,255,255,0.6)', marginBottom:'8px', letterSpacing:'2px'}}>
+                RESET TOKEN
+              </label>
+              <input
+                type="text"
+                value={resetToken}
+                onChange={e=>setResetToken(e.target.value)}
+                placeholder="Paste token from email"
+                disabled={loading}
+                style={{
+                  width:'100%', padding:'12px 16px', background:'rgba(255,255,255,0.08)',
+                  border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
+                  color:'#fff', fontSize:'15px', outline:'none', boxSizing:'border-box',
+                  fontFamily:"'Segoe UI', sans-serif"
+                }}
+              />
+            </div>
+            <div style={{marginBottom:'20px'}}>
+              <label style={{display:'block', fontSize:'12px', color:'rgba(255,255,255,0.6)', marginBottom:'8px', letterSpacing:'2px'}}>
+                NEW PASSWORD
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e=>setNewPassword(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
+                placeholder="••••••"
+                disabled={loading}
+                style={{
+                  width:'100%', padding:'12px 16px', background:'rgba(255,255,255,0.08)',
+                  border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
+                  color:'#fff', fontSize:'15px', outline:'none', boxSizing:'border-box',
+                  fontFamily:"'Segoe UI', sans-serif"
+                }}
+              />
+            </div>
+          </>
+        )}
 
         {/* Error message */}
         {error && <div style={{color:'#ff6b6b', fontSize:'12px', marginBottom:'16px', textAlign:'center'}}>{error}</div>}
@@ -166,8 +338,34 @@ function AuthScreen({ onAuthenticated }) {
           onMouseEnter={e=>!loading&&(e.target.style.transform='scale(1.02)')}
           onMouseLeave={e=>!loading&&(e.target.style.transform='scale(1)')}
         >
-          {loading ? 'LOADING...' : (mode === 'login' ? 'LOGIN' : 'CREATE ACCOUNT')}
+          {loading ? 'LOADING...' :
+            mode === 'login' ? 'LOGIN' :
+            mode === 'register' ? 'CREATE ACCOUNT' :
+            resetSent ? 'RESET PASSWORD' : 'SEND RESET EMAIL'}
         </button>
+
+        {/* Links for login/register modes */}
+        {mode === 'login' && (
+          <div style={{marginTop:'20px', textAlign:'center', fontSize:'12px'}}>
+            <button
+              onClick={() => { setMode('reset'); setError(''); }}
+              style={{background:'none', border:'none', color:'#c8a84b', cursor:'pointer', textDecoration:'underline'}}
+            >
+              Forgot password?
+            </button>
+          </div>
+        )}
+
+        {mode === 'reset' && (
+          <div style={{marginTop:'20px', textAlign:'center'}}>
+            <button
+              onClick={() => { setMode('login'); setError(''); setResetToken(''); setResetSent(false); }}
+              style={{background:'none', border:'none', color:'#c8a84b', cursor:'pointer', fontSize:'12px', textDecoration:'underline'}}
+            >
+              Back to login
+            </button>
+          </div>
+        )}
 
         <div style={{marginTop:'20px', textAlign:'center', fontSize:'11px', color:'rgba(255,255,255,0.3)'}}>
           Free to play · No download required

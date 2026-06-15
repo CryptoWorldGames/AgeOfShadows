@@ -10,12 +10,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 function initDatabase() {
   db.serialize(() => {
-    // Users table: username, password hash, created date
+    // Users table: email, password hash, display name, created date
     db.run(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        display_name TEXT,
         password_hash TEXT NOT NULL,
+        reset_token TEXT,
+        reset_token_expires DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -39,12 +42,12 @@ function initDatabase() {
   });
 }
 
-function registerUser(username, password) {
+function registerUser(email, displayName, password) {
   return new Promise((resolve, reject) => {
     const hash = bcrypt.hashSync(password, 10);
     db.run(
-      'INSERT INTO users (username, password_hash) VALUES (?, ?)',
-      [username, hash],
+      'INSERT INTO users (email, display_name, password_hash) VALUES (?, ?, ?)',
+      [email, displayName || email.split('@')[0], hash],
       function(err) {
         if (err) return reject(err);
         const userId = this.lastID;
@@ -62,16 +65,59 @@ function registerUser(username, password) {
   });
 }
 
-function authenticateUser(username, password) {
+function authenticateUser(email, password) {
   return new Promise((resolve, reject) => {
     db.get(
-      'SELECT id, password_hash FROM users WHERE username = ?',
-      [username],
+      'SELECT id, password_hash FROM users WHERE email = ?',
+      [email],
       (err, user) => {
         if (err) return reject(err);
         if (!user) return resolve(null);
         const match = bcrypt.compareSync(password, user.password_hash);
         resolve(match ? user.id : null);
+      }
+    );
+  });
+}
+
+function createPasswordResetToken(email) {
+  return new Promise((resolve, reject) => {
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+    db.run(
+      'UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE email = ?',
+      [token, expiresAt, email],
+      (err) => {
+        if (err) reject(err);
+        else resolve(token);
+      }
+    );
+  });
+}
+
+function resetPassword(email, resetToken, newPassword) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      'SELECT reset_token_expires FROM users WHERE email = ? AND reset_token = ?',
+      [email, resetToken],
+      (err, user) => {
+        if (err) return reject(err);
+        if (!user) return resolve(false);
+
+        // Check if token expired
+        if (new Date(user.reset_token_expires) < new Date()) {
+          return resolve(false);
+        }
+
+        const hash = bcrypt.hashSync(newPassword, 10);
+        db.run(
+          'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE email = ?',
+          [hash, email],
+          (err) => {
+            if (err) reject(err);
+            else resolve(true);
+          }
+        );
       }
     );
   });
@@ -133,11 +179,11 @@ function savePlayerData(userId, resources, units, buildings) {
   });
 }
 
-function getUserByUsername(username) {
+function getUserByEmail(email) {
   return new Promise((resolve, reject) => {
     db.get(
-      'SELECT id, username FROM users WHERE username = ?',
-      [username],
+      'SELECT id, email, display_name FROM users WHERE email = ?',
+      [email],
       (err, row) => {
         if (err) reject(err);
         else resolve(row);
@@ -153,5 +199,7 @@ module.exports = {
   authenticateUser,
   loadPlayerData,
   savePlayerData,
-  getUserByUsername
+  getUserByEmail,
+  createPasswordResetToken,
+  resetPassword
 };

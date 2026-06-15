@@ -4,7 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { initDatabase, registerUser, authenticateUser, loadPlayerData, savePlayerData, getUserByUsername } = require('./db');
+const { initDatabase, registerUser, authenticateUser, loadPlayerData, savePlayerData, getUserByEmail, createPasswordResetToken, resetPassword } = require('./db');
 
 const app = express();
 app.use(cors());
@@ -107,11 +107,11 @@ io.on('connection', (socket) => {
         buildings = [];
       }
 
-      const user = await getUserByUsername(data.username);
+      const user = await getUserByEmail(data.email);
       const player = {
         id: socket.id,
         userId: data.userId,
-        name: user.username || `Player${Math.floor(Math.random() * 1000)}`,
+        name: user.display_name || `Player${Math.floor(Math.random() * 1000)}`,
         color: data.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
         resources,
         units,
@@ -199,22 +199,22 @@ io.on('connection', (socket) => {
 
 // Authentication endpoints
 app.post('/api/register', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
+  const { email, displayName, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
   }
-  if (username.length < 3) {
-    return res.status(400).json({ error: 'Username must be at least 3 characters' });
+  if (!email.includes('@')) {
+    return res.status(400).json({ error: 'Invalid email address' });
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
   try {
-    const userId = await registerUser(username, password);
-    res.json({ success: true, userId, message: 'Account created' });
+    const userId = await registerUser(email, displayName, password);
+    res.json({ success: true, userId, email, message: 'Account created' });
   } catch (err) {
     if (err.message.includes('UNIQUE constraint failed')) {
-      res.status(400).json({ error: 'Username already exists' });
+      res.status(400).json({ error: 'Email already registered' });
     } else {
       res.status(500).json({ error: 'Registration failed' });
     }
@@ -222,18 +222,61 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password required' });
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
   }
   try {
-    const userId = await authenticateUser(username, password);
+    const userId = await authenticateUser(email, password);
     if (!userId) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    res.json({ success: true, userId, username, message: 'Logged in' });
+    const user = await getUserByEmail(email);
+    res.json({ success: true, userId, email, displayName: user.display_name, message: 'Logged in' });
   } catch (err) {
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Password reset - request token
+app.post('/api/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email required' });
+  }
+  try {
+    const user = await getUserByEmail(email);
+    if (!user) {
+      // Don't reveal if email exists or not (security)
+      return res.json({ success: true, message: 'If email exists, reset token sent' });
+    }
+    const token = await createPasswordResetToken(email);
+    // In production, send email with reset link
+    // For now, return token in response (for testing)
+    console.log(`Password reset token for ${email}: ${token}`);
+    res.json({ success: true, message: 'Password reset token sent to email', token });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+// Password reset - set new password
+app.post('/api/reset-password', async (req, res) => {
+  const { email, resetToken, newPassword } = req.body;
+  if (!email || !resetToken || !newPassword) {
+    return res.status(400).json({ error: 'Email, token, and new password required' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  try {
+    const success = await resetPassword(email, resetToken, newPassword);
+    if (!success) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Password reset failed' });
   }
 });
 

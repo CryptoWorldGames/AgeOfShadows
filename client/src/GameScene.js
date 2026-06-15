@@ -23,8 +23,8 @@ export default function GameScene({ auth }) {
 
     socket.on('connect', () => {
       console.log('Connected to server:', socket.id);
-      // Send join with userId and username to load saved data
-      socket.emit('join', { userId: auth.userId, username: auth.username });
+      // Send join with userId and email to load saved data
+      socket.emit('join', { userId: auth.userId, email: auth.email });
     });
 
     socket.on('joined', (data) => {
@@ -53,7 +53,7 @@ export default function GameScene({ auth }) {
       containerRef.current.appendChild(renderer.domElement);
 
       const env = createEnvironment(scene);
-      const ui = createUI(auth.username);
+      const ui = createUI(auth.displayName || auth.email);
 
       // Load saved resources or start with 0
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
