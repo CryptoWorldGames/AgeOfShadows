@@ -2,13 +2,13 @@ export const SETTINGS = {
   tree: { hitsToKill: 10, hitsPerResource: 10, yield: 10, pickupInterval: 1.0, respawnTime: 3600 },
   stone: { hitsToKill: 50, hitsPerResource: 20, yield: 10, pickupInterval: 1.0, respawnTime: 7200 },
   gold: { hitsToKill: 100, hitsPerResource: 40, yield: 10, pickupInterval: 1.0, respawnTime: 10800 },
-  chicken: { hitsToKill: 3, pickupInterval: 1.0, yield: 5, respawnTime: 3600, minOnMap: 5 },
+  chicken: { hitsToKill: 3, pickupInterval: 1.0, yield: 10, respawnTime: 3600, minOnMap: 5 },
   deer: { hitsToKill: 15, pickupInterval: 1.0, yield: 20, respawnTime: 7200 },
   water: { refillInterval: 10, bottleCapacity: 10, maxWater: 100 },
   drain: { foodInterval: 2160, waterInterval: 2160 },
   unit: {
-    speed: 2.4, swingInterval: 0.7, chopRange: 1.8, gatherRange: 1.6,
-    carryMax: 100
+    speed: 2.4, swingInterval: 0.7, chopRange: 1.8, gatherRange: 2.5,
+    carryMax: 100, huntRadius: 8
   },
   building: {
     townCenter: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 30, label: 'Town Center', storageMax: 100000 },
