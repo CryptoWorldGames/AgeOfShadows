@@ -1,18 +1,18 @@
 export const SETTINGS = {
-  tree: { hitsToKill: 10, hitsPerResource: 10, yield: 10, respawnTime: 3600 },
-  stone: { hitsToKill: 200, hitsPerResource: 20, yield: 10, respawnTime: 7200 },
-  gold: { hitsToKill: 400, hitsPerResource: 40, yield: 10, respawnTime: 10800 },
-  chicken: { hitsToKill: 3, pickupInterval: 1, yield: 5, respawnTime: 3600, minOnMap: 5 },
-  deer: { hitsToKill: 15, pickupInterval: 2, yield: 20, respawnTime: 7200 },
+  tree: { hitsToKill: 10, hitsPerResource: 10, yield: 10, pickupInterval: 1.0, respawnTime: 3600 },
+  stone: { hitsToKill: 50, hitsPerResource: 20, yield: 10, pickupInterval: 1.0, respawnTime: 7200 },
+  gold: { hitsToKill: 100, hitsPerResource: 40, yield: 10, pickupInterval: 1.0, respawnTime: 10800 },
+  chicken: { hitsToKill: 3, pickupInterval: 1.0, yield: 5, respawnTime: 3600, minOnMap: 5 },
+  deer: { hitsToKill: 15, pickupInterval: 1.0, yield: 20, respawnTime: 7200 },
   water: { refillInterval: 10, bottleCapacity: 10, maxWater: 100 },
   drain: { foodInterval: 2160, waterInterval: 2160 },
   unit: {
     speed: 2.4, swingInterval: 0.7, chopRange: 1.8, gatherRange: 1.6,
-    carryWood: 10, carryStone: 5, carryGold: 2, carryFood: 10
+    carryMax: 100
   },
   building: {
-    townCenter: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 30, tearDownTime: 60, label: 'Town Center' },
-    house: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 60, tearDownTime: 120, label: 'House', maxUnits: 10, storageMax: 1000, decayInterval: 3600 },
+    townCenter: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 30, label: 'Town Center', storageMax: 100000 },
+    house: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 60, label: 'House', maxUnits: 10, storageMax: 10000, decayInterval: 3600 },
     woodFence: { woodCost: 10, stoneCost: 0, goldCost: 0, buildTime: 60, hitsToDestroy: 25, label: 'Wood Fence' },
     stoneFence: { woodCost: 0, stoneCost: 50, goldCost: 0, buildTime: 120, hitsToDestroy: 100, label: 'Stone Fence' },
     farm: { woodCost: 40, stoneCost: 0, goldCost: 0, buildTime: 15, label: 'Farm' },

@@ -24,6 +24,7 @@ export default function GameScene({ playerId, gameState }) {
     containerRef.current.appendChild(renderer.domElement);
     const env = createEnvironment(scene);
     const ui = createUI(playerId, gameState);
+    // Resources now tracked via building storage + unit inventory
     const resources = { wood: 10000, food: 10000, water: 10000, gold: 10000, stone: 10000 };
     const world = { camera, units: [], trees: [], buildings: [], animals: [], stones: [], golds: [], resources, ui, pondPosition: env.pondPosition };
     world.units.push(createHuman(scene, { x: -8, y: 0, z: 8 }, { team: 'red' }));
@@ -57,8 +58,12 @@ export default function GameScene({ playerId, gameState }) {
       addSpot(x, z); world.golds.push(createGold(scene, { x, y:0, z }));
     }
     world.golds.push(createGold(scene, { x: 5, y:0, z: 5 }));
+    // Town Center with storage
     const startTC = createTownCenter(scene, false);
-    startTC.setPosition(0, 0); startTC.place(); world.buildings.push(startTC);
+    startTC.setPosition(0, 0); startTC.place();
+    startTC.storage = { wood:10000, stone:10000, gold:10000, food:10000, water:10000, max:100000 };
+    startTC.getPosition = () => ({ x:0, z:0 });
+    world.buildings.push(startTC);
     world.animals.push(createChicken(scene, { x:6, y:0, z:6 }));
     world.animals.push(createChicken(scene, { x:-6, y:0, z:6 }));
     world.animals.push(createChicken(scene, { x:6, y:0, z:-6 }));

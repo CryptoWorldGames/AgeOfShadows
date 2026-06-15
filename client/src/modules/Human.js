@@ -103,17 +103,25 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     });
   }, undefined, (err) => console.error('Failed to load character:', err));
 
+  // Inventory — what unit is carrying
+  const inventory = { wood: 0, stone: 0, gold: 0, food: 0, water: 0 };
+  const carryMax = SETTINGS.unit.carryMax;
+
+  function carryTotal() { return Object.values(inventory).reduce((a, b) => a + b, 0); }
+  function isFull() { return carryTotal() >= carryMax; }
+
   let target = null;
   let chopTarget = null; let chopSlot = null;
   let animalTarget = null; let animalSlot = null;
   let stoneTarget = null; let stoneSlot = null;
   let goldTarget = null; let goldSlot = null;
-  // Auto-task type — remembers what task type was assigned
-  let autoTask = null; // 'chop' | 'stone' | 'gold' | 'animal' | null
+  let autoTask = null; // remembers task type for auto-continue
+  let depositTarget = null; // building to deposit at
+  let returning = false; // walking to deposit
 
   let moving = false; let walkClock = 0; let chopPhase = 0;
   let stoneHitCount = 0; let goldHitCount = 0; let woodHitCount = 0;
-  let gatherTimer = 0; let chopActive = false; let frozen = false;
+  let gatherTimer = 0; let depositTimer = 0; let chopActive = false; let frozen = false;
   let waterDrainTimer = 0; let foodDrainTimer = 0; let waterRefillTimer = 0;
 
   const S = SETTINGS;
@@ -184,11 +192,10 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     if (chopPhase >= 1) { chopPhase = 0; }
   }
 
-  // ===== AUTO-TASK: find nearest resource of same type =====
   function findNearest(world, type) {
     const me = group.position;
     let best = null, bestDist = Infinity;
-    const list = type === 'chop' ? world.trees : type === 'stone' ? world.stones : type === 'gold' ? world.golds : [];
+    const list = type === 'chop' ? (world.trees||[]) : type === 'stone' ? (world.stones||[]) : type === 'gold' ? (world.golds||[]) : [];
     list.forEach((r) => {
       if (r.isDepleted()) return;
       const p = r.position();
@@ -196,6 +203,47 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
       if (d < bestDist) { bestDist = d; best = r; }
     });
     return best;
+  }
+
+  function findNearestBuilding(world) {
+    const me = group.position;
+    let best = null, bestDist = Infinity;
+    (world.buildings||[]).forEach((b) => {
+      if (!b.storage) return;
+      const p = b.getPosition ? b.getPosition() : b.position;
+      if (!p) return;
+      const d = Math.sqrt((p.x-me.x)**2 + (p.z-me.z)**2);
+      if (d < bestDist) { bestDist = d; best = b; }
+    });
+    return best;
+  }
+
+  function depositInventory(building, world) {
+    // Transfer all inventory to building storage
+    Object.keys(inventory).forEach((key) => {
+      if (inventory[key] > 0) {
+        const space = (building.storage.max||10000) - (building.storage[key]||0);
+        const deposit = Math.min(inventory[key], space);
+        building.storage[key] = (building.storage[key]||0) + deposit;
+        inventory[key] -= deposit;
+      }
+    });
+    // Update world resources from all building storages
+    updateWorldResources(world);
+  }
+
+  function updateWorldResources(world) {
+    const totals = { wood:0, stone:0, gold:0, food:0, water:0 };
+    (world.buildings||[]).forEach((b) => {
+      if (!b.storage) return;
+      Object.keys(totals).forEach((k) => { totals[k] += b.storage[k]||0; });
+    });
+    // Also add what units are carrying
+    (world.units||[]).forEach((u) => {
+      if (!u.inventory) return;
+      Object.keys(totals).forEach((k) => { totals[k] += u.inventory[k]||0; });
+    });
+    Object.keys(totals).forEach((k) => { world.resources[k] = totals[k]; });
   }
 
   function update(dt, world) {
@@ -215,16 +263,58 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
       } else waterRefillTimer=0;
     }
 
+    // === DEPOSIT RUN ===
+    if (returning && depositTarget) {
+      const dp = depositTarget.getPosition ? depositTarget.getPosition() : depositTarget.position;
+      if (dp) {
+        const arrived = moveToward({ x: dp.x, z: dp.z }, dt, 2.0);
+        moving = !arrived;
+        if (arrived) {
+          depositInventory(depositTarget, world);
+          returning = false;
+          depositTarget = null;
+          // Resume auto-task
+          if (autoTask) {
+            const next = findNearest(world, autoTask);
+            if (next) {
+              if (autoTask === 'chop') { chopTarget=next; chopSlot=null; chopPhase=0; woodHitCount=0; }
+              else if (autoTask === 'stone') { stoneTarget=next; stoneSlot=null; chopPhase=0; stoneHitCount=0; }
+              else if (autoTask === 'gold') { goldTarget=next; goldSlot=null; chopPhase=0; goldHitCount=0; }
+            }
+          }
+        }
+      } else { returning=false; depositTarget=null; }
+      // Skip resource gathering while returning
+      if (moving) walkPose(dt); else modelHolder.position.y*=0.7;
+      if (!chopActive) { axeRot.x+=(axeRestRot.x-axeRot.x)*0.3; axeRot.y+=(axeRestRot.y-axeRot.y)*0.3; axeRot.z+=(axeRestRot.z-axeRot.z)*0.3; }
+      separate(world);
+      if (handR) { handR.getWorldPosition(handWorld); axeHolder.parent.worldToLocal(axeHolder.position.copy(handWorld)); axeHolder.rotation.set(axeRot.x,axeRot.y,axeRot.z); }
+      if (world.camera) healthBar.group.quaternion.copy(world.camera.quaternion);
+      healthBar.update(unit.health/unit.maxHealth);
+      return;
+    }
+
+    // === CHECK IF FULL — go deposit ===
+    if (isFull() && autoTask && !returning) {
+      const building = findNearestBuilding(world);
+      if (building) { depositTarget=building; returning=true; return; }
+    }
+
     // Animal
     if (animalTarget) {
       if (animalTarget.isDepleted()) { animalTarget=null; animalSlot=null; }
       else {
         const ap = animalTarget.position(); const st = animalTarget.state();
         if (st === 'meatpile') {
-          if (animalTarget.foodRemaining() > 0) {
+          if (animalTarget.foodRemaining() > 0 && !isFull()) {
             if (distTo(ap.x,ap.z) <= gatherRange) {
               frozen=true; faceToward(ap.x,ap.z); gatherTimer+=dt;
-              if (gatherTimer >= S.chicken.pickupInterval) { gatherTimer=0; const got=animalTarget.takeFood(1); if (world.resources) world.resources.food+=got; }
+              if (gatherTimer >= S.chicken.pickupInterval) {
+                gatherTimer=0;
+                const got=animalTarget.takeFood(1);
+                inventory.food = Math.min(inventory.food+got, carryMax-carryTotal()+inventory.food);
+                updateWorldResources(world);
+              }
             } else { moveToward(animalSlot||ap,dt,0.8); moving=true; }
           } else { animalTarget=null; animalSlot=null; }
         } else if (st === 'wandering') {
@@ -238,22 +328,27 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     // Tree
     else if (chopTarget) {
       if (chopTarget.isDepleted()) {
-        // Auto-task: find next tree
         const next = findNearest(world, 'chop');
         if (next) { chopTarget=next; chopSlot=null; chopPhase=0; woodHitCount=0; }
         else { chopTarget=null; chopSlot=null; }
       } else {
         const tp = chopTarget.position(); const st = chopTarget.state(); const dTree = distTo(tp.x,tp.z);
         if (st === 'woodpile') {
-          if (chopTarget.woodRemaining() > 0) {
+          if (chopTarget.woodRemaining() > 0 && !isFull()) {
             if (dTree <= gatherRange) {
               frozen=true; faceToward(tp.x,tp.z); gatherTimer+=dt;
-              if (gatherTimer >= S.tree.pickupInterval) { gatherTimer=0; const got=chopTarget.takeWood(1); if (world.resources) world.resources.wood+=got; }
+              if (gatherTimer >= S.tree.pickupInterval) {
+                gatherTimer=0;
+                const got=chopTarget.takeWood(1);
+                inventory.wood += got;
+                updateWorldResources(world);
+              }
             } else { moveToward(chopSlot||tp,dt,0.15); moving=true; }
           } else {
-            // Wood all picked up — find next tree
+            // Done with this tree — next tree or deposit
             const next = findNearest(world, 'chop');
-            if (next) { chopTarget=next; chopSlot=null; chopPhase=0; woodHitCount=0; }
+            if (next && !isFull()) { chopTarget=next; chopSlot=null; chopPhase=0; woodHitCount=0; }
+            else if (isFull()) { chopTarget=null; }
             else { chopTarget=null; chopSlot=null; }
           }
         } else {
@@ -262,7 +357,7 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
             if (st === 'standing') {
               swingPose(dt, chopTarget, 'chop', world, () => {
                 woodHitCount++;
-                if (woodHitCount >= S.tree.hitsPerResource) { woodHitCount=0; if (world.resources) world.resources.wood+=1; }
+                if (woodHitCount >= S.tree.hitsPerResource) { woodHitCount=0; }
               });
             }
           } else { moveToward(chopSlot||tp,dt,0.15); moving=true; }
@@ -278,16 +373,32 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
       } else {
         const sp = stoneTarget.position(); const st = stoneTarget.state(); const dStone = distTo(sp.x,sp.z);
         if (st === 'pile') {
-          const next = findNearest(world, 'stone');
-          if (next) { stoneTarget=next; stoneSlot=null; chopPhase=0; stoneHitCount=0; }
-          else { stoneTarget=null; stoneSlot=null; }
+          if (stoneTarget.stoneRemaining() > 0 && !isFull()) {
+            if (dStone <= gatherRange) {
+              frozen=true; faceToward(sp.x,sp.z); gatherTimer+=dt;
+              if (gatherTimer >= S.stone.pickupInterval) {
+                gatherTimer=0;
+                const got=stoneTarget.takeStone(1);
+                inventory.stone += got;
+                updateWorldResources(world);
+              }
+            } else { moveToward(stoneSlot||sp,dt,0.15); moving=true; }
+          } else {
+            const next = findNearest(world, 'stone');
+            if (next && !isFull()) { stoneTarget=next; stoneSlot=null; chopPhase=0; stoneHitCount=0; }
+            else { stoneTarget=null; stoneSlot=null; }
+          }
         } else {
           if (dStone <= chopRange) {
             frozen=true; faceToward(sp.x,sp.z);
             if (st === 'standing') {
               swingPose(dt, stoneTarget, 'mine', world, () => {
                 stoneHitCount++;
-                if (stoneHitCount >= S.stone.hitsPerResource) { stoneHitCount=0; if (world.resources) world.resources.stone+=1; }
+                if (stoneHitCount >= S.stone.hitsPerResource) {
+                  stoneHitCount=0;
+                  inventory.stone += 1;
+                  updateWorldResources(world);
+                }
               });
             }
           } else { moveToward(stoneSlot||sp,dt,0.15); moving=true; }
@@ -303,16 +414,32 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
       } else {
         const gp = goldTarget.position(); const st = goldTarget.state(); const dGold = distTo(gp.x,gp.z);
         if (st === 'pile') {
-          const next = findNearest(world, 'gold');
-          if (next) { goldTarget=next; goldSlot=null; chopPhase=0; goldHitCount=0; }
-          else { goldTarget=null; goldSlot=null; }
+          if (goldTarget.goldRemaining() > 0 && !isFull()) {
+            if (dGold <= gatherRange) {
+              frozen=true; faceToward(gp.x,gp.z); gatherTimer+=dt;
+              if (gatherTimer >= S.gold.pickupInterval) {
+                gatherTimer=0;
+                const got=goldTarget.takeGold(1);
+                inventory.gold += got;
+                updateWorldResources(world);
+              }
+            } else { moveToward(goldSlot||gp,dt,0.15); moving=true; }
+          } else {
+            const next = findNearest(world, 'gold');
+            if (next && !isFull()) { goldTarget=next; goldSlot=null; chopPhase=0; goldHitCount=0; }
+            else { goldTarget=null; goldSlot=null; }
+          }
         } else {
           if (dGold <= chopRange) {
             frozen=true; faceToward(gp.x,gp.z);
             if (st === 'standing') {
               swingPose(dt, goldTarget, 'mine', world, () => {
                 goldHitCount++;
-                if (goldHitCount >= S.gold.hitsPerResource) { goldHitCount=0; if (world.resources) world.resources.gold+=1; }
+                if (goldHitCount >= S.gold.hitsPerResource) {
+                  goldHitCount=0;
+                  inventory.gold += 1;
+                  updateWorldResources(world);
+                }
               });
             }
           } else { moveToward(goldSlot||gp,dt,0.15); moving=true; }
@@ -327,9 +454,9 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
     if (moving) walkPose(dt); else modelHolder.position.y*=0.7;
 
     if (!chopActive) {
-      axeRot.x += (axeRestRot.x-axeRot.x)*0.3;
-      axeRot.y += (axeRestRot.y-axeRot.y)*0.3;
-      axeRot.z += (axeRestRot.z-axeRot.z)*0.3;
+      axeRot.x+=(axeRestRot.x-axeRot.x)*0.3;
+      axeRot.y+=(axeRestRot.y-axeRot.y)*0.3;
+      axeRot.z+=(axeRestRot.z-axeRot.z)*0.3;
     }
 
     separate(world);
@@ -345,16 +472,16 @@ export function createHuman(scene, position = { x: 0, y: 0, z: 0 }, options = {}
   }
 
   const unit = {
-    group, type:'unit', team, radius,
+    group, type:'unit', team, radius, inventory,
     health:100, maxHealth:100, selected:false,
     getModelCenterY: () => modelCenterY,
     setSelected(b) { unit.selected=b; },
-    moveTo(v) { target=v.clone(); chopTarget=null; chopSlot=null; animalTarget=null; animalSlot=null; stoneTarget=null; stoneSlot=null; goldTarget=null; goldSlot=null; chopPhase=0; stoneHitCount=0; goldHitCount=0; woodHitCount=0; autoTask=null; },
-    chopTree(tree,slot) { chopTarget=tree; chopSlot=slot||null; animalTarget=null; stoneTarget=null; goldTarget=null; target=null; chopPhase=0; woodHitCount=0; autoTask='chop'; },
-    killAnimal(animal,slot) { animalTarget=animal; animalSlot=slot||null; chopTarget=null; stoneTarget=null; goldTarget=null; target=null; chopPhase=0; autoTask='animal'; },
-    mineStone(stone,slot) { stoneTarget=stone; stoneSlot=slot||null; chopTarget=null; animalTarget=null; goldTarget=null; target=null; chopPhase=0; stoneHitCount=0; autoTask='stone'; },
-    mineGold(gold,slot) { goldTarget=gold; goldSlot=slot||null; chopTarget=null; animalTarget=null; stoneTarget=null; target=null; chopPhase=0; goldHitCount=0; autoTask='gold'; },
-    stop() { target=null; chopTarget=null; chopSlot=null; animalTarget=null; animalSlot=null; stoneTarget=null; stoneSlot=null; goldTarget=null; goldSlot=null; autoTask=null; },
+    moveTo(v) { target=v.clone(); chopTarget=null; chopSlot=null; animalTarget=null; animalSlot=null; stoneTarget=null; stoneSlot=null; goldTarget=null; goldSlot=null; chopPhase=0; stoneHitCount=0; goldHitCount=0; woodHitCount=0; autoTask=null; returning=false; depositTarget=null; },
+    chopTree(tree,slot) { chopTarget=tree; chopSlot=slot||null; animalTarget=null; stoneTarget=null; goldTarget=null; target=null; chopPhase=0; woodHitCount=0; autoTask='chop'; returning=false; },
+    killAnimal(animal,slot) { animalTarget=animal; animalSlot=slot||null; chopTarget=null; stoneTarget=null; goldTarget=null; target=null; chopPhase=0; autoTask='animal'; returning=false; },
+    mineStone(stone,slot) { stoneTarget=stone; stoneSlot=slot||null; chopTarget=null; animalTarget=null; goldTarget=null; target=null; chopPhase=0; stoneHitCount=0; autoTask='stone'; returning=false; },
+    mineGold(gold,slot) { goldTarget=gold; goldSlot=slot||null; chopTarget=null; animalTarget=null; stoneTarget=null; target=null; chopPhase=0; goldHitCount=0; autoTask='gold'; returning=false; },
+    stop() { target=null; chopTarget=null; chopSlot=null; animalTarget=null; animalSlot=null; stoneTarget=null; stoneSlot=null; goldTarget=null; goldSlot=null; autoTask=null; returning=false; depositTarget=null; },
     update, animate() {}
   };
 
