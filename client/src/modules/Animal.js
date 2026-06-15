@@ -154,7 +154,9 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
     model.scale.setScalar(3.6 / Math.max(size.x, size.y, size.z));
     model.updateMatrixWorld(true);
     const bbox2 = new THREE.Box3().setFromObject(model);
-    model.position.y = -bbox2.min.y;
+    model.rotation.z = 0.15;
+    model.position.y = 0.8;
+	model.rotation.x = 0.08;
     model.traverse((c) => {
       if (c.isMesh) {
         c.castShadow = true; c.receiveShadow = true;
