@@ -6,8 +6,10 @@ function AuthScreen({ onAuthenticated }) {
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
@@ -259,20 +261,36 @@ function AuthScreen({ onAuthenticated }) {
             <label style={{display:'block', fontSize:'12px', color:'rgba(255,255,255,0.6)', marginBottom:'8px', letterSpacing:'2px'}}>
               PASSWORD
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e=>setPassword(e.target.value)}
-              onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
-              placeholder="••••••"
-              disabled={loading}
-              style={{
-                width:'100%', padding:'12px 16px', background:'rgba(255,255,255,0.08)',
-                border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
-                color:'#fff', fontSize:'15px', outline:'none', boxSizing:'border-box',
-                fontFamily:"'Segoe UI', sans-serif", opacity: loading ? 0.5 : 1
-              }}
-            />
+            <div style={{position:'relative', width:'100%'}}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e=>setPassword(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
+                placeholder="••••••"
+                disabled={loading}
+                style={{
+                  width:'100%', padding:'12px 16px', paddingRight:'40px',
+                  background:'rgba(255,255,255,0.08)',
+                  border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
+                  color:'#fff', fontSize:'15px', outline:'none', boxSizing:'border-box',
+                  fontFamily:"'Segoe UI', sans-serif", opacity: loading ? 0.5 : 1
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={loading}
+                style={{
+                  position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)',
+                  background:'none', border:'none', color:'rgba(255,255,255,0.6)',
+                  cursor: loading ? 'not-allowed' : 'pointer', fontSize:'18px', padding:'0',
+                  display:'flex', alignItems:'center', justifyContent:'center'
+                }}
+              >
+                {showPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
+            </div>
           </div>
         )}
 
@@ -304,20 +322,36 @@ function AuthScreen({ onAuthenticated }) {
               <label style={{display:'block', fontSize:'12px', color:'rgba(255,255,255,0.6)', marginBottom:'8px', letterSpacing:'2px'}}>
                 NEW PASSWORD
               </label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={e=>setNewPassword(e.target.value)}
-                onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
-                placeholder="••••••"
-                disabled={loading}
-                style={{
-                  width:'100%', padding:'12px 16px', background:'rgba(255,255,255,0.08)',
-                  border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
-                  color:'#fff', fontSize:'15px', outline:'none', boxSizing:'border-box',
-                  fontFamily:"'Segoe UI', sans-serif"
-                }}
-              />
+              <div style={{position:'relative', width:'100%'}}>
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={e=>setNewPassword(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
+                  placeholder="••••••"
+                  disabled={loading}
+                  style={{
+                    width:'100%', padding:'12px 16px', paddingRight:'40px',
+                    background:'rgba(255,255,255,0.08)',
+                    border:'1px solid rgba(200,168,75,0.3)', borderRadius:'8px',
+                    color:'#fff', fontSize:'15px', outline:'none', boxSizing:'border-box',
+                    fontFamily:"'Segoe UI', sans-serif"
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  disabled={loading}
+                  style={{
+                    position:'absolute', right:'12px', top:'50%', transform:'translateY(-50%)',
+                    background:'none', border:'none', color:'rgba(255,255,255,0.6)',
+                    cursor: loading ? 'not-allowed' : 'pointer', fontSize:'18px', padding:'0',
+                    display:'flex', alignItems:'center', justifyContent:'center'
+                  }}
+                >
+                  {showNewPassword ? '👁️' : '👁️‍🗨️'}
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -368,7 +402,7 @@ function AuthScreen({ onAuthenticated }) {
         )}
 
         <div style={{marginTop:'20px', textAlign:'center', fontSize:'11px', color:'rgba(255,255,255,0.3)'}}>
-          Free to play · No download required
+          Free to play · No download required · An idle browser game
         </div>
       </div>
 
