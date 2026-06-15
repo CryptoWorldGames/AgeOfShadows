@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import GameScene from './GameScene';
+import GameScene from './GameScene.jsx';
 
 function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState('login');
