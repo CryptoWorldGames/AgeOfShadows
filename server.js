@@ -156,7 +156,7 @@ app.get('/{*path}', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/dist/index.html'));
 });
 
-const PORT = parseInt(process.env.APP_PORT || '5006');
+const PORT = parseInt(process.env.PORT || '5006');
 process.title = 'AgeOfShadows_server';
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[AgeOfShadows] Server running on port ${PORT}`);
