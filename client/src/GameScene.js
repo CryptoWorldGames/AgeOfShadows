@@ -9,6 +9,7 @@ import { createTownCenter } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
 import { createStone } from './modules/Stone';
 import { createGold } from './modules/Gold';
+
 export default function GameScene({ playerName }) {
   const containerRef = useRef(null);
   useEffect(() => {
@@ -23,8 +24,8 @@ export default function GameScene({ playerName }) {
     renderer.shadowMap.type = THREE.PCFShadowMap;
     containerRef.current.appendChild(renderer.domElement);
     const env = createEnvironment(scene);
-    const ui = createUI(playerId, gameState);
-    const resources = { wood: 10000, food: 10000, water: 10000, gold: 10000, stone: 10000 };
+    const ui = createUI(playerName);
+    const resources = { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
     const world = { camera, units: [], trees: [], buildings: [], animals: [], stones: [], golds: [], resources, ui, pondPosition: env.pondPosition };
     world.units.push(createHuman(scene, { x: -8, y: 0, z: 8 }, { team: 'red' }));
     world.units.push(createHuman(scene, { x: 8, y: 0, z: 8 }, { team: 'blue' }));
@@ -59,7 +60,7 @@ export default function GameScene({ playerName }) {
     world.golds.push(createGold(scene, { x: 5, y:0, z: 5 }));
     const startTC = createTownCenter(scene, false);
     startTC.setPosition(0, 0); startTC.place();
-    startTC.storage = { wood:10000, stone:10000, gold:10000, food:10000, water:10000, max:100000 };
+    startTC.storage = { wood:0, stone:0, gold:0, food:0, water:0, max:100000 };
     startTC.getPosition = () => ({ x:0, z:0 });
     world.buildings.push(startTC);
     world.animals.push(createChicken(scene, { x:6, y:0, z:6 }));
@@ -94,6 +95,6 @@ export default function GameScene({ playerName }) {
       window.removeEventListener('resize', handleResize); dispose();
       if (containerRef.current && renderer.domElement.parentNode === containerRef.current) containerRef.current.removeChild(renderer.domElement);
     };
-  }, [playerId]);
+  }, [playerName]);
   return React.createElement('div', { ref: containerRef, style: { width:'100%', height:'100vh', overflow:'hidden' } });
 }
