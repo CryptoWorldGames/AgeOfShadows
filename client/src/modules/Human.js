@@ -78,10 +78,21 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     model.traverse((c) => {
       if (c.isMesh) {
         c.castShadow=true; c.receiveShadow=true;
-        if (c.material && teamTint) {
-          const mn = c.material.name||'';
-          const isSkin = SKIN_MATS.some((s)=>mn.includes(s));
-          if (!isSkin) { c.material=c.material.clone(); c.material.color.multiply(teamTint); }
+        // Force all materials visible — CS2 models have transparency issues
+        if (c.material) {
+          const mats = Array.isArray(c.material) ? c.material : [c.material];
+          mats.forEach((mat) => {
+            mat.transparent = false;
+            mat.opacity = 1;
+            mat.depthWrite = true;
+            mat.visible = true;
+            mat.needsUpdate = true;
+            if (teamTint) {
+              const mn = mat.name||'';
+              const isSkin = SKIN_MATS.some((s)=>mn.includes(s));
+              if (!isSkin) { mat = mat.clone(); mat.color.multiply(teamTint); }
+            }
+          });
         }
       }
     });
@@ -96,24 +107,22 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     });
   }, undefined, (err)=>console.error('Failed to load character:',err));
 
-  // Inventory
   const inventory = {wood:0,stone:0,gold:0,food:0,water:0};
   const carryMax = SETTINGS.unit.carryMax;
   function carryTotal() { return Object.values(inventory).reduce((a,b)=>a+b,0); }
   function isFull() { return carryTotal()>=carryMax; }
 
-  // Task state
   let target=null;
   let chopTarget=null; let chopSlot=null;
-  let animalTarget=null; // current animal being hunted/gathered
+  let animalTarget=null;
   let stoneTarget=null; let stoneSlot=null;
   let goldTarget=null; let goldSlot=null;
-  let autoTask=null; // 'chop'|'stone'|'gold'|'hunt'|null
+  let autoTask=null;
   let depositTarget=null;
   let returning=false;
-  let lastKillPos=null; // position of last kill to return and gather
-  let huntSearchRadius=20; // expands as no animals found nearby
-  let huntAngle=0; // for spiral search
+  let lastKillPos=null;
+  let huntSearchRadius=20;
+  let huntAngle=0;
 
   let moving=false; let walkClock=0; let chopPhase=0;
   let stoneHitCount=0; let goldHitCount=0; let woodHitCount=0;
@@ -255,13 +264,11 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
   }
 
   function getNextHuntTarget(world) {
-    // First check if there is leftover meat at last kill spot
     if (lastKillPos) {
       const animals = (world.animals||[]).filter((a)=>{
         const st=a.state?a.state():'';
         return st==='meatpile'&&a.foodRemaining&&a.foodRemaining()>0;
       });
-      // find meatpile near last kill pos
       let nearest=null,nd=Infinity;
       animals.forEach((a)=>{
         const p=a.position();
@@ -271,10 +278,8 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       if (nearest) { lastKillPos=null; return nearest; }
       lastKillPos=null;
     }
-    // Find nearest live or meatpile animal
     const a=findNearestAnimal(world,huntSearchRadius);
-    if (a) { huntSearchRadius=20; return a; } // reset search radius on find
-    // Expand search
+    if (a) { huntSearchRadius=20; return a; }
     huntSearchRadius=Math.min(huntSearchRadius+10,150);
     return null;
   }
@@ -296,11 +301,9 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       } else waterRefillTimer=0;
     }
 
-    // === DEPOSIT RUN ===
     if (returning&&depositTarget) {
       const dp=depositTarget.getPosition?depositTarget.getPosition():depositTarget.position;
       if (dp) {
-        // On way back — if not full yet stop to pick up nearby meatpile
         if (!isFull()&&autoTask==='hunt') {
           const nearMeat=(world.animals||[]).find((a)=>{
             const st=a.state?a.state():'';
@@ -315,7 +318,6 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
         if (arrived) {
           depositInventory(depositTarget,world);
           returning=false; depositTarget=null;
-          // Resume auto-task
           if (autoTask==='hunt') {
             const next=getNextHuntTarget(world);
             if (next) animalTarget=next;
@@ -341,13 +343,11 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       return;
     }
 
-    // === CHECK FULL — deposit ===
     if (isFull()&&autoTask&&!returning) {
       const building=findNearestBuilding(world);
       if (building) { depositTarget=building; returning=true; return; }
     }
 
-    // === HUNT ===
     if (animalTarget) {
       if (animalTarget.isDepleted()) { animalTarget=null; }
       else {
@@ -364,7 +364,6 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
               }
             } else { moveToward(ap,dt,0.5); moving=true; }
           } else {
-            // Done with this meatpile — find next animal
             animalTarget=null;
             if (autoTask==='hunt') {
               const next=getNextHuntTarget(world);
@@ -373,34 +372,29 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
             }
           }
         } else if (st==='wandering') {
-          // Chase animal continuously using its current position
           const d=distTo(ap.x,ap.z);
           if (d<=chopRange) {
             frozen=true; faceToward(ap.x,ap.z);
             swingPose(dt,animalTarget,'chop',world,()=>{});
           } else {
-            // Always move toward animal's CURRENT position
             moveToward(ap,dt,chopRange*0.8);
             moving=true;
           }
         } else if (st==='dying') {
           frozen=true; faceToward(ap.x,ap.z);
-        } else if (st==='meatpile'||st==='respawning') {
+        } else if (st==='respawning') {
           animalTarget=null;
         }
-        // Record kill position when animal just died
         if (animalTarget&&animalTarget.state()!=='wandering'&&animalTarget.state()!=='dying') {
           if (!lastKillPos) lastKillPos=animalTarget.position();
         }
       }
-      // If animal target gone and still hunting, find next
       if (!animalTarget&&autoTask==='hunt') {
         const next=getNextHuntTarget(world);
         if (next) animalTarget=next;
         else { huntAngle+=0.5; const r=huntSearchRadius; target=new THREE.Vector3(spawnPos.x+Math.cos(huntAngle)*r,0,spawnPos.z+Math.sin(huntAngle)*r); }
       }
     }
-    // === CHOP ===
     else if (chopTarget) {
       if (chopTarget.isDepleted()) {
         const next=findNearest(world,'chop');
@@ -434,7 +428,6 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
         }
       }
     }
-    // === STONE ===
     else if (stoneTarget) {
       if (stoneTarget.isDepleted()) {
         const next=findNearest(world,'stone');
@@ -466,7 +459,6 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
         }
       }
     }
-    // === GOLD ===
     else if (goldTarget) {
       if (goldTarget.isDepleted()) {
         const next=findNearest(world,'gold');
@@ -502,7 +494,6 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       const arrived=moveToward(target,dt,0.5);
       if (arrived) {
         target=null;
-        // Arrived at hunt search point — look for animals here
         if (autoTask==='hunt') {
           const next=getNextHuntTarget(world);
           if (next) animalTarget=next;
