@@ -9,7 +9,7 @@ import { createTownCenter } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
 import { createStone } from './modules/Stone';
 import { createGold } from './modules/Gold';
-export default function GameScene({ playerId, gameState }) {
+export default function GameScene({ playerName }) {
   const containerRef = useRef(null);
   useEffect(() => {
     if (!containerRef.current) return;
