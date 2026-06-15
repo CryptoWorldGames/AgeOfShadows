@@ -4,6 +4,7 @@ import { clone as SkeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.j
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { SETTINGS } from './Settings.js';
 
+const R2 = 'https://pub-9e79279ca165496da153d64ecb88f99c.r2.dev';
 const loader = new GLTFLoader();
 let chickenLoadPromise = null;
 let deerLoadPromise = null;
@@ -11,7 +12,7 @@ let deerLoadPromise = null;
 function getChickenGLTF() {
   if (chickenLoadPromise) return chickenLoadPromise;
   chickenLoadPromise = new Promise((resolve, reject) => {
-    loader.load('/models/chicken.glb', resolve, undefined, reject);
+    loader.load(`${R2}/chicken.glb`, resolve, undefined, reject);
   });
   return chickenLoadPromise;
 }
@@ -21,7 +22,7 @@ function getDeerGLTF() {
   deerLoadPromise = new Promise((resolve, reject) => {
     const deerLoader = new GLTFLoader();
     deerLoader.setMeshoptDecoder(MeshoptDecoder);
-    deerLoader.load('/models/deer.glb', resolve, undefined, reject);
+    deerLoader.load(`${R2}/deer.glb`, resolve, undefined, reject);
   });
   return deerLoadPromise;
 }
@@ -150,13 +151,11 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
     const model = SkeletonClone(gltf.scene);
     const bbox = new THREE.Box3().setFromObject(model);
     const size = bbox.getSize(new THREE.Vector3());
-    // 3.6 = roughly chest height on human = realistic deer size
     model.scale.setScalar(3.6 / Math.max(size.x, size.y, size.z));
     model.updateMatrixWorld(true);
-    const bbox2 = new THREE.Box3().setFromObject(model);
     model.rotation.z = 0.15;
     model.position.y = 0.8;
-	model.rotation.x = 0.08;
+    model.rotation.x = 0.08;
     model.traverse((c) => {
       if (c.isMesh) {
         c.castShadow = true; c.receiveShadow = true;
@@ -186,7 +185,6 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
 
   function update(dt, world) {
     if (mixer) mixer.update(dt);
-
     let flee = false;
     if (world && world.units) {
       world.units.forEach((u) => {
@@ -195,14 +193,11 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
         if (Math.sqrt(dx*dx+dz*dz) < 8) { fleeDir.set(dx, 0, dz).normalize(); flee = true; }
       });
     }
-
     if (flee) {
-      // Slowly back away — no sliding since it's just a slow drift
       group.position.x += fleeDir.x * 1.2 * dt;
       group.position.z += fleeDir.z * 1.2 * dt;
       group.rotation.y = Math.atan2(fleeDir.x, fleeDir.z);
     } else {
-      // Stand still, rotate slowly to look natural
       wanderTimer -= dt;
       if (wanderTimer <= 0) {
         wanderTimer = 4 + Math.random() * 6;
