@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { io } from 'socket.io-client';
 import { createEnvironment } from './modules/Environment';
 import { createHuman } from './modules/Human';
 import { createTree } from './modules/Tree';
@@ -10,91 +11,186 @@ import { createChicken, createDeer } from './modules/Animal';
 import { createStone } from './modules/Stone';
 import { createGold } from './modules/Gold';
 
-export default function GameScene({ playerName }) {
+export default function GameScene({ auth }) {
   const containerRef = useRef(null);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
-    if (!containerRef.current) return;
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 25, 35);
-    camera.lookAt(0, 0, 0);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
-    containerRef.current.appendChild(renderer.domElement);
-    const env = createEnvironment(scene);
-    const ui = createUI(playerName);
-    const resources = { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
-    const world = { camera, units: [], trees: [], buildings: [], animals: [], stones: [], golds: [], resources, ui, pondPosition: env.pondPosition };
-    world.units.push(createHuman(scene, { x: -8, y: 0, z: 8 }, { team: 'red' }));
-    world.units.push(createHuman(scene, { x: 8, y: 0, z: 8 }, { team: 'blue' }));
-    const usedSpots = [];
-    function isTooClose(x, z, minDist) { return usedSpots.some((s) => Math.sqrt((x-s.x)**2+(z-s.z)**2) < minDist); }
-    function addSpot(x, z) { usedSpots.push({ x, z }); }
-    let attempts = 0;
-    while (world.trees.length < 20 && attempts < 300) {
-      attempts++;
-      const x = (Math.random()-0.5)*120; const z = (Math.random()-0.5)*120;
-      if (Math.sqrt(x*x+z*z) < 12) continue;
-      if (isTooClose(x, z, 5)) continue;
-      addSpot(x, z); world.trees.push(createTree(scene, { x, y:0, z }));
+    if (!containerRef.current || !auth) return;
+
+    // Connect to socket.io
+    const socket = io('/', { reconnection: true });
+
+    socket.on('connect', () => {
+      console.log('Connected to server:', socket.id);
+      // Send join with userId and username to load saved data
+      socket.emit('join', { userId: auth.userId, username: auth.username });
+    });
+
+    socket.on('joined', (data) => {
+      console.log('Joined game with loaded data:', data);
+      initializeGame(data);
+    });
+
+    socket.on('joinError', (err) => {
+      console.error('Join error:', err);
+      setError(err.error || 'Failed to join game');
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+    });
+
+    function initializeGame(joinData) {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 25, 35);
+      camera.lookAt(0, 0, 0);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+      containerRef.current.appendChild(renderer.domElement);
+
+      const env = createEnvironment(scene);
+      const ui = createUI(auth.username);
+
+      // Load saved resources or start with 0
+      const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
+
+      const world = {
+        camera, socket, playerId: joinData.playerId,
+        units: [], trees: [], buildings: [], animals: [],
+        stones: [], golds: [], resources, ui, pondPosition: env.pondPosition
+      };
+
+      // Create or restore player units
+      if (joinData.player.units && joinData.player.units.length > 0) {
+        joinData.player.units.forEach(u => {
+          world.units.push(createHuman(scene, { x: u.x, y: 0, z: u.z }, { team: u.team || 'red' }));
+        });
+      } else {
+        world.units.push(createHuman(scene, { x: -8, y: 0, z: 8 }, { team: 'red' }));
+        world.units.push(createHuman(scene, { x: 8, y: 0, z: 8 }, { team: 'blue' }));
+      }
+
+      // Create trees
+      const usedSpots = [];
+      function isTooClose(x, z, minDist) { return usedSpots.some((s) => Math.sqrt((x-s.x)**2+(z-s.z)**2) < minDist); }
+      function addSpot(x, z) { usedSpots.push({ x, z }); }
+      let attempts = 0;
+      while (world.trees.length < 20 && attempts < 300) {
+        attempts++;
+        const x = (Math.random()-0.5)*120; const z = (Math.random()-0.5)*120;
+        if (Math.sqrt(x*x+z*z) < 12) continue;
+        if (isTooClose(x, z, 5)) continue;
+        addSpot(x, z); world.trees.push(createTree(scene, { x, y:0, z }));
+      }
+
+      // Create stones
+      attempts = 0;
+      while (world.stones.length < 8 && attempts < 300) {
+        attempts++;
+        const x = (Math.random()-0.5)*120; const z = (Math.random()-0.5)*120;
+        if (Math.sqrt(x*x+z*z) < 15) continue;
+        if (isTooClose(x, z, 8)) continue;
+        addSpot(x, z); world.stones.push(createStone(scene, { x, y:0, z }));
+      }
+
+      // Create golds
+      attempts = 0;
+      while (world.golds.length < 4 && attempts < 300) {
+        attempts++;
+        const angle = Math.random()*Math.PI*2;
+        const r = 15 + Math.random()*30;
+        const x = Math.cos(angle)*r; const z = Math.sin(angle)*r;
+        if (isTooClose(x, z, 10)) continue;
+        addSpot(x, z); world.golds.push(createGold(scene, { x, y:0, z }));
+      }
+      world.golds.push(createGold(scene, { x: 5, y:0, z: 5 }));
+
+      // Create town center
+      const startTC = createTownCenter(scene, false);
+      startTC.setPosition(0, 0); startTC.place();
+      startTC.storage = { wood:0, stone:0, gold:0, food:0, water:0, max:100000 };
+      startTC.getPosition = () => ({ x:0, z:0 });
+      world.buildings.push(startTC);
+
+      // Create animals
+      world.animals.push(createChicken(scene, { x:6, y:0, z:6 }));
+      world.animals.push(createChicken(scene, { x:-6, y:0, z:6 }));
+      world.animals.push(createChicken(scene, { x:6, y:0, z:-6 }));
+      world.animals.push(createChicken(scene, { x:-6, y:0, z:-6 }));
+      world.animals.push(createChicken(scene, { x:0, y:0, z:8 }));
+      world.animals.push(createDeer(scene, { x:5, y:0, z:-8 }));
+      world.animals.push(createDeer(scene, { x:-5, y:0, z:-8 }));
+      world.animals.push(createDeer(scene, { x:10, y:0, z:5 }));
+      world.animals.push(createDeer(scene, { x:-10, y:0, z:5 }));
+
+      // Socket.io listeners
+      socket.on('resourceUpdate', (res) => {
+        world.resources = res;
+      });
+
+      socket.on('treeUpdate', (tree) => {
+        const t = world.trees.find(x => x.id === tree.id);
+        if (t) { t.hp = tree.hp; t.wood = tree.wood; t.state = tree.state; }
+      });
+
+      socket.on('buildingPlaced', (building) => {
+        world.buildings.push(building);
+      });
+
+      // Controls and animation
+      const { update, dispose } = createControls(camera, renderer, scene, world);
+      let last = performance.now(); let time = 0;
+      const animate = () => {
+        requestAnimationFrame(animate);
+        const now = performance.now(); let dt = (now-last)/1000; last = now;
+        if (dt > 0.1) dt = 0.1; time += dt;
+        update(time, dt);
+        if (env.waterUpdate) env.waterUpdate(dt);
+        world.trees.forEach((t) => t.update(dt));
+        world.stones.forEach((s) => s.update(dt));
+        world.golds.forEach((g) => g.update(dt));
+        world.animals.forEach((a) => a.update(dt, world));
+        world.units.forEach((u) => { u.update(dt, world); u.animate(dt); });
+        ui.setResources(world.resources);
+        renderer.render(scene, camera);
+      };
+      animate();
+
+      const handleResize = () => {
+        camera.aspect = window.innerWidth/window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      };
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        dispose();
+        if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
+          containerRef.current.removeChild(renderer.domElement);
+        }
+      };
     }
-    attempts = 0;
-    while (world.stones.length < 8 && attempts < 300) {
-      attempts++;
-      const x = (Math.random()-0.5)*120; const z = (Math.random()-0.5)*120;
-      if (Math.sqrt(x*x+z*z) < 15) continue;
-      if (isTooClose(x, z, 8)) continue;
-      addSpot(x, z); world.stones.push(createStone(scene, { x, y:0, z }));
-    }
-    attempts = 0;
-    while (world.golds.length < 4 && attempts < 300) {
-      attempts++;
-      const angle = Math.random()*Math.PI*2;
-      const r = 15 + Math.random()*30;
-      const x = Math.cos(angle)*r; const z = Math.sin(angle)*r;
-      if (isTooClose(x, z, 10)) continue;
-      addSpot(x, z); world.golds.push(createGold(scene, { x, y:0, z }));
-    }
-    world.golds.push(createGold(scene, { x: 5, y:0, z: 5 }));
-    const startTC = createTownCenter(scene, false);
-    startTC.setPosition(0, 0); startTC.place();
-    startTC.storage = { wood:0, stone:0, gold:0, food:0, water:0, max:100000 };
-    startTC.getPosition = () => ({ x:0, z:0 });
-    world.buildings.push(startTC);
-    world.animals.push(createChicken(scene, { x:6, y:0, z:6 }));
-    world.animals.push(createChicken(scene, { x:-6, y:0, z:6 }));
-    world.animals.push(createChicken(scene, { x:6, y:0, z:-6 }));
-    world.animals.push(createChicken(scene, { x:-6, y:0, z:-6 }));
-    world.animals.push(createChicken(scene, { x:0, y:0, z:8 }));
-    world.animals.push(createDeer(scene, { x:5, y:0, z:-8 }));
-    world.animals.push(createDeer(scene, { x:-5, y:0, z:-8 }));
-    world.animals.push(createDeer(scene, { x:10, y:0, z:5 }));
-    world.animals.push(createDeer(scene, { x:-10, y:0, z:5 }));
-    const { update, dispose } = createControls(camera, renderer, scene, world);
-    let last = performance.now(); let time = 0;
-    const animate = () => {
-      requestAnimationFrame(animate);
-      const now = performance.now(); let dt = (now-last)/1000; last = now;
-      if (dt > 0.1) dt = 0.1; time += dt;
-      update(time, dt);
-      if (env.waterUpdate) env.waterUpdate(dt);
-      world.trees.forEach((t) => t.update(dt));
-      world.stones.forEach((s) => s.update(dt));
-      world.golds.forEach((g) => g.update(dt));
-      world.animals.forEach((a) => a.update(dt, world));
-      world.units.forEach((u) => { u.update(dt, world); u.animate(dt); });
-      ui.setResources(resources);
-      renderer.render(scene, camera);
-    };
-    animate();
-    const handleResize = () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
-    window.addEventListener('resize', handleResize);
+
     return () => {
-      window.removeEventListener('resize', handleResize); dispose();
-      if (containerRef.current && renderer.domElement.parentNode === containerRef.current) containerRef.current.removeChild(renderer.domElement);
+      socket.disconnect();
     };
-  }, [playerName]);
+  }, [auth]);
+
+  if (error) {
+    return (
+      <div style={{
+        width:'100%', height:'100vh', background:'#000', display:'flex',
+        alignItems:'center', justifyContent:'center', color:'#fff', fontSize:'20px'
+      }}>
+        Error: {error}
+      </div>
+    );
+  }
+
   return React.createElement('div', { ref: containerRef, style: { width:'100%', height:'100vh', overflow:'hidden' } });
 }

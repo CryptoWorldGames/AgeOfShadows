@@ -4,6 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const { initDatabase, registerUser, authenticateUser, loadPlayerData, savePlayerData, getUserByUsername } = require('./db');
 
 const app = express();
 app.use(cors());
@@ -14,11 +15,17 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
+// Initialize database on startup
+initDatabase();
+
 const world = {
   trees: generateTrees(20),
   buildings: [],
   players: {}
 };
+
+// Track userId for each socket for saving data on disconnect
+const socketUserMap = {};
 
 function generateTrees(n) {
   const trees = [];
@@ -79,21 +86,50 @@ setInterval(() => {
 io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
-  socket.on('join', (data) => {
-    const units = createPlayerUnits(socket.id);
-    const player = {
-      id: socket.id,
-      name: data.name || `Player${Math.floor(Math.random() * 1000)}`,
-      color: data.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
-      resources: { wood: 0, food: 0, water: 0, gold: 0, stone: 0 },
-      units
-    };
-    world.players[socket.id] = player;
-    // Send this player their own data + full world state
-    socket.emit('joined', { playerId: socket.id, player, world });
-    // Tell everyone else a new player joined with their units
-    socket.broadcast.emit('playerJoined', { playerId: socket.id, player });
-    console.log(`${player.name} joined. Players: ${Object.keys(world.players).length}`);
+  socket.on('join', async (data) => {
+    try {
+      // Load saved player data from database
+      const savedData = await loadPlayerData(data.userId);
+
+      let units, resources, buildings;
+      if (savedData) {
+        // Restore saved progress
+        resources = savedData.resources;
+        buildings = savedData.buildings;
+        // Recreate units with saved positions
+        units = savedData.units.length > 0
+          ? savedData.units
+          : createPlayerUnits(socket.id);
+      } else {
+        // New player: create fresh units
+        units = createPlayerUnits(socket.id);
+        resources = { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
+        buildings = [];
+      }
+
+      const user = await getUserByUsername(data.username);
+      const player = {
+        id: socket.id,
+        userId: data.userId,
+        name: user.username || `Player${Math.floor(Math.random() * 1000)}`,
+        color: data.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
+        resources,
+        units,
+        buildings
+      };
+
+      world.players[socket.id] = player;
+      socketUserMap[socket.id] = data.userId;
+
+      // Send this player their own data + full world state
+      socket.emit('joined', { playerId: socket.id, player, world });
+      // Tell everyone else a new player joined with their units
+      socket.broadcast.emit('playerJoined', { playerId: socket.id, player });
+      console.log(`${player.name} (userId: ${data.userId}) joined. Players: ${Object.keys(world.players).length}`);
+    } catch (err) {
+      console.error('Error on join:', err);
+      socket.emit('joinError', { error: err.message });
+    }
   });
 
   socket.on('unitMove', (data) => {
@@ -127,23 +163,78 @@ io.on('connection', (socket) => {
   });
 
   socket.on('placeBuilding', (data) => {
+    const player = world.players[socket.id];
+    if (!player) return;
     const building = {
       id: `b_${Date.now()}`,
       type: data.type, x: data.x, z: data.z,
       ownerId: socket.id
     };
     world.buildings.push(building);
+    if (!player.buildings) player.buildings = [];
+    player.buildings.push(building);
     io.emit('buildingPlaced', building);
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     const player = world.players[socket.id];
     if (player) {
+      const userId = socketUserMap[socket.id];
+      if (userId) {
+        try {
+          // Save player data to database
+          await savePlayerData(userId, player.resources, player.units, player.buildings || []);
+          console.log(`${player.name} saved to database.`);
+        } catch (err) {
+          console.error(`Failed to save player data for ${player.name}:`, err);
+        }
+      }
       console.log(`${player.name} disconnected.`);
       delete world.players[socket.id];
+      delete socketUserMap[socket.id];
       io.emit('playerLeft', { playerId: socket.id });
     }
   });
+});
+
+// Authentication endpoints
+app.post('/api/register', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+  if (username.length < 3) {
+    return res.status(400).json({ error: 'Username must be at least 3 characters' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  try {
+    const userId = await registerUser(username, password);
+    res.json({ success: true, userId, message: 'Account created' });
+  } catch (err) {
+    if (err.message.includes('UNIQUE constraint failed')) {
+      res.status(400).json({ error: 'Username already exists' });
+    } else {
+      res.status(500).json({ error: 'Registration failed' });
+    }
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+  try {
+    const userId = await authenticateUser(username, password);
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    res.json({ success: true, userId, username, message: 'Logged in' });
+  } catch (err) {
+    res.status(500).json({ error: 'Login failed' });
+  }
 });
 
 app.post('/api/join', (req, res) => {
