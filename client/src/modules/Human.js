@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { SETTINGS } from './Settings.js';
 
-const MODEL_URL = '/models/balkan__cs2_agent_model_dragomir_no1.glb';
+const MODEL_URL = 'https://pub-9e79279ca165496da153d64ecb88f99c.r2.dev/balkan__cs2_agent_model_dragomir_no1.glb';
 const SKIN_MATS = ['tm_balkan_v2_head_varianta.001'];
 
 let audioCtx = null;
