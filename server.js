@@ -44,6 +44,15 @@ function generateTrees(n) {
   return trees;
 }
 
+function createPlayerUnits(socketId) {
+  const spawnX = (Math.random() - 0.5) * 20;
+  const spawnZ = (Math.random() - 0.5) * 20;
+  return [
+    { id: `${socketId}_u0`, x: spawnX - 2, z: spawnZ, team: 'red', ownerId: socketId },
+    { id: `${socketId}_u1`, x: spawnX + 2, z: spawnZ, team: 'blue', ownerId: socketId }
+  ];
+}
+
 setInterval(() => {
   let changed = false;
   world.trees.forEach((t) => {
@@ -71,18 +80,18 @@ io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
   socket.on('join', (data) => {
+    const units = createPlayerUnits(socket.id);
     const player = {
       id: socket.id,
       name: data.name || `Player${Math.floor(Math.random() * 1000)}`,
       color: data.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
       resources: { wood: 0, food: 0, water: 0, gold: 0, stone: 0 },
-      units: [
-        { id: `${socket.id}_u0`, x: (Math.random()-0.5)*6, z: (Math.random()-0.5)*6, team: 'red' },
-        { id: `${socket.id}_u1`, x: (Math.random()-0.5)*6, z: (Math.random()-0.5)*6, team: 'blue' }
-      ]
+      units
     };
     world.players[socket.id] = player;
+    // Send this player their own data + full world state
     socket.emit('joined', { playerId: socket.id, player, world });
+    // Tell everyone else a new player joined with their units
     socket.broadcast.emit('playerJoined', { playerId: socket.id, player });
     console.log(`${player.name} joined. Players: ${Object.keys(world.players).length}`);
   });
