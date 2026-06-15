@@ -26,37 +26,26 @@ function getDeerGLTF() {
   return deerLoadPromise;
 }
 
-// ===== CHICKEN =====
 export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
   const group = new THREE.Group();
   group.position.set(position.x, 0, position.z);
   group.rotation.y = Math.random() * Math.PI * 2;
   scene.add(group);
 
-  const hitbox = new THREE.Mesh(
-    new THREE.BoxGeometry(0.6, 0.5, 0.6),
-    new THREE.MeshBasicMaterial({ visible: false })
-  );
-  hitbox.position.y = 0.25;
-  group.add(hitbox);
+  const hitbox = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
+  hitbox.position.y = 0.25; group.add(hitbox);
 
-  let mixer = null;
-  let walkAction = null;
-  let scaredAction = null;
-  let liveMeshes = [];
-  let deadMeshes = [];
-  let isMoving = false;
+  let mixer = null, walkAction = null, scaredAction = null;
+  let liveMeshes = [], deadMeshes = [], isMovingLocal = false;
 
   getChickenGLTF().then((gltf) => {
     const model = SkeletonClone(gltf.scene);
     const bbox = new THREE.Box3().setFromObject(model);
     const size = bbox.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    model.scale.setScalar(0.3 / maxDim);
+    model.scale.setScalar(0.3 / Math.max(size.x, size.y, size.z));
     model.updateMatrixWorld(true);
     const bbox2 = new THREE.Box3().setFromObject(model);
     model.position.y = -bbox2.min.y;
-
     model.traverse((c) => {
       if (c.isMesh) {
         c.castShadow = true; c.receiveShadow = true; c.visible = true;
@@ -70,7 +59,6 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
       }
     });
     group.add(model);
-
     mixer = new THREE.AnimationMixer(model);
     mixer.stopAllAction();
     const clipMap = {};
@@ -90,8 +78,8 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
 
   const S = SETTINGS.chicken; const cfg = SETTINGS.animal.chicken;
   let hp = S.hitsToKill, food = S.yield, state = 'wandering', respawnTimer = 0;
-  let wanderTimer = Math.random() * 3, dyingT = 0, scaredTimer = 0, isMovingLocal = false;
-  let wanderDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+  let wanderTimer = Math.random() * 3, dyingT = 0, scaredTimer = 0;
+  let wanderDir = new THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize();
   const spawnPos = new THREE.Vector3(position.x, 0, position.z);
 
   function setWalking(w) { if (!walkAction) return; walkAction.paused = !w; if (w && scaredAction) scaredAction.stop(); }
@@ -141,7 +129,6 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
   };
 }
 
-// ===== DEER =====
 export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
   const group = new THREE.Group();
   group.position.set(position.x, 0, position.z);
@@ -158,12 +145,10 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
     const model = SkeletonClone(gltf.scene);
     const bbox = new THREE.Box3().setFromObject(model);
     const size = bbox.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    model.scale.setScalar(1.2 / maxDim);
+    model.scale.setScalar(1.2 / Math.max(size.x, size.y, size.z));
     model.updateMatrixWorld(true);
     const bbox2 = new THREE.Box3().setFromObject(model);
     model.position.y = -bbox2.min.y;
-
     model.traverse((c) => {
       if (c.isMesh) {
         c.castShadow = true; c.receiveShadow = true;
@@ -174,21 +159,17 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
       }
     });
     group.add(model);
-
     mixer = new THREE.AnimationMixer(model);
     mixer.stopAllAction();
     const clips = gltf.animations || [];
     console.log('Deer animations:', clips.map(c => c.name));
-    const clipMap = {};
-    clips.forEach((clip) => { clipMap[clip.name.toLowerCase()] = clip; });
-
-    const idleClip = clipMap['idle'] || clipMap['idle01'] || clipMap['stand'] || clips[0];
-    const walkClip = clipMap['walk'] || clipMap['walk01'] || clipMap['walking'] || clips[1];
-    const runClip = clipMap['run'] || clipMap['run01'] || clipMap['gallop'] || clipMap['trot'] || clips[2];
-
-    if (idleClip) { idleAction = mixer.clipAction(idleClip); idleAction.loop = THREE.LoopRepeat; idleAction.play(); }
-    if (walkClip) { walkAction = mixer.clipAction(walkClip); walkAction.loop = THREE.LoopRepeat; }
-    if (runClip) { runAction = mixer.clipAction(runClip); runAction.loop = THREE.LoopRepeat; }
+    if (clips[0]) {
+      idleAction = mixer.clipAction(clips[0]);
+      idleAction.loop = THREE.LoopRepeat;
+      idleAction.play();
+      walkAction = idleAction;
+      runAction = idleAction;
+    }
   }).catch((err) => console.warn('Deer GLB failed:', err));
 
   const cfg = SETTINGS.animal.deer;
@@ -197,15 +178,6 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
   let runTimer = 0;
   const spawnPos = new THREE.Vector3(position.x, 0, position.z);
 
-  function setAnim(type) {
-    if (!mixer) return;
-    const stop = (a) => { if (a && a.isRunning()) a.fadeOut(0.3); };
-    const play = (a) => { if (a) a.reset().fadeIn(0.3).play(); };
-    if (type === 'run') { stop(idleAction); stop(walkAction); play(runAction || walkAction); }
-    else if (type === 'walk') { stop(idleAction); stop(runAction); play(walkAction || idleAction); }
-    else { stop(walkAction); stop(runAction); play(idleAction); }
-  }
-
   function update(dt, world) {
     if (mixer) mixer.update(dt);
     let flee = false;
@@ -213,18 +185,16 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
       world.units.forEach((u) => {
         const dx = group.position.x - u.group.position.x;
         const dz = group.position.z - u.group.position.z;
-        if (Math.sqrt(dx*dx + dz*dz) < 10) { wanderDir.set(dx, 0, dz).normalize(); flee = true; }
+        if (Math.sqrt(dx*dx+dz*dz) < 10) { wanderDir.set(dx, 0, dz).normalize(); flee = true; }
       });
     }
-    if (flee) { if (!isRunning) { isRunning = true; setAnim('run'); } runTimer = 3; }
-    else if (runTimer > 0) { runTimer -= dt; if (runTimer <= 0) { isRunning = false; setAnim('walk'); } }
-
+    if (flee) { isRunning = true; runTimer = 3; }
+    else if (runTimer > 0) { runTimer -= dt; if (runTimer <= 0) isRunning = false; }
     wanderTimer -= dt;
     if (wanderTimer <= 0 && !flee) {
       wanderTimer = 3 + Math.random()*5;
       wanderDir.set(Math.random()-0.5, 0, Math.random()-0.5).normalize();
       if (group.position.distanceTo(spawnPos) > cfg.wanderRange) wanderDir.subVectors(spawnPos, group.position).normalize();
-      if (!isRunning) setAnim('walk');
     }
     const spd = isRunning ? cfg.wanderSpeed : cfg.wanderSpeed*0.25;
     group.position.x += wanderDir.x*spd*dt;

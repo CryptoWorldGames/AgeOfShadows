@@ -64,10 +64,10 @@ export default function GameScene({ playerId, gameState }) {
     world.animals.push(createChicken(scene, { x:6, y:0, z:-6 }));
     world.animals.push(createChicken(scene, { x:-6, y:0, z:-6 }));
     world.animals.push(createChicken(scene, { x:0, y:0, z:8 }));
-    world.animals.push(createDeer(scene, { x:12, y:0, z:0 }));
-    world.animals.push(createDeer(scene, { x:-12, y:0, z:0 }));
-    world.animals.push(createDeer(scene, { x:0, y:0, z:12 }));
-    world.animals.push(createDeer(scene, { x:0, y:0, z:-12 }));
+    world.animals.push(createDeer(scene, { x:5, y:0, z:-8 }));
+    world.animals.push(createDeer(scene, { x:-5, y:0, z:-8 }));
+    world.animals.push(createDeer(scene, { x:10, y:0, z:5 }));
+    world.animals.push(createDeer(scene, { x:-10, y:0, z:5 }));
     const { update, dispose } = createControls(camera, renderer, scene, world);
     let last = performance.now(); let time = 0;
     const animate = () => {
