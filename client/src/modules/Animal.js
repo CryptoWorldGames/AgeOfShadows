@@ -138,17 +138,20 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
   group.rotation.y = Math.random() * Math.PI * 2;
   scene.add(group);
 
-  const hitbox = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 1.6), new THREE.MeshBasicMaterial({ visible: false }));
-  hitbox.position.y = 0.6; group.add(hitbox);
+  const hitbox = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.4, 3.2), new THREE.MeshBasicMaterial({ visible: false }));
+  hitbox.position.y = 1.2; group.add(hitbox);
 
   let mixer = null, idleAction = null;
-  let isRunning = false;
+  let wanderTimer = Math.random() * 4 + 3;
+  let targetRotation = Math.random() * Math.PI * 2;
+  let currentRotation = targetRotation;
 
   getDeerGLTF().then((gltf) => {
     const model = SkeletonClone(gltf.scene);
     const bbox = new THREE.Box3().setFromObject(model);
     const size = bbox.getSize(new THREE.Vector3());
-    model.scale.setScalar(1.2 / Math.max(size.x, size.y, size.z));
+    // 3.6 = roughly chest height on human = realistic deer size
+    model.scale.setScalar(3.6 / Math.max(size.x, size.y, size.z));
     model.updateMatrixWorld(true);
     const bbox2 = new THREE.Box3().setFromObject(model);
     model.position.y = -bbox2.min.y;
@@ -165,7 +168,6 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
     mixer = new THREE.AnimationMixer(model);
     mixer.stopAllAction();
     const clips = gltf.animations || [];
-    console.log('Deer animations:', clips.map(c => c.name));
     if (clips[0]) {
       idleAction = mixer.clipAction(clips[0]);
       idleAction.loop = THREE.LoopRepeat;
@@ -177,34 +179,43 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
   }).catch((err) => console.warn('Deer GLB failed:', err));
 
   const cfg = SETTINGS.animal.deer;
-  let wanderTimer = Math.random() * 3;
-  let wanderDir = new THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize();
-  let runTimer = 0;
   const spawnPos = new THREE.Vector3(position.x, 0, position.z);
+  let fleeDir = new THREE.Vector3();
 
   function update(dt, world) {
     if (mixer) mixer.update(dt);
+
     let flee = false;
     if (world && world.units) {
       world.units.forEach((u) => {
         const dx = group.position.x - u.group.position.x;
         const dz = group.position.z - u.group.position.z;
-        if (Math.sqrt(dx*dx+dz*dz) < 10) { wanderDir.set(dx, 0, dz).normalize(); flee = true; }
+        if (Math.sqrt(dx*dx+dz*dz) < 8) { fleeDir.set(dx, 0, dz).normalize(); flee = true; }
       });
     }
-    if (flee) { isRunning = true; runTimer = 3; }
-    else if (runTimer > 0) { runTimer -= dt; if (runTimer <= 0) isRunning = false; }
-    wanderTimer -= dt;
-    if (wanderTimer <= 0 && !flee) {
-      wanderTimer = 3 + Math.random()*5;
-      wanderDir.set(Math.random()-0.5, 0, Math.random()-0.5).normalize();
-      if (group.position.distanceTo(spawnPos) > cfg.wanderRange) wanderDir.subVectors(spawnPos, group.position).normalize();
+
+    if (flee) {
+      // Slowly back away — no sliding since it's just a slow drift
+      group.position.x += fleeDir.x * 1.2 * dt;
+      group.position.z += fleeDir.z * 1.2 * dt;
+      group.rotation.y = Math.atan2(fleeDir.x, fleeDir.z);
+    } else {
+      // Stand still, rotate slowly to look natural
+      wanderTimer -= dt;
+      if (wanderTimer <= 0) {
+        wanderTimer = 4 + Math.random() * 6;
+        targetRotation = Math.random() * Math.PI * 2;
+        if (group.position.distanceTo(spawnPos) > cfg.wanderRange) {
+          group.position.x += (spawnPos.x - group.position.x) * 0.05;
+          group.position.z += (spawnPos.z - group.position.z) * 0.05;
+        }
+      }
+      let diff = targetRotation - currentRotation;
+      if (diff > Math.PI) diff -= Math.PI * 2;
+      if (diff < -Math.PI) diff += Math.PI * 2;
+      currentRotation += diff * dt * 0.5;
+      group.rotation.y = currentRotation;
     }
-    if (idleAction) idleAction.timeScale = isRunning ? 2.0 : 1.0;
-    const spd = isRunning ? cfg.wanderSpeed * 0.4 : cfg.wanderSpeed * 0.08;
-    group.position.x += wanderDir.x*spd*dt;
-    group.position.z += wanderDir.z*spd*dt;
-    group.rotation.y = Math.atan2(wanderDir.x, wanderDir.z);
   }
 
   return {
