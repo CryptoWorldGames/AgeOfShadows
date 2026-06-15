@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as SkeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { SETTINGS } from './Settings.js';
 
 const loader = new GLTFLoader();
@@ -18,7 +19,9 @@ function getChickenGLTF() {
 function getDeerGLTF() {
   if (deerLoadPromise) return deerLoadPromise;
   deerLoadPromise = new Promise((resolve, reject) => {
-    loader.load('/models/deer.glb', resolve, undefined, reject);
+    const deerLoader = new GLTFLoader();
+    deerLoader.setMeshoptDecoder(MeshoptDecoder);
+    deerLoader.load('/models/deer.glb', resolve, undefined, reject);
   });
   return deerLoadPromise;
 }
@@ -72,7 +75,6 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
     mixer.stopAllAction();
     const clipMap = {};
     (gltf.animations || []).forEach((clip) => { clipMap[clip.name.toLowerCase()] = clip; });
-
     const walkClip = clipMap['walk01'];
     const scaredClip = clipMap['chicken_scared01'] || clipMap['chicken_scared02'];
     if (walkClip) { walkAction = mixer.clipAction(THREE.AnimationClip.parse(THREE.AnimationClip.toJSON(walkClip))); walkAction.loop = THREE.LoopRepeat; walkAction.play(); walkAction.paused = true; }

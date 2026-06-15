@@ -56,7 +56,6 @@ export default function GameScene({ playerId, gameState }) {
       if (isTooClose(x, z, 10)) continue;
       addSpot(x, z); world.golds.push(createGold(scene, { x, y:0, z }));
     }
-    // Small test gold deposit right next to TC
     world.golds.push(createGold(scene, { x: 5, y:0, z: 5 }));
     const startTC = createTownCenter(scene, false);
     startTC.setPosition(0, 0); startTC.place(); world.buildings.push(startTC);
@@ -65,10 +64,10 @@ export default function GameScene({ playerId, gameState }) {
     world.animals.push(createChicken(scene, { x:6, y:0, z:-6 }));
     world.animals.push(createChicken(scene, { x:-6, y:0, z:-6 }));
     world.animals.push(createChicken(scene, { x:0, y:0, z:8 }));
-    for (let i = 0; i < 4; i++) {
-      const ang = (i/4)*Math.PI*2; const r = 35+Math.random()*15;
-      world.animals.push(createDeer(scene, { x:Math.cos(ang)*r, y:0, z:Math.sin(ang)*r }));
-    }
+    world.animals.push(createDeer(scene, { x:12, y:0, z:0 }));
+    world.animals.push(createDeer(scene, { x:-12, y:0, z:0 }));
+    world.animals.push(createDeer(scene, { x:0, y:0, z:12 }));
+    world.animals.push(createDeer(scene, { x:0, y:0, z:-12 }));
     const { update, dispose } = createControls(camera, renderer, scene, world);
     let last = performance.now(); let time = 0;
     const animate = () => {
