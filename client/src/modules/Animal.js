@@ -27,6 +27,44 @@ function getDeerGLTF() {
   return deerLoadPromise;
 }
 
+function makeAnimalHealthBar(scene, group, yOffset) {
+  const hbGroup = new THREE.Group();
+  hbGroup.position.y = yOffset;
+  const bg = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.15), new THREE.MeshBasicMaterial({ color: 0x222222, depthTest: false, transparent: true }));
+  const fill = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.11), new THREE.MeshBasicMaterial({ color: 0x22cc44, depthTest: false, transparent: true }));
+  fill.position.z = 0.001; hbGroup.add(bg); hbGroup.add(fill); hbGroup.renderOrder = 999;
+  group.add(hbGroup);
+  return {
+    group: hbGroup,
+    update(frac) {
+      frac = Math.max(0, Math.min(1, frac));
+      fill.scale.x = frac; fill.position.x = -(1-frac)*0.6;
+      fill.material.color.setHex(frac > 0.5 ? 0x22cc44 : frac > 0.25 ? 0xffaa00 : 0xff2222);
+    },
+    faceCamera(camera) { hbGroup.quaternion.copy(camera.quaternion); }
+  };
+}
+
+function createMeatPile(scene, x, z, big) {
+  const meatMat = new THREE.MeshStandardMaterial({ color: 0xc0584f, roughness: 0.9, flatShading: true });
+  const boneMat = new THREE.MeshStandardMaterial({ color: 0xe8dcc8, roughness: 0.8 });
+  const pile = new THREE.Group();
+  const count = big ? 6 : 3;
+  for (let i = 0; i < count; i++) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry((big ? 0.18 : 0.1) + Math.random() * 0.08, 5, 4), meatMat);
+    m.position.set((Math.random()-0.5)*0.5, 0.08, (Math.random()-0.5)*0.5);
+    m.scale.set(1, 0.6, 1); pile.add(m);
+  }
+  // Add a bone for deer
+  if (big) {
+    const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), boneMat);
+    bone.position.set(0.2, 0.1, 0.1); bone.rotation.z = 0.5; pile.add(bone);
+  }
+  pile.position.set(x, 0, z);
+  scene.add(pile);
+  return pile;
+}
+
 export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
   const group = new THREE.Group();
   group.position.set(position.x, 0, position.z);
@@ -35,6 +73,8 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
 
   const hitbox = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
   hitbox.position.y = 0.25; group.add(hitbox);
+
+  const healthBar = makeAnimalHealthBar(scene, group, 0.9);
 
   let mixer = null, walkAction = null, scaredAction = null;
   let liveMeshes = [], deadMeshes = [], isMovingLocal = false;
@@ -100,9 +140,14 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
     if (meatPile) { scene.remove(meatPile); meatPile = null; }
     liveMeshes.forEach((m) => { m.visible = true; }); deadMeshes.forEach((m) => { m.visible = false; });
     if (walkAction) { walkAction.reset().play(); walkAction.paused = true; }
+    healthBar.update(1);
   }
   function update(dt, world) {
     if (mixer) mixer.update(dt);
+    if (world && world.camera) healthBar.faceCamera(world.camera);
+    healthBar.update(hp / S.hitsToKill);
+    healthBar.group.visible = state === 'wandering';
+
     if (state === 'wandering') {
       if (scaredTimer > 0) { scaredTimer -= dt; if (scaredTimer <= 0) setWalking(isMovingLocal); }
       wanderTimer -= dt;
@@ -142,7 +187,15 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
   const hitbox = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.4, 3.2), new THREE.MeshBasicMaterial({ visible: false }));
   hitbox.position.y = 1.2; group.add(hitbox);
 
+  const healthBar = makeAnimalHealthBar(scene, group, 3.2);
+
+  const S = SETTINGS.deer;
+  let hp = 6, maxHp = 6, food = S ? S.yield : 20;
+  let state = 'wandering', dyingT = 0, respawnTimer = 0;
+
   let mixer = null, idleAction = null;
+  let allMeshes = [];
+  let meatPile = null;
   let wanderTimer = Math.random() * 4 + 3;
   let targetRotation = Math.random() * Math.PI * 2;
   let currentRotation = targetRotation;
@@ -163,6 +216,7 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
           const mats = Array.isArray(c.material) ? c.material : [c.material];
           mats.forEach((mat) => { mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; mat.needsUpdate = true; });
         }
+        allMeshes.push(c);
       }
     });
     group.add(model);
@@ -183,8 +237,52 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
   const spawnPos = new THREE.Vector3(position.x, 0, position.z);
   let fleeDir = new THREE.Vector3();
 
+  function takeDamage(d) {
+    if (state !== 'wandering') return;
+    hp -= d;
+    if (hp <= 0) { hp = 0; state = 'dying'; dyingT = 0; }
+  }
+
+  function reset() {
+    hp = maxHp; food = S ? S.yield : 20; state = 'wandering'; dyingT = 0; respawnTimer = 0;
+    group.position.copy(spawnPos);
+    group.position.x += (Math.random()-0.5)*10; group.position.z += (Math.random()-0.5)*10;
+    group.rotation.y = Math.random()*Math.PI*2; group.rotation.z = 0; group.position.y = 0;
+    group.visible = true;
+    if (meatPile) { scene.remove(meatPile); meatPile = null; }
+    allMeshes.forEach((m) => { m.visible = true; });
+    healthBar.update(1);
+    if (idleAction) idleAction.play();
+  }
+
   function update(dt, world) {
     if (mixer) mixer.update(dt);
+    if (world && world.camera) healthBar.faceCamera(world.camera);
+    healthBar.update(hp / maxHp);
+    healthBar.group.visible = state === 'wandering' && hp < maxHp;
+
+    if (state === 'dying') {
+      dyingT += dt; const f = Math.min(1, dyingT / 1.5);
+      group.rotation.z = f * Math.PI / 2;
+      group.position.y = -f * 0.3;
+      if (f >= 1) {
+        // Create meat pile at death position
+        meatPile = createMeatPile(scene, group.position.x, group.position.z, true);
+        group.visible = false;
+        if (mixer) mixer.stopAllAction();
+        state = 'meatpile';
+      }
+      return;
+    }
+
+    if (state === 'meatpile') {
+      respawnTimer += dt;
+      if (respawnTimer >= (S ? S.respawnTime : 7200)) reset();
+      return;
+    }
+
+    if (state !== 'wandering') return;
+
     let flee = false;
     if (world && world.units) {
       world.units.forEach((u) => {
@@ -193,8 +291,8 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
         if (Math.sqrt(dx*dx+dz*dz) < 8) { fleeDir.set(dx, 0, dz).normalize(); flee = true; }
       });
     }
+
     if (flee) {
-      // Stand still when unit is close enough to attack — don't slide away
       const tooClose = world && world.units && world.units.some((u) => {
         const dx = group.position.x - u.group.position.x;
         const dz = group.position.z - u.group.position.z;
@@ -224,7 +322,20 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
   }
 
   return {
-    group, type: 'deer', position: () => group.position.clone(),
-    state: () => 'wandering', isDepleted: () => false, canKill: false, update
+    group, type: 'deer', position: () => meatPile ? meatPile.position.clone() : group.position.clone(),
+    state: () => state,
+    foodRemaining: () => food,
+    isDepleted: () => state === 'respawning',
+    canKill: true,
+    takeDamage,
+    takeFood(n) {
+      const give = Math.min(n, food); food -= give;
+      if (food <= 0) {
+        state = 'respawning';
+        if (meatPile) { scene.remove(meatPile); meatPile = null; }
+      }
+      return give;
+    },
+    update
   };
 }
