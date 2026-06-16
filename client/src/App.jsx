@@ -239,7 +239,7 @@ return (
         <div style={{fontSize:'64px', marginBottom:'8px'}}>⚔️</div>
         <h1 style={{fontSize:'52px',fontWeight:'900',margin:0,letterSpacing:'4px',background:'linear-gradient(135deg, #c8a84b, #ffd700, #c8a84b)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>AGE OF SHADOWS</h1>
         <p style={{color:'rgba(255,255,255,0.5)',fontSize:'14px',letterSpacing:'6px',marginTop:'8px'}}>MULTIPLAYER STRATEGY</p>
-        <p style={{color:'#fff',fontSize:'16px',fontWeight:'600',marginTop:'12px',letterSpacing:'2px'}}>v1.9</p>
+        <p style={{color:'#fff',fontSize:'16px',fontWeight:'600',marginTop:'12px',letterSpacing:'2px'}}>v2.0</p>
       </div>
       <div style={{background:'rgba(0,0,0,0.7)',border:'1px solid rgba(200,168,75,0.4)',borderRadius:'16px',padding:'40px 48px',width:'360px',zIndex:1,backdropFilter:'blur(10px)',boxShadow:'0 0 60px rgba(200,168,75,0.1)'}}>
         <h2 style={{margin:'0 0 24px',fontSize:'20px',color:'#c8a84b',textAlign:'center'}}>{mode==='login'?'Enter the Realm':mode==='register'?'Create Account':'Reset Password'}</h2>
