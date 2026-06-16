@@ -26,6 +26,22 @@ const world = {
 // Track userId for each socket to save on disconnect
 const socketUserMap = {};
 
+// Rate limiting: track registrations by IP
+const registrationAttempts = {};
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const dayInMs = 24 * 60 * 60 * 1000;
+  if (!registrationAttempts[ip]) {
+    registrationAttempts[ip] = [];
+  }
+  // Clean old attempts
+  registrationAttempts[ip] = registrationAttempts[ip].filter(t => now - t < dayInMs);
+  if (registrationAttempts[ip].length >= 5) return false; // Max 5 per day per IP
+  registrationAttempts[ip].push(now);
+  return true;
+}
+
 function generateTrees(n) {
   const trees = [];
   const used = [];
@@ -211,29 +227,36 @@ io.on('connection', (socket) => {
 
 // Authentication endpoints
 app.post('/api/register', async (req, res) => {
-  const { email, displayName, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password required' });
-  }
-  if (!email.includes('@')) {
-    return res.status(400).json({ error: 'Invalid email address' });
+  const { displayName, password, recaptchaToken, contactEmail, wantsEmails } = req.body;
+  const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+  if (!displayName || !password) {
+    return res.status(400).json({ error: 'Display name and password required' });
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
+
+  // Check rate limit
+  if (!checkRateLimit(clientIp)) {
+    return res.status(429).json({ error: 'Too many registration attempts. Try again tomorrow.' });
+  }
+
+  // Verify reCAPTCHA (basic check - server-side verification would require API key)
+  if (!recaptchaToken) {
+    return res.status(400).json({ error: 'reCAPTCHA verification required' });
+  }
+
   try {
-    const result = await registerUser(email, displayName, password);
-    const emailConfigured = process.env.SENDGRID_API_KEY || process.env.GMAIL_EMAIL;
-    const message = emailConfigured
-      ? 'Account created. Check your email for the verification link.'
-      : 'Account created. Check the server console for your verification token.';
-    res.json({ success: true, userId: result.userId, email, message, emailConfigured });
+    // Use displayName as email for account system (no email verification needed)
+    const autoEmail = `user_${Date.now()}@ageofshadows.local`;
+    const result = await registerUser(autoEmail, displayName, password, {
+      contactEmail: contactEmail || null,
+      wantsEmails: wantsEmails && contactEmail ? true : false
+    });
+    res.json({ success: true, userId: result.userId, displayName, message: 'Account created! Welcome to Age of Shadows.' });
   } catch (err) {
-    if (err.message.includes('already registered')) {
-      res.status(400).json({ error: 'Email already registered' });
-    } else {
-      res.status(500).json({ error: 'Registration failed' });
-    }
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 

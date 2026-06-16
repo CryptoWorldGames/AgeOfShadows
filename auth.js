@@ -50,7 +50,7 @@ function savePlayers(players) {
   }
 }
 
-function registerUser(email, displayName, password) {
+function registerUser(email, displayName, password, options = {}) {
   return new Promise((resolve, reject) => {
     try {
       const users = loadUsers();
@@ -62,8 +62,6 @@ function registerUser(email, displayName, password) {
 
       const userId = Date.now().toString();
       const hash = bcrypt.hashSync(password, 10);
-      const verificationToken = require('crypto').randomBytes(32).toString('hex');
-      const tokenExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
 
       users[userId] = {
         id: userId,
@@ -71,10 +69,10 @@ function registerUser(email, displayName, password) {
         displayName: displayName || email.split('@')[0],
         passwordHash: hash,
         createdAt: new Date().toISOString(),
-        emailVerified: false,
-        verificationToken,
-        verificationExpires: tokenExpires,
-        profile: { age: null, state: null, country: null }
+        emailVerified: true,
+        profile: { age: null, state: null, country: null },
+        contactEmail: options.contactEmail || null,
+        wantsEmails: options.wantsEmails || false
       };
 
       saveUsers(users);
@@ -89,11 +87,8 @@ function registerUser(email, displayName, password) {
       };
       savePlayers(players);
 
-      // Send verification email
-      sendVerificationEmail(email, verificationToken).then(sent => {
-        console.log(`[AUTH] User registered: ${email} (${userId})`);
-        resolve({ userId, verificationToken, emailSent: sent });
-      });
+      console.log(`[AUTH] User registered: ${displayName} (${userId})${options.wantsEmails ? ` - Contact: ${options.contactEmail}` : ''}`);
+      resolve({ userId });
     } catch (err) {
       reject(err);
     }
