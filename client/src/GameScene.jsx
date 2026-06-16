@@ -36,14 +36,25 @@ export default function GameScene({ auth }) {
     });
 
     function initializeGame(joinData) {
+      console.log('🎮 Initializing game...');
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
       camera.position.set(0, 25, 35);
       camera.lookAt(0, 0, 0);
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+      let renderer;
+      try {
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+      } catch (e) {
+        console.error('WebGL failed:', e);
+        setError('WebGL not supported. Try a different browser.');
+        return;
+      }
+
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFShadowMap;
+      console.log('📍 Canvas appending to container...');
       containerRef.current.appendChild(renderer.domElement);
 
       const env = createEnvironment(scene);
@@ -193,7 +204,9 @@ export default function GameScene({ auth }) {
         ui.setResources(world.resources);
         renderer.render(scene, camera);
       };
+      console.log('🎬 Starting animation loop...');
       animate();
+      console.log('✅ Game initialized successfully');
 
       const handleResize = () => {
         camera.aspect = window.innerWidth/window.innerHeight;
