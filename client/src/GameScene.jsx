@@ -48,6 +48,20 @@ export default function GameScene({ auth }) {
 
       const env = createEnvironment(scene);
       const ui = createUI(auth.displayName || auth.email, null, auth.email);
+      showChatPanel(socket);
+
+      // Add inventory button
+      const invBtn = document.createElement('button');
+      invBtn.style.cssText = `position:absolute;top:14px;left:80px;padding:10px 14px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:6px;color:#c8a84b;cursor:pointer;font-weight:600;font-size:11px;font-family:'Segoe UI',sans-serif;z-index:100;`;
+      invBtn.textContent = '📦 Inventory';
+      invBtn.onclick = () => showInventoryModal(world.resources);
+      document.body.appendChild(invBtn);
+
+      // Add house click handler
+      const tcBuilding = world.buildings[0];
+      if (tcBuilding && tcBuilding.mesh) {
+        tcBuilding.mesh.userData.onClicked = () => showHouseModal(socket, auth.userId);
+      }
 
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
 

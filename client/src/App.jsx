@@ -1,5 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GameScene from './GameScene.jsx';
+
+function MobileOrientationCheck() {
+  const [isMobile, setIsMobile] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const portrait = window.innerHeight > window.innerWidth;
+      setIsMobile(mobile);
+      setIsPortrait(portrait);
+    };
+
+    checkMobile();
+    window.addEventListener('orientationchange', checkMobile);
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('orientationchange', checkMobile);
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
+
+  if (isMobile && isPortrait) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontFamily: "'Segoe UI', sans-serif", textAlign: 'center', padding: '20px', boxSizing: 'border-box' }}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>📱</div>
+        <h1 style={{ fontSize: '28px', margin: '0 0 16px' }}>Turn Phone Sideways</h1>
+        <p style={{ fontSize: '14px', opacity: 0.7 }}>The game works best in landscape mode</p>
+        <p style={{ fontSize: '12px', opacity: 0.5, marginTop: '20px' }}>Rotate your device to continue</p>
+      </div>
+    );
+  }
+
+  return null;
+}
 
 function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState('login');
@@ -203,6 +239,11 @@ function AuthScreen({ onAuthenticated }) {
 
 export default function App() {
   const [auth, setAuth] = useState(null);
-  if (!auth) return <AuthScreen onAuthenticated={setAuth} />;
-  return <GameScene auth={auth} />;
+
+  return (
+    <>
+      <MobileOrientationCheck />
+      {!auth ? <AuthScreen onAuthenticated={setAuth} /> : <GameScene auth={auth} />}
+    </>
+  );
 }

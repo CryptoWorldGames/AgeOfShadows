@@ -175,6 +175,17 @@ io.on('connection', (socket) => {
     io.emit('buildingPlaced', building);
   });
 
+  socket.on('chat', (data) => {
+    if (!data.message || !data.playerName) return;
+    const chatMessage = {
+      playerName: data.playerName,
+      message: data.message,
+      timestamp: new Date().toISOString()
+    };
+    io.emit('chatMessage', chatMessage);
+    console.log(`[CHAT] ${data.playerName}: ${data.message}`);
+  });
+
   socket.on('disconnect', async () => {
     const player = world.players[socket.id];
     if (player) {
@@ -340,6 +351,128 @@ app.post('/api/reset-password', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Password reset failed' });
   }
+});
+
+// Game endpoints
+app.post('/api/spawn-worker', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'User ID required' });
+  try {
+    const playerData = await loadPlayerData(userId);
+    if (!playerData) return res.status(404).json({ error: 'Player not found' });
+
+    const COST = { wood: 500, food: 1000, stone: 200, gold: 50 };
+    const hasResources = Object.entries(COST).every(([res, cost]) => playerData.resources[res] >= cost);
+
+    if (!hasResources) {
+      return res.status(400).json({ error: `Need: ${COST.wood}🪵 ${COST.food}🍖 ${COST.stone}⛏️ ${COST.gold}💰` });
+    }
+
+    Object.entries(COST).forEach(([res, cost]) => {
+      playerData.resources[res] -= cost;
+    });
+
+    const newWorker = {
+      id: `${userId}_w${Date.now()}`,
+      x: Math.random() * 30 - 15,
+      z: Math.random() * 30 - 15,
+      task: 'idle',
+      ownerId: userId
+    };
+    playerData.units.push(newWorker);
+    await savePlayerData(userId, playerData.resources, playerData.units, playerData.buildings);
+
+    res.json({ success: true, worker: newWorker, resources: playerData.resources });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to spawn worker' });
+  }
+});
+
+app.post('/api/wallet', async (req, res) => {
+  const { userId, cashapp, paypal, solana } = req.body;
+  if (!userId) return res.status(400).json({ error: 'User ID required' });
+  try {
+    const users = require('./auth').loadUsers ? JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'data/users.json'), 'utf-8')) : {};
+    if (users[userId]) {
+      users[userId].wallet = { cashapp, paypal, solana };
+      require('fs').writeFileSync(require('path').join(__dirname, 'data/users.json'), JSON.stringify(users, null, 2));
+    }
+    res.json({ success: true, message: 'Wallet saved' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save wallet' });
+  }
+});
+
+app.post('/api/buy-currency', async (req, res) => {
+  const { userId, amount } = req.body;
+  if (!userId || !amount) return res.status(400).json({ error: 'User ID and amount required' });
+
+  const playerData = await loadPlayerData(userId);
+  if (!playerData) return res.status(404).json({ error: 'Player not found' });
+
+  playerData.resources.gold = (playerData.resources.gold || 0) + amount;
+  await savePlayerData(userId, playerData.resources, playerData.units, playerData.buildings);
+
+  res.json({ success: true, gold: playerData.resources.gold, message: `Added ${amount} gold` });
+});
+
+app.get('/api/market', (req, res) => {
+  const listings = global.marketListings || [];
+  res.json({ listings });
+});
+
+app.post('/api/market/list', async (req, res) => {
+  const { userId, resource, amount, price } = req.body;
+  if (!userId || !resource || !amount || !price) return res.status(400).json({ error: 'Missing fields' });
+
+  const playerData = await loadPlayerData(userId);
+  if (!playerData || playerData.resources[resource] < amount) {
+    return res.status(400).json({ error: 'Insufficient resources' });
+  }
+
+  playerData.resources[resource] -= amount;
+  await savePlayerData(userId, playerData.resources, playerData.units, playerData.buildings);
+
+  const listing = {
+    id: `${userId}_${Date.now()}`,
+    userId,
+    resource,
+    amount,
+    price,
+    createdAt: new Date().toISOString()
+  };
+
+  global.marketListings = global.marketListings || [];
+  global.marketListings.push(listing);
+
+  res.json({ success: true, listing });
+});
+
+app.post('/api/market/buy', async (req, res) => {
+  const { userId, listingId } = req.body;
+  if (!userId || !listingId) return res.status(400).json({ error: 'User ID and listing ID required' });
+
+  global.marketListings = global.marketListings || [];
+  const listing = global.marketListings.find(l => l.id === listingId);
+  if (!listing) return res.status(404).json({ error: 'Listing not found' });
+
+  const buyer = await loadPlayerData(userId);
+  const seller = await loadPlayerData(listing.userId);
+
+  if (buyer.resources.gold < listing.price) {
+    return res.status(400).json({ error: 'Insufficient gold' });
+  }
+
+  buyer.resources.gold -= listing.price;
+  buyer.resources[listing.resource] = (buyer.resources[listing.resource] || 0) + listing.amount;
+  seller.resources.gold = (seller.resources.gold || 0) + listing.price;
+
+  await savePlayerData(userId, buyer.resources, buyer.units, buyer.buildings);
+  await savePlayerData(listing.userId, seller.resources, seller.units, seller.buildings);
+
+  global.marketListings = global.marketListings.filter(l => l.id !== listingId);
+
+  res.json({ success: true, message: 'Trade completed' });
 });
 
 app.post('/api/join', (req, res) => {

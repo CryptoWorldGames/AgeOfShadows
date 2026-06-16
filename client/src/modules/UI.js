@@ -1,3 +1,97 @@
+let globalSocket = null;
+
+function showInventoryModal(resources) {
+  const existingModal = document.getElementById('inventory-modal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'inventory-modal';
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
+
+  const resGrid = Object.entries(resources).map(([res, amt]) =>
+    `<div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;"><div style="font-size:11px;opacity:0.7;">${res.toUpperCase()}</div><div style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">${amt}</div></div>`
+  ).join('');
+
+  modal.innerHTML = `
+    <div style="background:rgba(0,0,0,0.9);border:1px solid rgba(200,168,75,0.4);border-radius:12px;padding:24px;width:90%;max-width:500px;color:#fff;font-family:'Segoe UI',sans-serif;">
+      <h2 style="margin:0 0 20px;color:#c8a84b;font-size:20px;">Inventory</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;margin-bottom:20px;">${resGrid}</div>
+      <button id="close-inventory" style="width:100%;padding:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;cursor:pointer;">Close</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  document.getElementById('close-inventory').onclick = () => modal.remove();
+}
+
+function showHouseModal(socket, userId) {
+  const existingModal = document.getElementById('house-modal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'house-modal';
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
+  modal.innerHTML = `
+    <div style="background:rgba(0,0,0,0.9);border:1px solid rgba(200,168,75,0.4);border-radius:12px;padding:24px;width:90%;max-width:400px;color:#fff;font-family:'Segoe UI',sans-serif;">
+      <h2 style="margin:0 0 20px;color:#c8a84b;font-size:20px;">🏛️ Town Center</h2>
+      <div style="margin-bottom:16px;padding:12px;background:rgba(200,168,75,0.1);border-radius:6px;font-size:12px;">
+        <div style="margin-bottom:8px;"><strong>Spawn Worker</strong></div>
+        <div style="opacity:0.7;margin-bottom:12px;">Cost: 1000🍖 500🪵 200⛏️ 50💰</div>
+      </div>
+      <button id="spawn-worker-btn" style="width:100%;padding:12px;background:linear-gradient(135deg, #c8a84b, #ffd700);border:none;border-radius:4px;color:#000;font-weight:600;cursor:pointer;margin-bottom:8px;">Spawn Worker</button>
+      <button id="close-house" style="width:100%;padding:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;cursor:pointer;">Close</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('spawn-worker-btn').onclick = async () => {
+    const res = await fetch('/api/spawn-worker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    });
+    const data = await res.json();
+    alert(data.message || (data.success ? 'Worker spawned!' : data.error));
+    modal.remove();
+  };
+
+  document.getElementById('close-house').onclick = () => modal.remove();
+}
+
+function showChatPanel(socket) {
+  const existingChat = document.getElementById('chat-panel');
+  if (existingChat) return;
+
+  const chatPanel = document.createElement('div');
+  chatPanel.id = 'chat-panel';
+  chatPanel.style.cssText = `position:absolute;bottom:20px;right:20px;width:300px;height:400px;background:rgba(0,0,0,0.8);border:1px solid rgba(200,168,75,0.4);border-radius:8px;display:flex;flex-direction:column;z-index:100;font-family:'Segoe UI',sans-serif;`;
+  chatPanel.innerHTML = `
+    <div style="padding:12px;border-bottom:1px solid rgba(200,168,75,0.2);color:#c8a84b;font-weight:600;font-size:13px;">💬 General Chat</div>
+    <div id="chat-messages" style="flex:1;overflow-y:auto;padding:12px;font-size:11px;color:#fff;"></div>
+    <div style="padding:8px;border-top:1px solid rgba(200,168,75,0.2);display:flex;gap:4px;">
+      <input id="chat-input" type="text" placeholder="Type message..." style="flex:1;padding:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#fff;font-size:11px;"/>
+      <button id="chat-send" style="padding:6px 12px;background:#c8a84b;border:none;border-radius:4px;color:#000;font-weight:600;cursor:pointer;font-size:10px;">Send</button>
+    </div>
+  `;
+  document.body.appendChild(chatPanel);
+
+  const messagesDiv = document.getElementById('chat-messages');
+  document.getElementById('chat-send').onclick = () => {
+    const input = document.getElementById('chat-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    socket.emit('chat', { message: msg, playerName: sessionStorage.getItem('playerName') || 'Player' });
+    input.value = '';
+  };
+
+  socket.on('chatMessage', (data) => {
+    const msgEl = document.createElement('div');
+    msgEl.style.cssText = `margin-bottom:6px;padding:4px;background:rgba(200,168,75,0.1);border-radius:3px;`;
+    msgEl.innerHTML = `<strong style="color:#c8a84b;">${data.playerName}:</strong> ${data.message}`;
+    messagesDiv.appendChild(msgEl);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+}
+
 function showSettingsPanel(email) {
   const existingModal = document.getElementById('settings-modal');
   if (existingModal) existingModal.remove();
