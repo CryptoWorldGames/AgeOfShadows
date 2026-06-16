@@ -10,8 +10,9 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
 
 const app = express();
 
-// Disable CSP to allow Three.js rendering
+// Debug header to verify deployed version
 app.use((req, res, next) => {
+  res.setHeader('X-App-Version', 'v2.3-deployment-verify');
   res.removeHeader('Content-Security-Policy');
   res.setHeader('X-Content-Security-Policy', 'disabled');
   next();
