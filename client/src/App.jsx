@@ -141,12 +141,22 @@ function AuthScreen({ onAuthenticated }) {
           setLoading(false);
           return;
         }
-        setError('');
-        setMode('login');
-        setEmail('');
-        setPassword('');
-        setDisplayName('');
-        setLoading(false);
+        const loginResponse = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password })
+        });
+        const loginData = await loginResponse.json();
+        if (!loginResponse.ok) {
+          setError('Account created but login failed. Please log in manually.');
+          setMode('login');
+          setLoading(false);
+          return;
+        }
+        if (loginData.adminToken) {
+          sessionStorage.setItem('adminToken', loginData.adminToken);
+        }
+        onAuthenticated({ userId: loginData.userId, email: loginData.email, displayName: loginData.displayName });
       } catch (err) {
         setError('Network error: ' + err.message);
         setLoading(false);
