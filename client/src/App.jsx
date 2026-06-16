@@ -1,6 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import GameScene from './GameScene.jsx';
 
+function AdminPanel({ email }) {
+  const isAdmin = email === 'shadowdefense2023@gmail.com';
+  if (!isAdmin) return null;
+
+  const [stats, setStats] = useState(null);
+  const [adminToken, setAdminToken] = useState('');
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('adminToken');
+    if (token) setAdminToken(token);
+  }, []);
+
+  const fetchStats = async () => {
+    if (!adminToken) return;
+    const res = await fetch('/api/admin/stats', {
+      headers: { 'x-admin-token': adminToken }
+    });
+    const data = await res.json();
+    setStats(data);
+  };
+
+  return (
+    <div style={{ position: 'fixed', bottom: 20, left: 20, background: 'rgba(255,0,0,0.2)', border: '2px solid #ff0000', borderRadius: 8, padding: 16, color: '#fff', fontFamily: "'Segoe UI', sans-serif", fontSize: 12, zIndex: 999 }}>
+      <div style={{ fontWeight: 600, marginBottom: 8 }}>🔐 ADMIN PANEL</div>
+      <button onClick={fetchStats} style={{ padding: '6px 12px', background: '#ff0000', border: 'none', borderRadius: 4, color: '#fff', cursor: 'pointer', marginBottom: 8, width: '100%' }}>Fetch Stats</button>
+      {stats && (
+        <div style={{ fontSize: 11 }}>
+          <div>Players: {stats.playerCount}</div>
+          <div>Trees: {stats.worldState.trees}</div>
+          <div>Buildings: {stats.worldState.buildings}</div>
+          <div style={{ marginTop: 8, maxHeight: 150, overflow: 'auto' }}>
+            {stats.onlinePlayers.map(p => <div key={p.name} style={{ opacity: 0.8 }}>{p.name} ({p.units} units)</div>)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MobileOrientationCheck() {
   const [isMobile, setIsMobile] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
@@ -72,6 +111,9 @@ function AuthScreen({ onAuthenticated }) {
           setError(data.error || 'Login failed');
           setLoading(false);
           return;
+        }
+        if (data.adminToken) {
+          sessionStorage.setItem('adminToken', data.adminToken);
         }
         onAuthenticated({ userId: data.userId, email: data.email, displayName: data.displayName });
       } catch (err) {
@@ -243,6 +285,7 @@ export default function App() {
   return (
     <>
       <MobileOrientationCheck />
+      {auth && <AdminPanel email={auth.email} />}
       {!auth ? <AuthScreen onAuthenticated={setAuth} /> : <GameScene auth={auth} />}
     </>
   );

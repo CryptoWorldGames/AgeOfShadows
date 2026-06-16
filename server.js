@@ -6,6 +6,8 @@ const { Server } = require('socket.io');
 const path = require('path');
 const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerData, createPasswordResetToken, resetPassword, verifyEmail, updateUserProfile, deleteUserAccount } = require('./auth');
 
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -242,7 +244,11 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const user = await getUserById(userId);
-    res.json({ success: true, userId, email, displayName: user?.displayName, message: 'Logged in' });
+    const response = { success: true, userId, email, displayName: user?.displayName, message: 'Logged in' };
+    if (isAdmin(email)) {
+      response.adminToken = Buffer.from(email).toString('base64');
+    }
+    res.json(response);
   } catch (err) {
     res.status(500).json({ error: 'Login failed' });
   }
@@ -473,6 +479,95 @@ app.post('/api/market/buy', async (req, res) => {
   global.marketListings = global.marketListings.filter(l => l.id !== listingId);
 
   res.json({ success: true, message: 'Trade completed' });
+});
+
+// ADMIN PANEL - SECURE ACCESS ONLY
+function isAdmin(userEmail) {
+  return userEmail === ADMIN_EMAIL;
+}
+
+app.post('/api/admin/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
+  }
+
+  if (!isAdmin(email)) {
+    return res.status(403).json({ error: 'Not authorized' });
+  }
+
+  try {
+    const userId = await authenticateUser(email, password);
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const user = await getUserById(userId);
+    res.json({ success: true, userId, email, adminToken: Buffer.from(email).toString('base64') });
+  } catch (err) {
+    res.status(500).json({ error: 'Admin login failed' });
+  }
+});
+
+app.get('/api/admin/stats', (req, res) => {
+  const adminToken = req.headers['x-admin-token'];
+  const email = adminToken ? Buffer.from(adminToken, 'base64').toString() : '';
+
+  if (!isAdmin(email)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const playerCount = Object.keys(world.players).length;
+  const totalResources = Object.values(world.players).reduce((sum, p) => sum + Object.values(p.resources).reduce((a, b) => a + b, 0), 0);
+
+  res.json({
+    playerCount,
+    totalResources,
+    worldState: {
+      trees: world.trees.length,
+      players: playerCount,
+      buildings: world.buildings.length
+    },
+    onlinePlayers: Object.values(world.players).map(p => ({ name: p.name, resources: p.resources, units: p.units.length }))
+  });
+});
+
+app.post('/api/admin/wipe-player', (req, res) => {
+  const { adminToken, targetUserId } = req.body;
+  const email = adminToken ? Buffer.from(adminToken, 'base64').toString() : '';
+
+  if (!isAdmin(email)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  try {
+    deleteUserAccount(targetUserId);
+    res.json({ success: true, message: `Player ${targetUserId} wiped` });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to wipe player' });
+  }
+});
+
+app.post('/api/admin/gift-resources', (req, res) => {
+  const { adminToken, userId, resources } = req.body;
+  const email = adminToken ? Buffer.from(adminToken, 'base64').toString() : '';
+
+  if (!isAdmin(email)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  try {
+    const playerData = loadPlayerData(userId);
+    if (!playerData) return res.status(404).json({ error: 'Player not found' });
+
+    Object.entries(resources || {}).forEach(([res, amount]) => {
+      playerData.resources[res] = (playerData.resources[res] || 0) + amount;
+    });
+
+    savePlayerData(userId, playerData.resources, playerData.units, playerData.buildings);
+    res.json({ success: true, message: 'Resources gifted', resources: playerData.resources });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to gift resources' });
+  }
 });
 
 app.post('/api/join', (req, res) => {
