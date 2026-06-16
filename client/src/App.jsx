@@ -274,6 +274,7 @@ function AuthScreen({ onAuthenticated }) {
         <div style={{fontSize:'64px', marginBottom:'8px'}}>⚔️</div>
         <h1 style={{fontSize:'52px',fontWeight:'900',margin:0,letterSpacing:'4px',background:'linear-gradient(135deg, #c8a84b, #ffd700, #c8a84b)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>AGE OF SHADOWS</h1>
         <p style={{color:'rgba(255,255,255,0.5)',fontSize:'14px',letterSpacing:'6px',marginTop:'8px'}}>MULTIPLAYER STRATEGY</p>
+        <p style={{color:'#fff',fontSize:'16px',fontWeight:'600',marginTop:'12px',letterSpacing:'2px'}}>v1.0</p>
       </div>
       <div style={{background:'rgba(0,0,0,0.7)',border:'1px solid rgba(200,168,75,0.4)',borderRadius:'16px',padding:'40px 48px',width:'360px',zIndex:1,backdropFilter:'blur(10px)',boxShadow:'0 0 60px rgba(200,168,75,0.1)'}}>
         <h2 style={{margin:'0 0 24px',fontSize:'20px',color:'#c8a84b',textAlign:'center'}}>{mode==='login'?'Enter the Realm':mode==='register'?'Create Account':'Reset Password'}</h2>
@@ -289,7 +290,7 @@ function AuthScreen({ onAuthenticated }) {
         {mode==='reset'&&(<div style={{marginTop:'20px',textAlign:'center'}}><button onClick={()=>{setMode('login');setError('');setResetToken('');setResetSent(false)}} style={{background:'none',border:'none',color:'#c8a84b',cursor:'pointer',fontSize:'12px',textDecoration:'underline'}}>Back to login</button></div>)}
         <div style={{marginTop:'20px',textAlign:'center',fontSize:'11px',color:'rgba(255,255,255,0.3)',lineHeight:'1.6'}}>Free to play · No download required<br/>A relaxing, idle browser game</div>
       </div>
-      <div style={{position:'absolute',bottom:'14px',left:'20px',right:'20px',fontSize:'10px',color:'rgba(255,255,255,0.15)',textAlign:'center',zIndex:1}}>© 2026 CryptoWorldGames · <span style={{fontSize:'9px',opacity:0.6}}>v1.0</span></div>
+      <div style={{position:'absolute',bottom:'14px',left:'20px',right:'20px',fontSize:'10px',color:'rgba(255,255,255,0.15)',textAlign:'center',zIndex:1}}>© 2026 CryptoWorldGames</div>
     </div>
   );
 }
