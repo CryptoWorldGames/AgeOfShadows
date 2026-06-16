@@ -313,6 +313,45 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     resetPose();
     moving=false; chopActive=false; frozen=false;
 
+    // HP/Hunger/Thirst deduction: 100% per 24 hours = 0.0694% per minute
+    const deductRate = 0.00694 * dt; // per second
+    const nearHome = world.buildings && world.buildings[0];
+    const distToHome = nearHome ? Math.sqrt((group.position.x - nearHome.getPosition().x)**2 + (group.position.z - nearHome.getPosition().z)**2) : Infinity;
+    const inHouse = distToHome < 15; // Safe zone around town center
+
+    if (inHouse) {
+      // In house: restore at 1% per minute (0.01667% per second)
+      const restoreRate = 0.01667 * dt;
+      if (hunger < 100) hunger = Math.min(100, hunger + restoreRate);
+      if (thirst < 100) thirst = Math.min(100, thirst + restoreRate);
+      if (hp < 100) hp = Math.min(100, hp + restoreRate);
+    } else {
+      // Outside: deduct normally
+      hunger = Math.max(0, hunger - deductRate);
+      thirst = Math.max(0, thirst - deductRate);
+    }
+
+    // Auto-home at 5% of any stat
+    if (!inHouse && (hunger <= 5 || thirst <= 5 || hp <= 5)) {
+      if (!returning) {
+        returning = true;
+        target = nearHome ? nearHome.getPosition() : group.position;
+        depositTarget = nearHome;
+        chopTarget = null;
+        animalTarget = null;
+        stoneTarget = null;
+        goldTarget = null;
+        autoTask = null;
+      }
+    }
+
+    // Die if any stat hits 0
+    if (hunger <= 0 || thirst <= 0 || hp <= 0) {
+      group.visible = false;
+      unit.alive = false;
+      return;
+    }
+
     waterDrainTimer+=dt;
     if (waterDrainTimer>=S.drain.waterInterval) { waterDrainTimer=0; if (world.resources.water>0) world.resources.water=Math.max(0,world.resources.water-1); }
     foodDrainTimer+=dt;
@@ -324,6 +363,38 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
         waterRefillTimer+=dt;
         if (waterRefillTimer>=S.water.refillInterval) { waterRefillTimer=0; world.resources.water=Math.min(100,world.resources.water+1); }
       } else waterRefillTimer=0;
+    }
+
+    // Spiral resource search when home area depleted
+    if ((chopTarget&&chopTarget.isDepleted())||(!chopTarget&&autoTask==='chop'&&inHouse)) {
+      const spiralRadius = huntSearchRadius;
+      const spiralMax = 8;
+      let found = false;
+      for (let i = 1; i <= spiralMax; i++) {
+        const angle = huntAngle + (i * 0.5);
+        const testPos = {x: spawnPos.x + Math.cos(angle) * (5 + i * 5), z: spawnPos.z + Math.sin(angle) * (5 + i * 5)};
+        const nearest = findNearest(world,'chop');
+        if (nearest) {
+          chopTarget = nearest;
+          found = true;
+          break;
+        }
+      }
+      if (!found && !target) {
+        huntAngle += 0.5;
+        target = new THREE.Vector3(spawnPos.x + Math.cos(huntAngle) * (5 + Math.random() * 20), 0, spawnPos.z + Math.sin(huntAngle) * (5 + Math.random() * 20));
+      }
+    }
+
+    // Rescue system: if owner is under attack, go help
+    if (world.players) {
+      const myOwner = Object.values(world.players).find(p => p.units && p.units.some(u => u === unit));
+      if (myOwner && myOwner.underAttack) {
+        target = new THREE.Vector3(myOwner.position.x, 0, myOwner.position.z);
+        returning = false;
+        chopTarget = null;
+        autoTask = null;
+      }
     }
 
     if (returning&&depositTarget) {
