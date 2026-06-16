@@ -66,7 +66,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
 
   const modelHolder = new THREE.Group(); group.add(modelHolder);
   const axeHolder = new THREE.Group(); axeHolder.add(makeAxe()); modelHolder.add(axeHolder);
-  const healthBar = makeHealthBar(); healthBar.group.position.y=2.3; group.add(healthBar.group);
+  const healthBar = makeHealthBar(); healthBar.group.position.y=2.3; healthBar.group.visible=false; group.add(healthBar.group);
 
   let modelCenterY=1.0;
   const B={}; const rest={}; let handR=null;
@@ -614,7 +614,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     stats: lifetimeGathered,
     aliveTime: getAliveTime,
     getModelCenterY:()=>modelCenterY,
-    setSelected(b){unit.selected=b;},
+    setSelected(b){unit.selected=b;healthBar.group.visible=b;},
     moveTo(v){target=v.clone();chopTarget=null;animalTarget=null;stoneTarget=null;goldTarget=null;chopPhase=0;stoneHitCount=0;goldHitCount=0;woodHitCount=0;autoTask=null;returning=false;depositTarget=null;lastKillPos=null;},
     chopTree(tree,slot){chopTarget=tree;chopSlot=slot||null;animalTarget=null;stoneTarget=null;goldTarget=null;target=null;chopPhase=0;woodHitCount=0;autoTask='chop';returning=false;},
     killAnimal(animal){animalTarget=animal;chopTarget=null;stoneTarget=null;goldTarget=null;target=null;chopPhase=0;autoTask='hunt';returning=false;huntSearchRadius=20;},
