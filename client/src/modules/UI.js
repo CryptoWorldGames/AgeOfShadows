@@ -1,6 +1,6 @@
 let globalSocket = null;
 
-function showInventoryModal(resources) {
+export function showInventoryModal(resources) {
   const existingModal = document.getElementById('inventory-modal');
   if (existingModal) existingModal.remove();
 
@@ -23,7 +23,7 @@ function showInventoryModal(resources) {
   document.getElementById('close-inventory').onclick = () => modal.remove();
 }
 
-function showHouseModal(socket, userId) {
+export function showHouseModal(socket, userId) {
   const existingModal = document.getElementById('house-modal');
   if (existingModal) existingModal.remove();
 
@@ -57,7 +57,7 @@ function showHouseModal(socket, userId) {
   document.getElementById('close-house').onclick = () => modal.remove();
 }
 
-function showChatPanel(socket) {
+export function showChatPanel(socket) {
   const existingChat = document.getElementById('chat-panel');
   if (existingChat) return;
 

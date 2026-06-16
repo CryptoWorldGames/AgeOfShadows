@@ -236,14 +236,18 @@ io.on('connection', (socket) => {
 
 // Authentication endpoints
 app.post('/api/register', async (req, res) => {
-  const { email, displayName, password, wantsEmails } = req.body;
+  let { email, displayName, password, wantsEmails } = req.body;
   const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
-  if (!email || !displayName || !password) {
-    return res.status(400).json({ error: 'Email, display name, and password required' });
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
   }
   if (!email.includes('@')) {
     return res.status(400).json({ error: 'Invalid email address' });
+  }
+  // Display name is optional (UI marks it optional) — default to the email prefix
+  if (!displayName || !displayName.trim()) {
+    displayName = email.split('@')[0];
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
