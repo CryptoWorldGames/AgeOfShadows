@@ -138,10 +138,6 @@ function AuthScreen({ onAuthenticated }) {
         setError('Invalid email address');
         return;
       }
-      if (!recaptchaToken) {
-        setError('Please complete the reCAPTCHA');
-        return;
-      }
       setLoading(true);
       try {
         const response = await fetch('/api/register', {
