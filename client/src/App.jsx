@@ -149,7 +149,7 @@ function AuthScreen({ onAuthenticated }) {
         if (!response.ok) {
           setError(data.error || 'Registration failed');
           setRecaptchaToken('');
-          window.grecaptcha.reset();
+          if (window.grecaptcha) window.grecaptcha.reset();
           setLoading(false);
           return;
         }
