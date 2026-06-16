@@ -61,13 +61,19 @@ function registerUser(email, displayName, password) {
 
       const userId = Date.now().toString();
       const hash = bcrypt.hashSync(password, 10);
+      const verificationToken = require('crypto').randomBytes(32).toString('hex');
+      const tokenExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
 
       users[userId] = {
         id: userId,
         email,
         displayName: displayName || email.split('@')[0],
         passwordHash: hash,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        emailVerified: false,
+        verificationToken,
+        verificationExpires: tokenExpires,
+        profile: { age: null, state: null, country: null }
       };
 
       saveUsers(users);
@@ -82,7 +88,8 @@ function registerUser(email, displayName, password) {
       };
       savePlayers(players);
 
-      resolve(userId);
+      console.log(`[EMAIL] Verification token for ${email}: ${verificationToken}`);
+      resolve({ userId, verificationToken });
     } catch (err) {
       reject(err);
     }
@@ -198,6 +205,94 @@ function resetPassword(email, resetToken, newPassword) {
   });
 }
 
+function verifyEmail(verificationToken) {
+  return new Promise((resolve, reject) => {
+    try {
+      const users = loadUsers();
+      const user = Object.values(users).find(u => u.verificationToken === verificationToken);
+
+      if (!user) {
+        return resolve(false);
+      }
+
+      // Check if token expired
+      if (new Date(user.verificationExpires) < new Date()) {
+        return resolve(false);
+      }
+
+      user.emailVerified = true;
+      user.verificationToken = null;
+      user.verificationExpires = null;
+      saveUsers(users);
+      resolve(true);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+function updateUserProfile(userId, age, state, country) {
+  return new Promise((resolve, reject) => {
+    try {
+      const users = loadUsers();
+      const user = users[userId];
+      if (!user) return resolve(false);
+
+      user.profile = { age, state, country };
+      saveUsers(users);
+      resolve(true);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+function deleteUserAccount(userId) {
+  return new Promise((resolve, reject) => {
+    try {
+      const users = loadUsers();
+      const players = loadPlayers();
+
+      delete users[userId];
+      delete players[userId];
+
+      saveUsers(users);
+      savePlayers(players);
+      resolve(true);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+function cleanupUnverifiedAccounts() {
+  try {
+    const users = loadUsers();
+    const now = new Date();
+    let deletedCount = 0;
+
+    Object.keys(users).forEach(userId => {
+      const user = users[userId];
+      if (!user.emailVerified && user.verificationExpires) {
+        if (new Date(user.verificationExpires) < now) {
+          console.log(`[CLEANUP] Deleting unverified account: ${user.email}`);
+          deleteUserAccount(userId);
+          deletedCount++;
+        }
+      }
+    });
+
+    if (deletedCount > 0) {
+      console.log(`[CLEANUP] Deleted ${deletedCount} unverified accounts`);
+    }
+  } catch (err) {
+    console.error('Cleanup error:', err);
+  }
+}
+
+// Run cleanup every minute
+setInterval(cleanupUnverifiedAccounts, 60 * 1000);
+
 module.exports = {
   registerUser,
   authenticateUser,
@@ -205,5 +300,9 @@ module.exports = {
   loadPlayerData,
   savePlayerData,
   createPasswordResetToken,
-  resetPassword
+  resetPassword,
+  verifyEmail,
+  updateUserProfile,
+  deleteUserAccount,
+  cleanupUnverifiedAccounts
 };

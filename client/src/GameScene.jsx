@@ -47,7 +47,7 @@ export default function GameScene({ auth }) {
       containerRef.current.appendChild(renderer.domElement);
 
       const env = createEnvironment(scene);
-      const ui = createUI(auth.displayName || auth.email);
+      const ui = createUI(auth.displayName || auth.email, null, auth.email);
 
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
 
@@ -134,6 +134,24 @@ export default function GameScene({ auth }) {
         const now = performance.now(); let dt = (now-last)/1000; last = now;
         if (dt > 0.1) dt = 0.1; time += dt;
         update(time, dt);
+
+        // Apply camera boundary limits
+        const MAX_HEIGHT = 60;
+        const MIN_HEIGHT = 5;
+        const MAP_RADIUS = 65;
+
+        // Enforce height limits
+        if (camera.position.y > MAX_HEIGHT) camera.position.y = MAX_HEIGHT;
+        if (camera.position.y < MIN_HEIGHT) camera.position.y = MIN_HEIGHT;
+
+        // Enforce map radius (no going too far away)
+        const dist = Math.sqrt(camera.position.x ** 2 + camera.position.z ** 2);
+        if (dist > MAP_RADIUS) {
+          const angle = Math.atan2(camera.position.z, camera.position.x);
+          camera.position.x = Math.cos(angle) * MAP_RADIUS;
+          camera.position.z = Math.sin(angle) * MAP_RADIUS;
+        }
+
         if (env.waterUpdate) env.waterUpdate(dt);
         world.trees.forEach((t) => t.update(dt));
         world.stones.forEach((s) => s.update(dt));

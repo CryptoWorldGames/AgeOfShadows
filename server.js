@@ -4,7 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerData, createPasswordResetToken, resetPassword } = require('./auth');
+const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerData, createPasswordResetToken, resetPassword, verifyEmail, updateUserProfile, deleteUserAccount } = require('./auth');
 
 const app = express();
 app.use(cors());
@@ -48,13 +48,20 @@ function generateTrees(n) {
   return trees;
 }
 
-function createPlayerUnits(socketId) {
+function createPlayerUnits(socketId, count = 1) {
   const spawnX = (Math.random() - 0.5) * 20;
   const spawnZ = (Math.random() - 0.5) * 20;
-  return [
-    { id: `${socketId}_u0`, x: spawnX - 2, z: spawnZ, team: 'red', ownerId: socketId },
-    { id: `${socketId}_u1`, x: spawnX + 2, z: spawnZ, team: 'blue', ownerId: socketId }
-  ];
+  const units = [];
+  for (let i = 0; i < count; i++) {
+    units.push({
+      id: `${socketId}_u${i}`,
+      x: spawnX + (i - Math.floor(count / 2)) * 3,
+      z: spawnZ,
+      team: i === 0 ? 'red' : 'blue',
+      ownerId: socketId
+    });
+  }
+  return units;
 }
 
 setInterval(() => {
@@ -93,9 +100,9 @@ io.on('connection', (socket) => {
       if (savedData) {
         resources = savedData.resources;
         buildings = savedData.buildings;
-        units = savedData.units.length > 0 ? savedData.units : createPlayerUnits(socket.id);
+        units = savedData.units.length > 0 ? savedData.units : createPlayerUnits(socket.id, 1);
       } else {
-        units = createPlayerUnits(socket.id);
+        units = createPlayerUnits(socket.id, 1);
         resources = { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
         buildings = [];
       }
@@ -202,8 +209,8 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
   try {
-    const userId = await registerUser(email, displayName, password);
-    res.json({ success: true, userId, email, message: 'Account created' });
+    const result = await registerUser(email, displayName, password);
+    res.json({ success: true, userId: result.userId, email, message: 'Account created. Check console/email for verification token.', verificationToken: result.verificationToken });
   } catch (err) {
     if (err.message.includes('already registered')) {
       res.status(400).json({ error: 'Email already registered' });
@@ -244,6 +251,75 @@ app.post('/api/forgot-password', async (req, res) => {
     res.json({ success: true, message: 'Password reset token sent', token });
   } catch (err) {
     res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+app.post('/api/verify-email', async (req, res) => {
+  const { verificationToken } = req.body;
+  if (!verificationToken) {
+    return res.status(400).json({ error: 'Verification token required' });
+  }
+  try {
+    const success = await verifyEmail(verificationToken);
+    if (!success) {
+      return res.status(400).json({ error: 'Invalid or expired verification token' });
+    }
+    res.json({ success: true, message: 'Email verified! You can now play.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+app.get('/api/profile', async (req, res) => {
+  const { userId } = req.query;
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID required' });
+  }
+  try {
+    const user = await getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({
+      email: user.email,
+      displayName: user.displayName,
+      emailVerified: user.emailVerified,
+      profile: user.profile || { age: null, state: null, country: null }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+app.post('/api/profile', async (req, res) => {
+  const { userId, age, state, country } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID required' });
+  }
+  try {
+    const success = await updateUserProfile(userId, age, state, country);
+    if (!success) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ success: true, message: 'Profile updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Profile update failed' });
+  }
+});
+
+app.post('/api/delete-account', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID required' });
+  }
+  try {
+    const success = await deleteUserAccount(userId);
+    if (!success) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ success: true, message: 'Account deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Account deletion failed' });
   }
 });
 

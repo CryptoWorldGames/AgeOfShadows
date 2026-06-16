@@ -1,4 +1,100 @@
-export function createUI(playerId, gameState) {
+function showSettingsPanel(email) {
+  const existingModal = document.getElementById('settings-modal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'settings-modal';
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
+  modal.innerHTML = `
+    <div style="background:rgba(0,0,0,0.9);border:1px solid rgba(200,168,75,0.4);border-radius:12px;padding:24px;width:90%;max-width:400px;color:#fff;font-family:'Segoe UI',sans-serif;">
+      <h2 style="margin:0 0 20px;color:#c8a84b;font-size:20px;">Settings & Profile</h2>
+
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Email</label>
+        <input type="email" id="settings-email" value="${email}" disabled style="width:100%;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#ccc;font-size:13px;box-sizing:border-box;"/>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Age</label>
+        <input type="number" id="settings-age" placeholder="18" min="13" style="width:100%;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.3);border-radius:4px;color:#fff;font-size:13px;box-sizing:border-box;"/>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">State/Territory</label>
+        <input type="text" id="settings-state" placeholder="California" style="width:100%;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.3);border-radius:4px;color:#fff;font-size:13px;box-sizing:border-box;"/>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Country</label>
+        <input type="text" id="settings-country" placeholder="USA" style="width:100%;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.3);border-radius:4px;color:#fff;font-size:13px;box-sizing:border-box;"/>
+      </div>
+
+      <button id="save-settings-btn" style="width:100%;padding:10px;background:linear-gradient(135deg, #c8a84b, #ffd700);border:none;border-radius:4px;color:#000;font-weight:600;cursor:pointer;margin-bottom:8px;">Save Profile</button>
+      <button id="delete-account-btn" style="width:100%;padding:10px;background:rgba(255,0,0,0.15);border:1px solid #ff6b6b;border-radius:4px;color:#ff6b6b;font-weight:600;cursor:pointer;margin-bottom:8px;">Delete Account</button>
+      <button id="close-settings-btn" style="width:100%;padding:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;font-weight:600;cursor:pointer;">Close</button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  document.getElementById('close-settings-btn').onclick = () => modal.remove();
+
+  document.getElementById('save-settings-btn').onclick = async () => {
+    const auth = JSON.parse(localStorage.getItem('auth') || '{}');
+    const age = document.getElementById('settings-age').value;
+    const state = document.getElementById('settings-state').value;
+    const country = document.getElementById('settings-country').value;
+
+    const res = await fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: auth.userId, age: age ? parseInt(age) : null, state, country })
+    });
+    const data = await res.json();
+    alert(data.message || 'Profile saved!');
+  };
+
+  document.getElementById('delete-account-btn').onclick = async () => {
+    if (confirm('Delete account? All progress will be lost permanently. Are you sure?')) {
+      const auth = JSON.parse(localStorage.getItem('auth') || '{}');
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: auth.userId })
+      });
+      alert('Account deleted. Redirecting...');
+      localStorage.removeItem('auth');
+      window.location.href = '/';
+    }
+  };
+}
+
+export function createUI(playerId, gameState, email) {
+
+  // Login info panel (top right)
+  if (email) {
+    const loginPanel = document.createElement('div');
+    loginPanel.id = 'login-panel';
+    loginPanel.style.cssText = `position:absolute;top:14px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:12px 16px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdropFilter:blur(4px)`;
+    loginPanel.innerHTML = `
+      <div style="opacity:0.7;margin-bottom:6px;">📧 Logged in as</div>
+      <div style="color:#c8a84b;font-weight:600;margin-bottom:8px;word-break:break-all;">${email}</div>
+      <button id="settings-btn" style="width:100%;padding:6px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:11px;font-weight:600;margin-bottom:6px;">⚙️ Settings</button>
+      <button id="logout-btn" style="width:100%;padding:6px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:11px;font-weight:600;">Logout</button>
+    `;
+    document.body.appendChild(loginPanel);
+
+    document.getElementById('logout-btn').onclick = () => {
+      if (confirm('Logout?')) {
+        localStorage.removeItem('auth');
+        window.location.href = '/';
+      }
+    };
+
+    document.getElementById('settings-btn').onclick = () => {
+      showSettingsPanel(email);
+    };
+  }
 
   const hudContainer = document.createElement('div');
   hudContainer.id = 'hud';
