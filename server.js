@@ -9,14 +9,16 @@ const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerD
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-// CSP headers that allow Three.js and WebGL
+// Disable CSP to allow Three.js rendering
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss: https://dl.polyhaven.org; frame-src 'self';");
+  res.removeHeader('Content-Security-Policy');
+  res.setHeader('X-Content-Security-Policy', 'disabled');
   next();
 });
+
+app.use(cors());
+app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, {
