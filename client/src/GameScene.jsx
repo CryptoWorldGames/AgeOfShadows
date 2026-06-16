@@ -55,7 +55,7 @@ export default function GameScene({ auth }) {
       gameInfo.style.cssText = `position:absolute;top:14px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:12px 16px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);`;
       gameInfo.innerHTML = `
         <div style="color:#c8a84b;font-weight:700;font-size:14px;margin-bottom:4px;letter-spacing:1px;">AGE OF SHADOWS</div>
-        <div style="opacity:0.7;font-size:11px;margin-bottom:8px;">v1.8</div>
+        <div style="opacity:0.7;font-size:11px;margin-bottom:8px;">v1.9</div>
         <button id="game-logout-btn" style="width:100%;padding:6px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">Logout</button>
       `;
       document.body.appendChild(gameInfo);
