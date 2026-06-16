@@ -223,7 +223,11 @@ app.post('/api/register', async (req, res) => {
   }
   try {
     const result = await registerUser(email, displayName, password);
-    res.json({ success: true, userId: result.userId, email, message: 'Account created. Check console/email for verification token.', verificationToken: result.verificationToken });
+    const emailConfigured = process.env.SENDGRID_API_KEY || process.env.GMAIL_EMAIL;
+    const message = emailConfigured
+      ? 'Account created. Check your email for the verification link.'
+      : 'Account created. Check the server console for your verification token.';
+    res.json({ success: true, userId: result.userId, email, message, emailConfigured });
   } catch (err) {
     if (err.message.includes('already registered')) {
       res.status(400).json({ error: 'Email already registered' });

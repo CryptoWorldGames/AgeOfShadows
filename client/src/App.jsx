@@ -90,6 +90,7 @@ function AuthScreen({ onAuthenticated }) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [verificationToken, setVerificationToken] = useState('');
+  const [emailConfigured, setEmailConfigured] = useState(false);
 
   async function handleSubmit() {
     setError('');
@@ -143,7 +144,7 @@ function AuthScreen({ onAuthenticated }) {
           setLoading(false);
           return;
         }
-        setVerificationToken(data.verificationToken);
+        setEmailConfigured(data.emailConfigured || false);
         setVerifyingEmail(true);
         setLoading(false);
       } catch (err) {
@@ -220,7 +221,11 @@ function AuthScreen({ onAuthenticated }) {
           <h1 style={{fontSize:'48px',fontWeight:'900',margin:0,letterSpacing:'2px'}}>Verify Email</h1>
         </div>
         <div style={{background:'rgba(0,0,0,0.7)',border:'1px solid rgba(200,168,75,0.4)',borderRadius:'16px',padding:'40px 48px',width:'360px',zIndex:1,backdropFilter:'blur(10px)',boxShadow:'0 0 60px rgba(200,168,75,0.1)'}}>
-          <p style={{textAlign:'center',color:'rgba(255,255,255,0.7)',marginBottom:'20px'}}>Verification token sent to console. Paste it below:</p>
+          <p style={{textAlign:'center',color:'rgba(255,255,255,0.7)',marginBottom:'20px'}}>
+            {emailConfigured
+              ? 'Check your email for the verification link. Copy the token from the email and paste it below:'
+              : 'Check the server console for your verification token and paste it below:'}
+          </p>
           <div style={{marginBottom:'20px'}}>
             <label style={{display:'block',fontSize:'12px',color:'rgba(255,255,255,0.6)',marginBottom:'8px',letterSpacing:'2px'}}>VERIFICATION TOKEN</label>
             <input type="text" value={verificationToken} onChange={e=>setVerificationToken(e.target.value)} placeholder="Paste token here" autoFocus style={{width:'100%',padding:'12px 16px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(200,168,75,0.3)',borderRadius:'8px',color:'#fff',fontSize:'15px',outline:'none',boxSizing:'border-box',fontFamily:"'Segoe UI', sans-serif"}}/>
