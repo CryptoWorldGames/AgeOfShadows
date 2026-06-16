@@ -71,7 +71,6 @@ function registerUser(email, displayName, password, options = {}) {
         createdAt: new Date().toISOString(),
         emailVerified: true,
         profile: { age: null, state: null, country: null },
-        contactEmail: options.contactEmail || null,
         wantsEmails: options.wantsEmails || false
       };
 

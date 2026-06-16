@@ -227,11 +227,14 @@ io.on('connection', (socket) => {
 
 // Authentication endpoints
 app.post('/api/register', async (req, res) => {
-  const { displayName, password, recaptchaToken, contactEmail, wantsEmails } = req.body;
+  const { email, displayName, password, recaptchaToken, wantsEmails } = req.body;
   const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
-  if (!displayName || !password) {
-    return res.status(400).json({ error: 'Display name and password required' });
+  if (!email || !displayName || !password) {
+    return res.status(400).json({ error: 'Email, display name, and password required' });
+  }
+  if (!email.includes('@')) {
+    return res.status(400).json({ error: 'Invalid email address' });
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
@@ -248,15 +251,16 @@ app.post('/api/register', async (req, res) => {
   }
 
   try {
-    // Use displayName as email for account system (no email verification needed)
-    const autoEmail = `user_${Date.now()}@ageofshadows.local`;
-    const result = await registerUser(autoEmail, displayName, password, {
-      contactEmail: contactEmail || null,
-      wantsEmails: wantsEmails && contactEmail ? true : false
+    const result = await registerUser(email, displayName, password, {
+      wantsEmails: wantsEmails || false
     });
-    res.json({ success: true, userId: result.userId, displayName, message: 'Account created! Welcome to Age of Shadows.' });
+    res.json({ success: true, userId: result.userId, email, displayName, message: 'Account created! Welcome to Age of Shadows.' });
   } catch (err) {
-    res.status(500).json({ error: 'Registration failed' });
+    if (err.message.includes('already registered')) {
+      res.status(400).json({ error: 'Email already registered' });
+    } else {
+      res.status(500).json({ error: 'Registration failed' });
+    }
   }
 });
 
