@@ -245,11 +245,6 @@ app.post('/api/register', async (req, res) => {
     return res.status(429).json({ error: 'Too many registration attempts. Try again tomorrow.' });
   }
 
-  // Verify reCAPTCHA (basic check - server-side verification would require API key)
-  if (!recaptchaToken) {
-    return res.status(400).json({ error: 'reCAPTCHA verification required' });
-  }
-
   try {
     const result = await registerUser(email, displayName, password, {
       wantsEmails: wantsEmails || false
