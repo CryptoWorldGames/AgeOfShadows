@@ -227,7 +227,7 @@ io.on('connection', (socket) => {
 
 // Authentication endpoints
 app.post('/api/register', async (req, res) => {
-  const { email, displayName, password, recaptchaToken, wantsEmails } = req.body;
+  const { email, displayName, password, wantsEmails } = req.body;
   const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
 
   if (!email || !displayName || !password) {
