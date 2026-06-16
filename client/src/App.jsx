@@ -88,9 +88,6 @@ function AuthScreen({ onAuthenticated }) {
   const [resetSent, setResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const [verifyingEmail, setVerifyingEmail] = useState(false);
-  const [verificationToken, setVerificationToken] = useState('');
-  const [emailConfigured, setEmailConfigured] = useState(false);
 
   async function handleSubmit() {
     setError('');
@@ -144,8 +141,11 @@ function AuthScreen({ onAuthenticated }) {
           setLoading(false);
           return;
         }
-        setEmailConfigured(data.emailConfigured || false);
-        setVerifyingEmail(true);
+        setError('');
+        setMode('login');
+        setEmail('');
+        setPassword('');
+        setDisplayName('');
         setLoading(false);
       } catch (err) {
         setError('Network error: ' + err.message);
@@ -210,47 +210,7 @@ function AuthScreen({ onAuthenticated }) {
     }
   }
 
-  if (verifyingEmail) {
-    return (
-      <div style={{width:'100vw', height:'100vh', background:'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', fontFamily:"'Segoe UI', sans-serif", color:'#fff', position:'relative', overflow:'hidden'}}>
-        <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none'}}>
-          {[...Array(80)].map((_,i)=><div key={i} style={{position:'absolute',left:`${Math.random()*100}%`,top:`${Math.random()*100}%`,width:Math.random()>0.8?'2px':'1px',height:Math.random()>0.8?'2px':'1px',background:'#fff',borderRadius:'50%',opacity:0.3+Math.random()*0.7}}/>)}
-        </div>
-        <div style={{textAlign:'center', marginBottom:'40px', zIndex:1}}>
-          <div style={{fontSize:'64px', marginBottom:'8px'}}>✉️</div>
-          <h1 style={{fontSize:'48px',fontWeight:'900',margin:0,letterSpacing:'2px'}}>Verify Email</h1>
-        </div>
-        <div style={{background:'rgba(0,0,0,0.7)',border:'1px solid rgba(200,168,75,0.4)',borderRadius:'16px',padding:'40px 48px',width:'360px',zIndex:1,backdropFilter:'blur(10px)',boxShadow:'0 0 60px rgba(200,168,75,0.1)'}}>
-          <p style={{textAlign:'center',color:'rgba(255,255,255,0.7)',marginBottom:'20px'}}>
-            {emailConfigured
-              ? 'Check your email for the verification link. Copy the token from the email and paste it below:'
-              : 'Check the server console for your verification token and paste it below:'}
-          </p>
-          <div style={{marginBottom:'20px'}}>
-            <label style={{display:'block',fontSize:'12px',color:'rgba(255,255,255,0.6)',marginBottom:'8px',letterSpacing:'2px'}}>VERIFICATION TOKEN</label>
-            <input type="text" value={verificationToken} onChange={e=>setVerificationToken(e.target.value)} placeholder="Paste token here" autoFocus style={{width:'100%',padding:'12px 16px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(200,168,75,0.3)',borderRadius:'8px',color:'#fff',fontSize:'15px',outline:'none',boxSizing:'border-box',fontFamily:"'Segoe UI', sans-serif"}}/>
-          </div>
-          {error&&<div style={{color:'#ff6b6b',fontSize:'12px',marginBottom:'16px',textAlign:'center'}}>{error}</div>}
-          <button onClick={async()=>{
-            if(!verificationToken.trim()){setError('Token required');return;}
-            setLoading(true);
-            const res=await fetch('/api/verify-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({verificationToken:verificationToken.trim()})});
-            const data=await res.json();
-            if(!res.ok){setError(data.error||'Verification failed');setLoading(false);return;}
-            setError('');
-            setVerifyingEmail(false);
-            setMode('login');
-            setPassword('');
-            alert('Email verified! You can now login.');
-            setLoading(false);
-          }} disabled={loading} style={{width:'100%',padding:'14px',background:'linear-gradient(135deg, #c8a84b, #ffd700)',border:'none',borderRadius:'8px',color:'#000',fontSize:'16px',fontWeight:'700',cursor:loading?'not-allowed':'pointer',letterSpacing:'2px',transition:'all 0.2s',fontFamily:"'Segoe UI', sans-serif",opacity:loading?0.7:1}}>{loading?'VERIFYING...':'VERIFY EMAIL'}</button>
-          <div style={{marginTop:'20px',textAlign:'center',fontSize:'12px'}}><button onClick={()=>{setVerifyingEmail(false);setError('')}} style={{background:'none',border:'none',color:'#c8a84b',cursor:'pointer',textDecoration:'underline'}}>Back to login</button></div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
+return (
     <div style={{
       width:'100vw', height:'100vh', background:'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)',
       display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column',
