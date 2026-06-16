@@ -84,6 +84,7 @@ function AuthScreen({ onAuthenticated }) {
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -141,6 +142,7 @@ function AuthScreen({ onAuthenticated }) {
           setLoading(false);
           return;
         }
+        setSuccess('Account created! Logging in...');
         const loginResponse = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -149,6 +151,7 @@ function AuthScreen({ onAuthenticated }) {
         const loginData = await loginResponse.json();
         if (!loginResponse.ok) {
           setError('Account created but login failed. Please log in manually.');
+          setSuccess('');
           setMode('login');
           setLoading(false);
           return;
@@ -159,6 +162,7 @@ function AuthScreen({ onAuthenticated }) {
         onAuthenticated({ userId: loginData.userId, email: loginData.email, displayName: loginData.displayName });
       } catch (err) {
         setError('Network error: ' + err.message);
+        setSuccess('');
         setLoading(false);
       }
     }
@@ -245,6 +249,7 @@ return (
         {mode!=='reset'&&(<div style={{marginBottom:'20px'}}><label style={{display:'block',fontSize:'12px',color:'rgba(255,255,255,0.6)',marginBottom:'8px',letterSpacing:'2px'}}>PASSWORD</label><div style={{position:'relative',display:'flex',alignItems:'center'}}><input type={showPassword?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSubmit()} placeholder="••••••" disabled={loading} style={{width:'100%',padding:'12px 16px',paddingRight:'40px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(200,168,75,0.3)',borderRadius:'8px',color:'#fff',fontSize:'15px',outline:'none',boxSizing:'border-box',fontFamily:"'Segoe UI', sans-serif",opacity:loading?0.5:1}}/><button type="button" onClick={()=>setShowPassword(!showPassword)} disabled={loading} style={{position:'absolute',right:'12px',background:'none',border:'none',color:'#c8a84b',cursor:loading?'not-allowed':'pointer',fontSize:'16px',padding:'0',width:'24px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',transition:'opacity 0.2s'}}>{showPassword?'👁️':'👁️'}</button></div></div>)}
         {mode==='reset'&&resetSent&&(<><div style={{marginBottom:'20px',padding:'12px',background:'rgba(200,168,75,0.1)',borderRadius:'8px',fontSize:'13px',color:'rgba(255,255,255,0.7)'}}>Check server logs for reset token</div><div style={{marginBottom:'20px'}}><label style={{display:'block',fontSize:'12px',color:'rgba(255,255,255,0.6)',marginBottom:'8px',letterSpacing:'2px'}}>RESET TOKEN</label><input type="text" value={resetToken} onChange={e=>setResetToken(e.target.value)} placeholder="Paste token" disabled={loading} style={{width:'100%',padding:'12px 16px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(200,168,75,0.3)',borderRadius:'8px',color:'#fff',fontSize:'15px',outline:'none',boxSizing:'border-box',fontFamily:"'Segoe UI', sans-serif"}}/></div><div style={{marginBottom:'20px'}}><label style={{display:'block',fontSize:'12px',color:'rgba(255,255,255,0.6)',marginBottom:'8px',letterSpacing:'2px'}}>NEW PASSWORD</label><div style={{position:'relative',display:'flex',alignItems:'center'}}><input type={showNewPassword?'text':'password'} value={newPassword} onChange={e=>setNewPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSubmit()} placeholder="••••••" disabled={loading} style={{width:'100%',padding:'12px 16px',paddingRight:'40px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(200,168,75,0.3)',borderRadius:'8px',color:'#fff',fontSize:'15px',outline:'none',boxSizing:'border-box',fontFamily:"'Segoe UI', sans-serif",opacity:loading?0.5:1}}/><button type="button" onClick={()=>setShowNewPassword(!showNewPassword)} disabled={loading} style={{position:'absolute',right:'12px',background:'none',border:'none',color:'#c8a84b',cursor:loading?'not-allowed':'pointer',fontSize:'16px',padding:'0',width:'24px',height:'24px',display:'flex',alignItems:'center',justifyContent:'center',transition:'opacity 0.2s'}}>{showNewPassword?'👁️':'👁️'}</button></div></div></>) }
         {error&&<div style={{color:'#ff6b6b',fontSize:'12px',marginBottom:'16px',textAlign:'center'}}>{error}</div>}
+        {success&&<div style={{color:'#6bff6b',fontSize:'12px',marginBottom:'16px',textAlign:'center'}}>{success}</div>}
         <button onClick={handleSubmit} disabled={loading} style={{width:'100%',padding:'14px',background:'linear-gradient(135deg, #c8a84b, #ffd700)',border:'none',borderRadius:'8px',color:'#000',fontSize:'16px',fontWeight:'700',cursor:loading?'not-allowed':'pointer',letterSpacing:'2px',transition:'all 0.2s',fontFamily:"'Segoe UI', sans-serif",opacity:loading?0.7:1}} onMouseEnter={e=>!loading&&(e.target.style.transform='scale(1.02)')} onMouseLeave={e=>!loading&&(e.target.style.transform='scale(1)')}>{loading?'LOADING...':mode==='login'?'LOGIN':mode==='register'?'CREATE ACCOUNT':resetSent?'RESET PASSWORD':'SEND RESET EMAIL'}</button>
         {mode==='login'&&(<div style={{marginTop:'20px',textAlign:'center',fontSize:'12px'}}><button onClick={()=>{setMode('reset');setError('')}} style={{background:'none',border:'none',color:'#c8a84b',cursor:'pointer',textDecoration:'underline'}}>Forgot password?</button></div>)}
         {mode==='reset'&&(<div style={{marginTop:'20px',textAlign:'center'}}><button onClick={()=>{setMode('login');setError('');setResetToken('');setResetSent(false)}} style={{background:'none',border:'none',color:'#c8a84b',cursor:'pointer',fontSize:'12px',textDecoration:'underline'}}>Back to login</button></div>)}
