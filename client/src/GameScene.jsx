@@ -47,7 +47,7 @@ export default function GameScene({ auth }) {
       containerRef.current.appendChild(renderer.domElement);
 
       const env = createEnvironment(scene);
-      const ui = createUI(auth.displayName || auth.email, null, auth.email);
+      const ui = createUI(auth.displayName || auth.email, null, auth.displayName);
       showChatPanel(socket);
 
       // Add inventory button

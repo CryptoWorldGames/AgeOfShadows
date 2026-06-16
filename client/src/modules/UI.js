@@ -230,16 +230,16 @@ function showSettingsPanel(email) {
   };
 }
 
-export function createUI(playerId, gameState, email) {
+export function createUI(playerId, gameState, displayName) {
 
   // Login info panel (top right)
-  if (email) {
+  if (displayName) {
     const loginPanel = document.createElement('div');
     loginPanel.id = 'login-panel';
     loginPanel.style.cssText = `position:absolute;top:14px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:12px 16px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdropFilter:blur(4px)`;
     loginPanel.innerHTML = `
-      <div style="opacity:0.7;margin-bottom:6px;">📧 Logged in as</div>
-      <div style="color:#c8a84b;font-weight:600;margin-bottom:8px;word-break:break-all;">${email}</div>
+      <div style="opacity:0.7;margin-bottom:6px;">👤 Playing as</div>
+      <div style="color:#c8a84b;font-weight:600;margin-bottom:8px;word-break:break-all;">${displayName}</div>
       <button id="settings-btn" style="width:100%;padding:6px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:11px;font-weight:600;margin-bottom:6px;">⚙️ Settings</button>
       <button id="logout-btn" style="width:100%;padding:6px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:11px;font-weight:600;">Logout</button>
     `;
@@ -253,7 +253,7 @@ export function createUI(playerId, gameState, email) {
     };
 
     document.getElementById('settings-btn').onclick = () => {
-      showSettingsPanel(email);
+      showSettingsPanel(displayName);
     };
   }
 
