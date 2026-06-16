@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('./email');
 
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const PLAYERS_FILE = path.join(__dirname, 'data', 'players.json');
@@ -88,8 +89,11 @@ function registerUser(email, displayName, password) {
       };
       savePlayers(players);
 
-      console.log(`[EMAIL] Verification token for ${email}: ${verificationToken}`);
-      resolve({ userId, verificationToken });
+      // Send verification email
+      sendVerificationEmail(email, verificationToken).then(sent => {
+        console.log(`[AUTH] User registered: ${email} (${userId})`);
+        resolve({ userId, verificationToken, emailSent: sent });
+      });
     } catch (err) {
       reject(err);
     }
@@ -167,10 +171,15 @@ function createPasswordResetToken(email) {
 
       const token = require('crypto').randomBytes(32).toString('hex');
       user.resetToken = token;
-      user.resetTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      user.resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
 
       saveUsers(users);
-      resolve(token);
+
+      // Send password reset email
+      sendPasswordResetEmail(email, token).then(sent => {
+        console.log(`[AUTH] Password reset requested: ${email}`);
+        resolve(token);
+      });
     } catch (err) {
       reject(err);
     }
