@@ -92,6 +92,73 @@ function showChatPanel(socket) {
   });
 }
 
+function showHouseInventoryModal(playerId, auth) {
+  const existingModal = document.getElementById('house-inventory-modal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'house-inventory-modal';
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
+
+  modal.innerHTML = `
+    <div style="background:rgba(0,0,0,0.9);border:1px solid rgba(200,168,75,0.4);border-radius:12px;padding:24px;width:90%;max-width:600px;color:#fff;font-family:'Segoe UI',sans-serif;max-height:80vh;overflow-y:auto;">
+      <h2 style="margin:0 0 20px;color:#c8a84b;font-size:20px;">🏛️ Town Center Inventory</h2>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:12px;margin-bottom:20px;">
+        <div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;">
+          <div style="font-size:11px;opacity:0.7;">WOOD</div>
+          <div id="inv-wood" style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">0</div>
+        </div>
+        <div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;">
+          <div style="font-size:11px;opacity:0.7;">STONE</div>
+          <div id="inv-stone" style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">0</div>
+        </div>
+        <div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;">
+          <div style="font-size:11px;opacity:0.7;">GOLD</div>
+          <div id="inv-gold" style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">0</div>
+        </div>
+        <div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;">
+          <div style="font-size:11px;opacity:0.7;">FOOD</div>
+          <div id="inv-food" style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">0</div>
+        </div>
+        <div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;">
+          <div style="font-size:11px;opacity:0.7;">WATER</div>
+          <div id="inv-water" style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">0</div>
+        </div>
+      </div>
+
+      <h3 style="color:#c8a84b;margin-top:20px;margin-bottom:12px;font-size:14px;">Actions</h3>
+      <div style="display:grid;gap:8px;">
+        <button id="spawn-worker-modal" style="padding:12px;background:linear-gradient(135deg, #c8a84b, #ffd700);border:none;border-radius:4px;color:#000;font-weight:600;cursor:pointer;width:100%;">➕ Spawn Worker (1000🍖 500🪵 200⛏️ 50💰)</button>
+        <button style="padding:12px;background:rgba(139,69,19,0.3);border:1px solid #8b4513;border-radius:4px;color:#daa520;cursor:pointer;width:100%;opacity:0.5;" disabled>🌳 Build Wood Fence (50🪵) - Coming Soon</button>
+        <button style="padding:12px;background:rgba(128,128,128,0.3);border:1px solid #808080;border-radius:4px;color:#c0c0c0;cursor:pointer;width:100%;opacity:0.5;" disabled>⬜ Build Stone Wall (100⛏️) - Coming Soon</button>
+        <button style="padding:12px;background:rgba(200,100,0,0.3);border:1px solid #c86400;border-radius:4px;color:#ff8c00;cursor:pointer;width:100%;opacity:0.5;" disabled>⚔️ Craft Sword (100🪵 50⛏️) - Coming Soon</button>
+      </div>
+
+      <h3 style="color:#c8a84b;margin-top:20px;margin-bottom:12px;font-size:14px;">Your Units</h3>
+      <div id="units-list" style="background:rgba(255,255,255,0.05);border-radius:6px;padding:12px;max-height:200px;overflow-y:auto;font-size:11px;">
+        <div style="opacity:0.7;">Loading units...</div>
+      </div>
+
+      <button id="close-house-inventory" style="width:100%;padding:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;cursor:pointer;margin-top:20px;">Close</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('close-house-inventory').onclick = () => modal.remove();
+  document.getElementById('spawn-worker-modal').onclick = () => {
+    const userId = sessionStorage.getItem('userId');
+    fetch('/api/spawn-worker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    }).then(r => r.json()).then(data => {
+      alert(data.message || (data.success ? 'Worker spawned!' : data.error));
+      modal.remove();
+    });
+  };
+}
+
 function showSettingsPanel(email) {
   const existingModal = document.getElementById('settings-modal');
   if (existingModal) existingModal.remove();

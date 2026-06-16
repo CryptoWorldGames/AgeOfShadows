@@ -112,6 +112,31 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
   function carryTotal() { return Object.values(inventory).reduce((a,b)=>a+b,0); }
   function isFull() { return carryTotal()>=carryMax; }
 
+  // Stats tracking for unit naming
+  const lifetimeGathered = {wood:0,stone:0,gold:0,food:0,water:0};
+  const spawnTime = Date.now();
+  let hp = 100, hunger = 100, thirst = 100;
+
+  function getUnitName() {
+    const stats = lifetimeGathered;
+    const max = Math.max(stats.wood, stats.stone, stats.gold, stats.food, stats.water);
+    if (max === 0) return 'Worker';
+    if (stats.wood === max) return 'Lumberjack';
+    if (stats.food === max) return 'Hunter';
+    if (stats.stone === max) return 'Stone Miner';
+    if (stats.gold === max) return 'Gold Miner';
+    if (stats.water === max) return 'Farmer';
+    return 'Worker';
+  }
+
+  function getAliveTime() {
+    const ms = Date.now() - spawnTime;
+    const mins = Math.floor(ms / 60000);
+    const hours = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${hours}h ${m}m`;
+  }
+
   let target=null;
   let chopTarget=null; let chopSlot=null;
   let animalTarget=null;
@@ -513,6 +538,10 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
   const unit = {
     group, type:'unit', team, radius, inventory,
     health:100, maxHealth:100, selected:false,
+    hp, hunger, thirst,
+    name: getUnitName(),
+    stats: lifetimeGathered,
+    aliveTime: getAliveTime,
     getModelCenterY:()=>modelCenterY,
     setSelected(b){unit.selected=b;},
     moveTo(v){target=v.clone();chopTarget=null;animalTarget=null;stoneTarget=null;goldTarget=null;chopPhase=0;stoneHitCount=0;goldHitCount=0;woodHitCount=0;autoTask=null;returning=false;depositTarget=null;lastKillPos=null;},
