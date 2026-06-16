@@ -23,23 +23,26 @@ export function createEnvironment(scene) {
 
   const loader = new THREE.TextureLoader();
 
-  // Grass ground — sized to match wall boundary
-  const grassTex = loader.load(
-    'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_path_2/grass_path_2_diff_1k.jpg',
-    undefined,
-    undefined,
-    () => console.warn('Grass texture not found, using color fallback')
-  );
-  grassTex.wrapS = THREE.RepeatWrapping;
-  grassTex.wrapT = THREE.RepeatWrapping;
-  grassTex.repeat.set(20, 20);
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(300, 300),
-    new THREE.MeshStandardMaterial({ color: 0x4a7a3a, map: grassTex, roughness: 0.9 })
-  );
+  // Grass ground — sized to match wall boundary.
+  // Color first so the floor is ALWAYS visible (green); texture is applied
+  // only if it loads successfully. Setting `map` to a failed texture renders black.
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a7a3a, roughness: 0.9 });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+  loader.load(
+    'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_path_2/grass_path_2_diff_1k.jpg',
+    (tex) => {
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(20, 20);
+      groundMat.map = tex;
+      groundMat.needsUpdate = true;
+    },
+    undefined,
+    () => console.warn('Grass texture not found, using green color fallback')
+  );
 
   // Dirt roads
   const road1Mat = new THREE.MeshStandardMaterial({ color: 0x9a7a50, roughness: 1.0 });
