@@ -11,3 +11,4 @@ client/node_modules/
 client/dist/
 public/models/*.glb
 public/models/*.fbx
+data/
