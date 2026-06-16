@@ -263,11 +263,33 @@ return (
 export default function App() {
   const [auth, setAuth] = useState(null);
 
+  useEffect(() => {
+    const saved = localStorage.getItem('auth');
+    if (saved) {
+      try {
+        setAuth(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to restore auth:', e);
+      }
+    }
+  }, []);
+
+  const handleAuthenticated = (authData) => {
+    setAuth(authData);
+    localStorage.setItem('auth', JSON.stringify(authData));
+  };
+
+  const handleLogout = () => {
+    setAuth(null);
+    localStorage.removeItem('auth');
+    sessionStorage.removeItem('adminToken');
+  };
+
   return (
     <>
       <MobileOrientationCheck />
       {auth && <AdminPanel email={auth.email} />}
-      {!auth ? <AuthScreen onAuthenticated={setAuth} /> : <GameScene auth={auth} />}
+      {!auth ? <AuthScreen onAuthenticated={handleAuthenticated} /> : <GameScene auth={auth} onLogout={handleLogout} />}
     </>
   );
 }
