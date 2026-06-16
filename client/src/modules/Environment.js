@@ -24,7 +24,12 @@ export function createEnvironment(scene) {
   const loader = new THREE.TextureLoader();
 
   // Grass ground — sized to match wall boundary
-  const grassTex = loader.load('https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_path_2/grass_path_2_diff_1k.jpg');
+  const grassTex = loader.load(
+    'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_path_2/grass_path_2_diff_1k.jpg',
+    undefined,
+    undefined,
+    () => console.warn('Grass texture not found, using color fallback')
+  );
   grassTex.wrapS = THREE.RepeatWrapping;
   grassTex.wrapT = THREE.RepeatWrapping;
   grassTex.repeat.set(20, 20);
@@ -55,7 +60,9 @@ export function createEnvironment(scene) {
       road2Mat.map = t2; road2Mat.needsUpdate = true;
       const t3 = tex.clone(); t3.wrapS = THREE.RepeatWrapping; t3.wrapT = THREE.RepeatWrapping; t3.repeat.set(1, 14); t3.needsUpdate = true;
       road3Mat.map = t3; road3Mat.needsUpdate = true;
-    }
+    },
+    undefined,
+    () => console.warn('Mud texture not found, using color fallback')
   );
 
   // ===== CASTLE BRICK WALLS =====
