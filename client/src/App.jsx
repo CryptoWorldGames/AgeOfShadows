@@ -53,12 +53,21 @@ function MobileOrientationCheck() {
     };
 
     checkMobile();
-    window.addEventListener('orientationchange', checkMobile);
-    window.addEventListener('resize', checkMobile);
+
+    // Use both orientationchange and resize; add debounce for reliability
+    let resizeTimeout;
+    const debouncedCheck = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(checkMobile, 100);
+    };
+
+    window.addEventListener('orientationchange', debouncedCheck);
+    window.addEventListener('resize', debouncedCheck);
 
     return () => {
-      window.removeEventListener('orientationchange', checkMobile);
-      window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('orientationchange', debouncedCheck);
+      window.removeEventListener('resize', debouncedCheck);
+      clearTimeout(resizeTimeout);
     };
   }, []);
 
