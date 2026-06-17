@@ -79,13 +79,6 @@ export default function GameScene({ auth }) {
         }
       };
 
-      // Add inventory button
-      const invBtn = document.createElement('button');
-      invBtn.style.cssText = `position:absolute;top:14px;left:80px;padding:10px 14px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:6px;color:#c8a84b;cursor:pointer;font-weight:600;font-size:11px;font-family:'Segoe UI',sans-serif;z-index:100;`;
-      invBtn.textContent = '📦 Inventory';
-      invBtn.onclick = () => showInventoryModal(world.resources);
-      document.body.appendChild(invBtn);
-
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
 
       const world = {
@@ -93,6 +86,13 @@ export default function GameScene({ auth }) {
         units: [], trees: [], buildings: [], animals: [],
         stones: [], golds: [], resources, ui, pondPosition: env.pondPosition
       };
+
+      // Add inventory button
+      const invBtn = document.createElement('button');
+      invBtn.style.cssText = `position:absolute;top:14px;left:80px;padding:10px 14px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:6px;color:#c8a84b;cursor:pointer;font-weight:600;font-size:11px;font-family:'Segoe UI',sans-serif;z-index:100;`;
+      invBtn.textContent = '📦 Inventory';
+      invBtn.onclick = () => showInventoryModal(world.resources);
+      document.body.appendChild(invBtn);
 
       if (joinData.player.units && joinData.player.units.length > 0) {
         joinData.player.units.forEach(u => {
