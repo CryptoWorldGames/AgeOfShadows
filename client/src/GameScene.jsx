@@ -54,11 +54,10 @@ export default function GameScene({ auth }) {
     };
     return (
       <div style={{ width: '100vw', height: '100vh', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontFamily: "'Segoe UI', sans-serif", textAlign: 'center', padding: '20px', boxSizing: 'border-box' }}>
-        <div style={{ fontSize: '72px', marginBottom: '8px', animation: 'spin 2s linear infinite' }}>↻</div>
+        <div onClick={checkAndReload} style={{ fontSize: '72px', marginBottom: '8px', animation: 'spin 2s linear infinite', cursor: 'pointer', opacity: 0.8 }}>↻</div>
         <style>{`@keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }`}</style>
         <h1 style={{ fontSize: 'clamp(22px,6vw,32px)', margin: '16px 0 12px', color: '#c8a84b', fontWeight: '900' }}>Turn Your Phone Sideways</h1>
-        <p style={{ fontSize: 'clamp(13px,3.5vw,16px)', opacity: 0.7, maxWidth: '320px', lineHeight: '1.6', margin: '0 0 12px' }}>Physically rotate your device to landscape (wide) mode</p>
-        <p style={{ fontSize: 'clamp(11px,3vw,13px)', opacity: 0.5, margin: '0 0 32px' }}>Then tap below to check</p>
+        <p style={{ fontSize: 'clamp(13px,3.5vw,16px)', opacity: 0.7, maxWidth: '320px', lineHeight: '1.6', margin: '0 0 28px' }}>Rotate your device to landscape, then tap the arrow or button below</p>
         <button onClick={checkAndReload} style={{ padding: 'clamp(14px,4vw,18px) clamp(24px,8vw,40px)', background: 'linear-gradient(135deg, #c8a84b, #ffd700)', border: 'none', borderRadius: '10px', color: '#000', fontSize: 'clamp(14px,4vw,17px)', fontWeight: '700', cursor: 'pointer', letterSpacing: '1px', marginBottom: '12px', width: 'min(80vw, 300px)' }}>
           ✓ Rotated & Ready
         </button>
