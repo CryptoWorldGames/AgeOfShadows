@@ -253,7 +253,7 @@ export default function GameScene({ auth }) {
     return () => {
       socket.disconnect();
     };
-  }, [auth, showRotateScreen]);
+  }, [auth]);
 
   if (error) {
     return (
