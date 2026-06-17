@@ -24,17 +24,23 @@ export function createEnvironment(scene) {
   const loader = new THREE.TextureLoader();
 
   // Grass ground — sized to match wall boundary
-  const grassTex = loader.load('https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_path_2/grass_path_2_diff_1k.jpg');
-  grassTex.wrapS = THREE.RepeatWrapping;
-  grassTex.wrapT = THREE.RepeatWrapping;
-  grassTex.repeat.set(20, 20);
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(300, 300),
-    new THREE.MeshStandardMaterial({ color: 0x4a7a3a, map: grassTex, roughness: 0.9 })
-  );
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a7a3a, roughness: 0.9 });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+  loader.load(
+    'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/grass_path_2/grass_path_2_diff_1k.jpg',
+    (tex) => {
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(20, 20);
+      groundMat.map = tex;
+      groundMat.needsUpdate = true;
+    },
+    undefined,
+    () => console.warn('Grass texture not found, using green color fallback')
+  );
 
   // Dirt roads
   const road1Mat = new THREE.MeshStandardMaterial({ color: 0x9a7a50, roughness: 1.0 });
@@ -55,7 +61,9 @@ export function createEnvironment(scene) {
       road2Mat.map = t2; road2Mat.needsUpdate = true;
       const t3 = tex.clone(); t3.wrapS = THREE.RepeatWrapping; t3.wrapT = THREE.RepeatWrapping; t3.repeat.set(1, 14); t3.needsUpdate = true;
       road3Mat.map = t3; road3Mat.needsUpdate = true;
-    }
+    },
+    undefined,
+    () => console.warn('Mud texture not found, using color fallback')
   );
 
   // ===== CASTLE BRICK WALLS =====
