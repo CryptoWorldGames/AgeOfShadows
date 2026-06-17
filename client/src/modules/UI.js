@@ -289,9 +289,9 @@ export function createUI(playerId, gameState, displayName) {
 
   document.body.appendChild(resourceBar);
 
-  // Selected count in far left corner
+  // Selected count in far left corner (above HUD)
   const selDiv = document.createElement('div');
-  selDiv.style.cssText = `position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.6);border:1px solid rgba(200,168,75,0.3);border-radius:8px;padding:12px 16px;color:#c8a84b;font-family:'Segoe UI',sans-serif;font-size:14px;z-index:100;`;
+  selDiv.style.cssText = `position:absolute;bottom:90px;left:20px;background:rgba(0,0,0,0.6);border:1px solid rgba(200,168,75,0.3);border-radius:8px;padding:12px 16px;color:#c8a84b;font-family:'Segoe UI',sans-serif;font-size:14px;z-index:100;`;
   selDiv.innerHTML = `Selected: <span id="unit-count" style="font-weight:600;">0</span>`;
   document.body.appendChild(selDiv);
 

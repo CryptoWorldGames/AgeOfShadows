@@ -275,6 +275,8 @@ export function createControls(camera, renderer, scene, world) {
   const keys = {};
   window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
   window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+  window.addEventListener('blur', () => Object.keys(keys).forEach(k => keys[k] = false));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) Object.keys(keys).forEach(k => keys[k] = false); });
 
   const update = (time, dt) => {
     const speed = 0.3;
