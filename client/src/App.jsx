@@ -190,23 +190,28 @@ function AuthScreen({ onAuthenticated }) {
 
 return (
     <div style={{
-      width:'100vw', height:'100vh', background:'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)',
+      width:'100vw', minHeight:'100vh', background:'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)',
       display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column',
-      fontFamily:"'Segoe UI', sans-serif", color:'#fff', position:'relative', overflow:'hidden'
+      fontFamily:"'Segoe UI', sans-serif", color:'#fff', position:'relative', overflow:'hidden',
+      paddingTop:'max(12px, env(safe-area-inset-top))',
+      paddingBottom:'max(12px, env(safe-area-inset-bottom))',
+      paddingLeft:'max(12px, env(safe-area-inset-left))',
+      paddingRight:'max(12px, env(safe-area-inset-right))',
+      boxSizing:'border-box'
     }}>
       <div style={{position:'absolute',inset:0,overflow:'hidden',pointerEvents:'none'}}>
         {[...Array(80)].map((_,i)=>(
           <div key={i} style={{position:'absolute',left:`${Math.random()*100}%`,top:`${Math.random()*100}%`,width:Math.random()>0.8?'2px':'1px',height:Math.random()>0.8?'2px':'1px',background:'#fff',borderRadius:'50%',opacity:0.3+Math.random()*0.7}}/>
         ))}
       </div>
-      <div style={{textAlign:'center', marginBottom:'40px', zIndex:1, maxWidth:'100%', padding:'0 16px'}}>
-        <div style={{fontSize:'clamp(48px, 12vw, 64px)', marginBottom:'8px'}}>⚔️</div>
-        <h1 style={{fontSize:'clamp(32px, 9vw, 52px)',fontWeight:'900',margin:0,letterSpacing:'clamp(2px, 1vw, 4px)',background:'linear-gradient(135deg, #c8a84b, #ffd700, #c8a84b)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>AGE OF SHADOWS</h1>
-        <p style={{color:'rgba(255,255,255,0.5)',fontSize:'clamp(12px, 3vw, 14px)',letterSpacing:'clamp(3px, 1vw, 6px)',marginTop:'8px'}}>MULTIPLAYER STRATEGY</p>
-        <p style={{color:'#fff',fontSize:'clamp(14px, 3.5vw, 16px)',fontWeight:'600',marginTop:'12px',letterSpacing:'2px'}}>v2.7</p>
+      <div style={{textAlign:'center', marginBottom:'clamp(12px, 2vh, 20px)', zIndex:1, maxWidth:'100%', padding:'0 12px', flex:'0 1 auto'}}>
+        <div style={{fontSize:'clamp(36px, 8vh, 64px)', marginBottom:'2px', lineHeight:'1'}}>⚔️</div>
+        <h1 style={{fontSize:'clamp(20px, 6vh, 48px)',fontWeight:'900',margin:0,letterSpacing:'clamp(0.5px, 0.5vw, 3px)',background:'linear-gradient(135deg, #c8a84b, #ffd700, #c8a84b)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',lineHeight:'1.1'}}>AGE OF SHADOWS</h1>
+        <p style={{color:'rgba(255,255,255,0.5)',fontSize:'clamp(9px, 2vh, 12px)',letterSpacing:'clamp(0.5px, 0.5vw, 3px)',margin:'4px 0 0 0'}}>MULTIPLAYER STRATEGY</p>
+        <p style={{color:'#fff',fontSize:'clamp(10px, 2vh, 13px)',fontWeight:'600',margin:'4px 0 0 0',letterSpacing:'1px'}}>v2.8</p>
       </div>
-      <div style={{background:'rgba(0,0,0,0.7)',border:'1px solid rgba(200,168,75,0.4)',borderRadius:'16px',padding:'clamp(24px, 5vw, 48px)',width:'clamp(300px, 90vw, 400px)',maxWidth:'90vw',zIndex:1,backdropFilter:'blur(10px)',boxShadow:'0 0 60px rgba(200,168,75,0.1)',marginLeft:'auto',marginRight:'auto'}}>
-        <h2 style={{margin:'0 0 24px',fontSize:'clamp(16px, 5vw, 20px)',color:'#c8a84b',textAlign:'center'}}>{mode==='login'?'Enter the Realm':mode==='register'?'Create Account':'Reset Password'}</h2>
+      <div style={{background:'rgba(0,0,0,0.7)',border:'1px solid rgba(200,168,75,0.4)',borderRadius:'12px',padding:'clamp(16px, 3vh, 28px)',width:'min(90vw, 360px)',zIndex:1,backdropFilter:'blur(10px)',boxShadow:'0 0 60px rgba(200,168,75,0.1)',marginLeft:'auto',marginRight:'auto',flex:'0 1 auto',maxHeight:'55vh',overflowY:'auto',overflowX:'hidden',boxSizing:'border-box'}}
+        <h2 style={{margin:'0 0 clamp(12px, 2vh, 16px)',fontSize:'clamp(14px, 3vh, 18px)',color:'#c8a84b',textAlign:'center'}}>{mode==='login'?'Enter the Realm':mode==='register'?'Create Account':'Reset Password'}</h2>
         {mode!=='reset'&&(<div style={{display:'flex',gap:'8px',marginBottom:'24px',borderBottom:'1px solid rgba(200,168,75,0.2)'}}><button onClick={()=>{setMode('login');setError('')}} style={{flex:1,padding:'8px',background:mode==='login'?'rgba(200,168,75,0.2)':'transparent',border:'none',borderBottom:mode==='login'?'2px solid #c8a84b':'none',color:'#c8a84b',fontSize:'13px',fontWeight:'600',cursor:'pointer',fontFamily:"'Segoe UI', sans-serif",letterSpacing:'1px'}}>LOGIN</button><button onClick={()=>{setMode('register');setError('')}} style={{flex:1,padding:'8px',background:mode==='register'?'rgba(200,168,75,0.2)':'transparent',border:'none',borderBottom:mode==='register'?'2px solid #c8a84b':'none',color:'#c8a84b',fontSize:'13px',fontWeight:'600',cursor:'pointer',fontFamily:"'Segoe UI', sans-serif",letterSpacing:'1px'}}>REGISTER</button></div>)}
         <div style={{marginBottom:'20px'}}><label style={{display:'block',fontSize:'clamp(11px, 2.5vw, 12px)',color:'rgba(255,255,255,0.6)',marginBottom:'8px',letterSpacing:'2px'}}>EMAIL</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSubmit()} placeholder="you@example.com" disabled={loading||(mode==='reset'&&resetSent)} autoFocus style={{width:'100%',padding:'clamp(10px, 2.5vw, 12px) clamp(12px, 3vw, 16px)',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(200,168,75,0.3)',borderRadius:'8px',color:'#fff',fontSize:'16px',outline:'none',boxSizing:'border-box',fontFamily:"'Segoe UI', sans-serif",opacity:loading?0.5:1,cursor:loading?'not-allowed':'text'}}/></div>
         {mode==='register'&&(<div style={{marginBottom:'20px'}}><label style={{display:'block',fontSize:'12px',color:'rgba(255,255,255,0.6)',marginBottom:'8px',letterSpacing:'2px'}}>DISPLAY NAME (optional)</label><input type="text" value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Your warrior name" disabled={loading} style={{width:'100%',padding:'12px 16px',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(200,168,75,0.3)',borderRadius:'8px',color:'#fff',fontSize:'15px',outline:'none',boxSizing:'border-box',fontFamily:"'Segoe UI', sans-serif",opacity:loading?0.5:1}}/></div>)}
