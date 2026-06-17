@@ -255,6 +255,14 @@ export default function GameScene({ auth }) {
     };
   }, [auth]);
 
+  if (!auth) {
+    return (
+      <div style={{ width: '100%', height: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8a84b', fontSize: '16px', textAlign: 'center', padding: '20px' }}>
+        <div>Not authenticated. Please log in.</div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div style={{width:'100%',height:'100vh',background:'#000',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:'20px'}}>
