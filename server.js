@@ -5,6 +5,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerData, createPasswordResetToken, resetPassword, verifyEmail, updateUserProfile, deleteUserAccount } = require('./auth');
+const { isEmailConfigured } = require('./email');
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
 
@@ -249,7 +250,14 @@ app.post('/api/register', async (req, res) => {
     const result = await registerUser(email, displayName, password, {
       wantsEmails: wantsEmails || false
     });
-    res.json({ success: true, userId: result.userId, email, displayName, message: 'Account created! Welcome to Age of Shadows.' });
+    res.json({
+      success: true,
+      userId: result.userId,
+      email,
+      displayName,
+      emailConfigured: isEmailConfigured(),
+      message: 'Account created! Welcome to Age of Shadows.'
+    });
   } catch (err) {
     if (err.message.includes('already registered')) {
       res.status(400).json({ error: 'Email already registered' });

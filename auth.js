@@ -62,6 +62,8 @@ function registerUser(email, displayName, password, options = {}) {
 
       const userId = Date.now().toString();
       const hash = bcrypt.hashSync(password, 10);
+      const verificationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const verificationExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
       users[userId] = {
         id: userId,
@@ -69,7 +71,9 @@ function registerUser(email, displayName, password, options = {}) {
         displayName: displayName || email.split('@')[0],
         passwordHash: hash,
         createdAt: new Date().toISOString(),
-        emailVerified: true,
+        emailVerified: false,
+        verificationToken,
+        verificationExpires,
         profile: { age: null, state: null, country: null },
         wantsEmails: options.wantsEmails || false
       };
@@ -86,7 +90,12 @@ function registerUser(email, displayName, password, options = {}) {
       };
       savePlayers(players);
 
-      console.log(`[AUTH] User registered: ${displayName} (${userId})${options.wantsEmails ? ` - Contact: ${options.contactEmail}` : ''}`);
+      // Send verification email
+      sendVerificationEmail(email, verificationToken).catch(err => {
+        console.error(`[AUTH] Failed to send verification email to ${email}:`, err.message);
+      });
+
+      console.log(`[AUTH] User registered: ${displayName} (${userId}) - Awaiting email verification`);
       resolve({ userId });
     } catch (err) {
       reject(err);

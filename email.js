@@ -122,7 +122,12 @@ async function sendPasswordResetEmail(email, resetToken) {
   }
 }
 
+function isEmailConfigured() {
+  return !!(process.env.SENDGRID_API_KEY || (process.env.GMAIL_EMAIL && process.env.GMAIL_APP_PASSWORD));
+}
+
 module.exports = {
   sendVerificationEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  isEmailConfigured
 };
