@@ -16,6 +16,7 @@ export default function GameScene({ auth }) {
   const [error, setError] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
+  const [checkingOrientation, setCheckingOrientation] = useState(true);
 
   useEffect(() => {
     const checkOrientation = () => {
@@ -23,6 +24,7 @@ export default function GameScene({ auth }) {
       const portrait = window.innerHeight > window.innerWidth;
       setIsMobile(mobile);
       setIsPortrait(portrait);
+      setCheckingOrientation(false);
       console.log('Orientation check:', { mobile, portrait, height: window.innerHeight, width: window.innerWidth });
     };
 
@@ -43,6 +45,14 @@ export default function GameScene({ auth }) {
       clearTimeout(resizeTimeout);
     };
   }, []);
+
+  if (checkingOrientation) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8a84b', fontSize: '16px' }}>
+        Loading...
+      </div>
+    );
+  }
 
   if (isMobile && isPortrait) {
     const checkAndReload = () => {
