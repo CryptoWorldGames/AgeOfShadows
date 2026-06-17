@@ -7,12 +7,15 @@ export function createControls(camera, renderer, scene, world) {
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.screenSpacePanning = true;
-  controls.minDistance = 2;
+  controls.minDistance = 8;
   controls.maxDistance = 150;
-  controls.maxPolarAngle = Math.PI / 2.1;
-  controls.zoomToCursor = true;
+  controls.minPolarAngle = Math.PI / 6;
+  controls.maxPolarAngle = Math.PI / 3;
+  controls.zoomToCursor = false;
   controls.mouseButtons = { MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   controls.enableRotate = false;
+  controls.target.set(0, 0, 0);
+  controls.update();
 
   const okSound = new Audio('/sounds/pensieri_profondi_scuba-ok-274157.mp3');
 

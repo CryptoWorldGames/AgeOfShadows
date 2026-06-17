@@ -43,22 +43,10 @@ export default function GameScene({ auth }) {
     };
   }, []);
 
-  if (isMobile && isPortrait) {
-    return (
-      <div style={{ width: '100vw', height: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontFamily: "'Segoe UI', sans-serif", textAlign: 'center', padding: '20px', boxSizing: 'border-box' }}>
-        <div style={{ fontSize: '64px', marginBottom: '20px' }}>📱</div>
-        <h1 style={{ fontSize: '28px', margin: '0 0 16px' }}>Turn Phone Sideways</h1>
-        <p style={{ fontSize: '14px', opacity: 0.7 }}>The game works best in landscape mode</p>
-        <p style={{ fontSize: '12px', opacity: 0.5, marginTop: '20px' }}>Rotate your device to continue</p>
-        <button onClick={() => window.location.reload()} style={{ marginTop: '40px', padding: '12px 24px', background: 'rgba(200,168,75,0.3)', border: '1px solid #c8a84b', borderRadius: '6px', color: '#c8a84b', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-          Refresh if stuck
-        </button>
-      </div>
-    );
-  }
+  const showRotateScreen = isMobile && isPortrait;
 
   useEffect(() => {
-    if (!containerRef.current || !auth) return;
+    if (showRotateScreen || !containerRef.current || !auth) return;
 
     const socket = io('/', { reconnection: true });
 
@@ -80,8 +68,8 @@ export default function GameScene({ auth }) {
     function initializeGame(joinData) {
       console.log('🎮 Initializing game...');
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      camera.position.set(0, 25, 35);
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 20, 28);
       camera.lookAt(0, 0, 0);
 
       let renderer;
@@ -141,14 +129,7 @@ export default function GameScene({ auth }) {
           world.units.push(createHuman(scene, { x: u.x, y: 0, z: u.z }, { team: u.team || 'red' }));
         });
       } else {
-        world.units.push(createHuman(scene, { x: -8, y: 0, z: 8 }, { team: 'red' }));
-        world.units.push(createHuman(scene, { x: 8, y: 0, z: 8 }, { team: 'blue' }));
-      }
-      // Center camera on first player unit
-      if (world.units.length > 0) {
-        const firstUnit = world.units[0].group.position;
-        camera.position.set(firstUnit.x - 10, 25, firstUnit.z + 15);
-        camera.lookAt(firstUnit.x, 0, firstUnit.z);
+        world.units.push(createHuman(scene, { x: 0, y: 0, z: 5 }, { team: 'red' }));
       }
 
       const usedSpots = [];
@@ -182,17 +163,6 @@ export default function GameScene({ auth }) {
         addSpot(x, z); world.golds.push(createGold(scene, { x, y:0, z }));
       }
       world.golds.push(createGold(scene, { x: 5, y:0, z: 5 }));
-
-      const startTC = createTownCenter(scene, false);
-      startTC.setPosition(0, 0); startTC.place();
-      startTC.storage = { wood:0, stone:0, gold:0, food:0, water:0, max:100000 };
-      startTC.getPosition = () => ({ x:0, z:0 });
-      world.buildings.push(startTC);
-
-      // House click handler (town center now exists)
-      if (startTC && startTC.mesh) {
-        startTC.mesh.userData.onClicked = () => showHouseModal(socket, auth.userId);
-      }
 
       world.animals.push(createChicken(scene, { x:6, y:0, z:6 }));
       world.animals.push(createChicken(scene, { x:-6, y:0, z:6 }));
@@ -274,12 +244,25 @@ export default function GameScene({ auth }) {
     return () => {
       socket.disconnect();
     };
-  }, [auth]);
+  }, [auth, showRotateScreen]);
 
   if (error) {
     return (
       <div style={{width:'100%',height:'100vh',background:'#000',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:'20px'}}>
         Error: {error}
+      </div>
+    );
+  }
+
+  if (showRotateScreen) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontFamily: "'Segoe UI', sans-serif", textAlign: 'center', padding: '20px', boxSizing: 'border-box' }}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>📱</div>
+        <h1 style={{ fontSize: '28px', margin: '0 0 16px' }}>Turn Phone Sideways</h1>
+        <p style={{ fontSize: '14px', opacity: 0.7 }}>The game works best in landscape mode</p>
+        <button onClick={() => window.location.reload()} style={{ marginTop: '40px', padding: '12px 24px', background: 'rgba(200,168,75,0.3)', border: '1px solid #c8a84b', borderRadius: '6px', color: '#c8a84b', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+          Refresh if stuck
+        </button>
       </div>
     );
   }
