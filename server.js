@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerData, createPasswordResetToken, resetPassword, verifyEmail, updateUserProfile, deleteUserAccount } = require('./auth');
 const { isEmailConfigured } = require('./email');
+const { initializeDatabase } = require('./database');
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
 
@@ -638,8 +639,22 @@ app.get('/{*path}', (req, res) => {
 
 const PORT = parseInt(process.env.PORT || '5006');
 process.title = 'AgeOfShadows_server';
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[AgeOfShadows] Server running on port ${PORT}`);
-  console.log(`[AgeOfShadows] Socket.IO ready`);
-});
+
+async function startServer() {
+  try {
+    console.log('[STARTUP] Initializing database...');
+    await initializeDatabase();
+
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`[AgeOfShadows] Server running on port ${PORT}`);
+      console.log(`[AgeOfShadows] Socket.IO ready`);
+      console.log(`[STARTUP] Database: ${process.env.DATABASE_URL ? 'PostgreSQL (production)' : 'ERROR: DATABASE_URL not set!'}`);
+    });
+  } catch (err) {
+    console.error('[STARTUP] Failed to initialize database:', err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
 process.on('SIGTERM', () => { server.close(() => process.exit(0)); });

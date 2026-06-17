@@ -1,309 +1,245 @@
-const fs = require('fs');
-const path = require('path');
 const bcrypt = require('bcryptjs');
+const { query } = require('./database');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('./email');
 
-const USERS_FILE = path.join(__dirname, 'data', 'users.json');
-const PLAYERS_FILE = path.join(__dirname, 'data', 'players.json');
-const DATA_DIR = path.join(__dirname, 'data');
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-function loadUsers() {
+async function registerUser(email, displayName, password, options = {}) {
   try {
-    if (fs.existsSync(USERS_FILE)) {
-      return JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8'));
+    // Check if email exists
+    const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      throw new Error('Email already registered');
     }
-  } catch (err) {
-    console.error('Error loading users:', err);
-  }
-  return {};
-}
 
-function saveUsers(users) {
-  try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-  } catch (err) {
-    console.error('Error saving users:', err);
-  }
-}
+    const userId = Date.now().toString();
+    const hash = bcrypt.hashSync(password, 10);
+    const verificationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const verificationExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-function loadPlayers() {
-  try {
-    if (fs.existsSync(PLAYERS_FILE)) {
-      return JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf-8'));
-    }
-  } catch (err) {
-    console.error('Error loading players:', err);
-  }
-  return {};
-}
+    await query(`
+      INSERT INTO users (id, email, display_name, password_hash, email_verified, verification_token, verification_expires, wants_emails)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `, [
+      userId,
+      email,
+      displayName || email.split('@')[0],
+      hash,
+      false,
+      verificationToken,
+      verificationExpires,
+      options.wantsEmails || false
+    ]);
 
-function savePlayers(players) {
-  try {
-    fs.writeFileSync(PLAYERS_FILE, JSON.stringify(players, null, 2));
-  } catch (err) {
-    console.error('Error saving players:', err);
-  }
-}
+    // Create player profile
+    await query(`
+      INSERT INTO players (user_id)
+      VALUES ($1)
+    `, [userId]);
 
-function registerUser(email, displayName, password, options = {}) {
-  return new Promise((resolve, reject) => {
-    try {
-      const users = loadUsers();
-
-      // Check if email exists
-      if (Object.values(users).some(u => u.email === email)) {
-        return reject(new Error('Email already registered'));
-      }
-
-      const userId = Date.now().toString();
-      const hash = bcrypt.hashSync(password, 10);
-      const verificationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const verificationExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-      users[userId] = {
-        id: userId,
-        email,
-        displayName: displayName || email.split('@')[0],
-        passwordHash: hash,
-        createdAt: new Date().toISOString(),
-        emailVerified: false,
-        verificationToken,
-        verificationExpires,
-        profile: { age: null, state: null, country: null },
-        wantsEmails: options.wantsEmails || false
-      };
-
-      saveUsers(users);
-
-      // Create player profile
-      const players = loadPlayers();
-      players[userId] = {
-        userId,
-        resources: { wood: 0, food: 0, water: 0, gold: 0, stone: 0 },
-        units: [],
-        buildings: []
-      };
-      savePlayers(players);
-
-      // Send verification email
-      sendVerificationEmail(email, verificationToken).catch(err => {
-        console.error(`[AUTH] Failed to send verification email to ${email}:`, err.message);
-      });
-
-      console.log(`[AUTH] User registered: ${displayName} (${userId}) - Awaiting email verification`);
-      resolve({ userId });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function authenticateUser(email, password) {
-  return new Promise((resolve, reject) => {
-    try {
-      const users = loadUsers();
-      const user = Object.values(users).find(u => u.email === email);
-
-      if (!user) {
-        return resolve(null);
-      }
-
-      const match = bcrypt.compareSync(password, user.passwordHash);
-      resolve(match ? user.id : null);
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function getUserById(userId) {
-  return new Promise((resolve, reject) => {
-    try {
-      const users = loadUsers();
-      resolve(users[userId] || null);
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function loadPlayerData(userId) {
-  return new Promise((resolve, reject) => {
-    try {
-      const players = loadPlayers();
-      resolve(players[userId] || null);
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function savePlayerData(userId, resources, units, buildings) {
-  return new Promise((resolve, reject) => {
-    try {
-      const players = loadPlayers();
-      players[userId] = {
-        userId,
-        resources,
-        units,
-        buildings,
-        lastSaved: new Date().toISOString()
-      };
-      savePlayers(players);
-      resolve();
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function createPasswordResetToken(email) {
-  return new Promise((resolve, reject) => {
-    try {
-      const users = loadUsers();
-      const user = Object.values(users).find(u => u.email === email);
-
-      if (!user) {
-        return resolve(null);
-      }
-
-      const token = require('crypto').randomBytes(32).toString('hex');
-      user.resetToken = token;
-      user.resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
-
-      saveUsers(users);
-
-      // Send password reset email
-      sendPasswordResetEmail(email, token).then(sent => {
-        console.log(`[AUTH] Password reset requested: ${email}`);
-        resolve(token);
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function resetPassword(email, resetToken, newPassword) {
-  return new Promise((resolve, reject) => {
-    try {
-      const users = loadUsers();
-      const user = Object.values(users).find(u => u.email === email);
-
-      if (!user || user.resetToken !== resetToken) {
-        return resolve(false);
-      }
-
-      // Check if token expired
-      if (new Date(user.resetTokenExpires) < new Date()) {
-        return resolve(false);
-      }
-
-      const hash = bcrypt.hashSync(newPassword, 10);
-      user.passwordHash = hash;
-      user.resetToken = null;
-      user.resetTokenExpires = null;
-
-      saveUsers(users);
-      resolve(true);
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function verifyEmail(verificationToken) {
-  return new Promise((resolve, reject) => {
-    try {
-      const users = loadUsers();
-      const user = Object.values(users).find(u => u.verificationToken === verificationToken);
-
-      if (!user) {
-        return resolve(false);
-      }
-
-      // Check if token expired
-      if (new Date(user.verificationExpires) < new Date()) {
-        return resolve(false);
-      }
-
-      user.emailVerified = true;
-      user.verificationToken = null;
-      user.verificationExpires = null;
-      saveUsers(users);
-      resolve(true);
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function updateUserProfile(userId, age, state, country) {
-  return new Promise((resolve, reject) => {
-    try {
-      const users = loadUsers();
-      const user = users[userId];
-      if (!user) return resolve(false);
-
-      user.profile = { age, state, country };
-      saveUsers(users);
-      resolve(true);
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function deleteUserAccount(userId) {
-  return new Promise((resolve, reject) => {
-    try {
-      const users = loadUsers();
-      const players = loadPlayers();
-
-      delete users[userId];
-      delete players[userId];
-
-      saveUsers(users);
-      savePlayers(players);
-      resolve(true);
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-function cleanupUnverifiedAccounts() {
-  try {
-    const users = loadUsers();
-    const now = new Date();
-    let deletedCount = 0;
-
-    Object.keys(users).forEach(userId => {
-      const user = users[userId];
-      if (!user.emailVerified && user.verificationExpires) {
-        if (new Date(user.verificationExpires) < now) {
-          console.log(`[CLEANUP] Deleting unverified account: ${user.email}`);
-          deleteUserAccount(userId);
-          deletedCount++;
-        }
-      }
+    // Send verification email
+    sendVerificationEmail(email, verificationToken).catch(err => {
+      console.error(`[AUTH] Failed to send verification email to ${email}:`, err.message);
     });
 
-    if (deletedCount > 0) {
-      console.log(`[CLEANUP] Deleted ${deletedCount} unverified accounts`);
-    }
+    console.log(`[AUTH] User registered: ${displayName} (${userId}) - Awaiting email verification`);
+    return { userId };
   } catch (err) {
-    console.error('Cleanup error:', err);
+    console.error('[AUTH] Registration error:', err.message);
+    throw err;
   }
 }
 
-// Run cleanup every minute
-setInterval(cleanupUnverifiedAccounts, 60 * 1000);
+async function authenticateUser(email, password) {
+  try {
+    const result = await query('SELECT id, password_hash FROM users WHERE email = $1', [email]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const user = result.rows[0];
+    const match = bcrypt.compareSync(password, user.password_hash);
+    return match ? user.id : null;
+  } catch (err) {
+    console.error('[AUTH] Authentication error:', err.message);
+    throw err;
+  }
+}
+
+async function getUserById(userId) {
+  try {
+    const result = await query(`
+      SELECT id, email, display_name, created_at, email_verified, profile
+      FROM users WHERE id = $1
+    `, [userId]);
+
+    return result.rows.length > 0 ? result.rows[0] : null;
+  } catch (err) {
+    console.error('[AUTH] Get user error:', err.message);
+    throw err;
+  }
+}
+
+async function loadPlayerData(userId) {
+  try {
+    const result = await query(`
+      SELECT user_id, resources, units, buildings, last_saved
+      FROM players WHERE user_id = $1
+    `, [userId]);
+
+    return result.rows.length > 0 ? result.rows[0] : null;
+  } catch (err) {
+    console.error('[AUTH] Load player error:', err.message);
+    throw err;
+  }
+}
+
+async function savePlayerData(userId, resources, units, buildings) {
+  try {
+    await query(`
+      UPDATE players
+      SET resources = $2, units = $3, buildings = $4, last_saved = NOW()
+      WHERE user_id = $1
+    `, [userId, JSON.stringify(resources), JSON.stringify(units), JSON.stringify(buildings)]);
+  } catch (err) {
+    console.error('[AUTH] Save player error:', err.message);
+    throw err;
+  }
+}
+
+async function createPasswordResetToken(email) {
+  try {
+    const result = await query('SELECT id FROM users WHERE email = $1', [email]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    await query(`
+      UPDATE users
+      SET reset_token = $2, reset_token_expires = $3
+      WHERE email = $1
+    `, [email, token, resetTokenExpires]);
+
+    // Send password reset email
+    sendPasswordResetEmail(email, token).then(sent => {
+      console.log(`[AUTH] Password reset requested: ${email}`);
+    });
+
+    return token;
+  } catch (err) {
+    console.error('[AUTH] Create reset token error:', err.message);
+    throw err;
+  }
+}
+
+async function resetPassword(email, resetToken, newPassword) {
+  try {
+    const result = await query(`
+      SELECT id, reset_token, reset_token_expires
+      FROM users WHERE email = $1
+    `, [email]);
+
+    if (result.rows.length === 0 || result.rows[0].reset_token !== resetToken) {
+      return false;
+    }
+
+    const user = result.rows[0];
+    if (new Date(user.reset_token_expires) < new Date()) {
+      return false;
+    }
+
+    const hash = bcrypt.hashSync(newPassword, 10);
+    await query(`
+      UPDATE users
+      SET password_hash = $2, reset_token = NULL, reset_token_expires = NULL
+      WHERE id = $1
+    `, [user.id, hash]);
+
+    return true;
+  } catch (err) {
+    console.error('[AUTH] Reset password error:', err.message);
+    throw err;
+  }
+}
+
+async function verifyEmail(verificationToken) {
+  try {
+    const result = await query(`
+      SELECT id, verification_expires
+      FROM users WHERE verification_token = $1
+    `, [verificationToken]);
+
+    if (result.rows.length === 0) {
+      return false;
+    }
+
+    const user = result.rows[0];
+    if (new Date(user.verification_expires) < new Date()) {
+      return false;
+    }
+
+    await query(`
+      UPDATE users
+      SET email_verified = true, verification_token = NULL, verification_expires = NULL
+      WHERE id = $1
+    `, [user.id]);
+
+    return true;
+  } catch (err) {
+    console.error('[AUTH] Email verification error:', err.message);
+    throw err;
+  }
+}
+
+async function updateUserProfile(userId, age, state, country) {
+  try {
+    const profile = JSON.stringify({ age, state, country });
+    await query(`
+      UPDATE users
+      SET profile = $2
+      WHERE id = $1
+    `, [userId, profile]);
+
+    return true;
+  } catch (err) {
+    console.error('[AUTH] Update profile error:', err.message);
+    throw err;
+  }
+}
+
+async function deleteUserAccount(userId) {
+  try {
+    // Player data will be deleted due to CASCADE
+    await query('DELETE FROM users WHERE id = $1', [userId]);
+    return true;
+  } catch (err) {
+    console.error('[AUTH] Delete account error:', err.message);
+    throw err;
+  }
+}
+
+async function cleanupUnverifiedAccounts() {
+  try {
+    const result = await query(`
+      DELETE FROM users
+      WHERE email_verified = false AND verification_expires < NOW()
+      RETURNING email
+    `);
+
+    if (result.rows.length > 0) {
+      console.log(`[CLEANUP] Deleted ${result.rows.length} unverified accounts`);
+      result.rows.forEach(row => console.log(`[CLEANUP] Deleted: ${row.email}`));
+    }
+  } catch (err) {
+    console.error('[CLEANUP] Error:', err.message);
+  }
+}
+
+// Run cleanup every 5 minutes
+setInterval(cleanupUnverifiedAccounts, 5 * 60 * 1000);
 
 module.exports = {
   registerUser,
