@@ -10,9 +10,14 @@ export function createStone(scene, position = { x: 0, y: 0, z: 0 }) {
   const scale = 0.8 + Math.random() * 0.6;
   group.scale.setScalar(scale);
 
+  // More realistic stone: darker gray with variations
+  const baseGray = 0.45 + Math.random() * 0.15;
   const rockMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(0.52 + Math.random() * 0.1, 0.50 + Math.random() * 0.1, 0.48),
-    roughness: 0.95, metalness: 0.05, flatShading: true
+    color: new THREE.Color(baseGray, baseGray - 0.02, baseGray - 0.04),
+    roughness: 0.92,
+    metalness: 0.02,
+    flatShading: true,
+    side: THREE.FrontSide
   });
 
   const main = new THREE.Mesh(new THREE.DodecahedronGeometry(0.9, 1), rockMat);

@@ -278,11 +278,22 @@ export function createUI(playerId, gameState, displayName) {
     span.innerHTML = `<img src="${r.img}" width="26" height="26" style="object-fit:contain;" alt="${r.key}"/><span id="res-${r.key}" style="color:${r.color};min-width:26px;">0</span>`;
     resourceBar.appendChild(span);
   });
-  const selSpan = document.createElement('span');
-  selSpan.style.cssText = 'opacity:0.8;font-size:13px;border-left:1px solid rgba(255,255,255,0.2);padding-left:14px;';
-  selSpan.innerHTML = `Selected: <span id="unit-count">0</span>`;
-  resourceBar.appendChild(selSpan);
+
+  const walletBtn = document.createElement('button');
+  walletBtn.style.cssText = 'display:flex;align-items:center;gap:6px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.4);border-radius:6px;padding:6px 12px;color:#c8a84b;cursor:pointer;font-family:"Segoe UI",sans-serif;font-size:12px;font-weight:600;transition:all 0.2s;';
+  walletBtn.innerHTML = '💰 Wallet';
+  walletBtn.onmouseenter = () => { walletBtn.style.background = 'rgba(200,168,75,0.25)'; };
+  walletBtn.onmouseleave = () => { walletBtn.style.background = 'rgba(200,168,75,0.15)'; };
+  walletBtn.onclick = () => { alert('Wallet feature coming soon!'); };
+  resourceBar.appendChild(walletBtn);
+
   document.body.appendChild(resourceBar);
+
+  // Selected count in far left corner
+  const selDiv = document.createElement('div');
+  selDiv.style.cssText = `position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.6);border:1px solid rgba(200,168,75,0.3);border-radius:8px;padding:12px 16px;color:#c8a84b;font-family:'Segoe UI',sans-serif;font-size:14px;z-index:100;`;
+  selDiv.innerHTML = `Selected: <span id="unit-count" style="font-weight:600;">0</span>`;
+  document.body.appendChild(selDiv);
 
   const buildBar = document.createElement('div');
   buildBar.style.cssText = `position:absolute;top:14px;left:14px;z-index:100;`;

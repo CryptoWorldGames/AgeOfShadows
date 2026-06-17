@@ -6,35 +6,81 @@ import * as THREE from 'three';
 export function createTownCenter(scene, ghost = true) {
   const group = new THREE.Group();
 
+  // Improved materials with better detail
   const wallMat = new THREE.MeshStandardMaterial({
-    color: 0xc9a36a, roughness: 0.85,
-    transparent: ghost, opacity: ghost ? 0.5 : 1.0
-  });
-  const roofMat = new THREE.MeshStandardMaterial({
-    color: 0x8a3b2b, roughness: 0.8,
-    transparent: ghost, opacity: ghost ? 0.5 : 1.0
+    color: 0xb8936a,
+    roughness: 0.9,
+    metalness: 0.0,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0,
+    side: THREE.FrontSide
   });
 
-  // Base
-  const base = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 4), wallMat);
-  base.position.y = 1;
-  base.castShadow = true; base.receiveShadow = true;
+  const roofMat = new THREE.MeshStandardMaterial({
+    color: 0x6b2f20,
+    roughness: 0.85,
+    metalness: 0.0,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
+  });
+
+  // Main wooden structure
+  const base = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.2, 4.5), wallMat);
+  base.position.y = 1.1;
+  base.castShadow = true;
+  base.receiveShadow = true;
   group.add(base);
 
-  // Roof
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.8, 4), roofMat);
-  roof.position.y = 2.9;
+  // Pitched roof (more realistic)
+  const roofGeo = new THREE.ConeGeometry(3.4, 2.0, 4);
+  const roof = new THREE.Mesh(roofGeo, roofMat);
+  roof.position.y = 3.2;
   roof.rotation.y = Math.PI / 4;
   roof.castShadow = true;
   group.add(roof);
 
-  // Door
+  // Door frame
+  const doorMat = new THREE.MeshStandardMaterial({
+    color: 0x2a1810,
+    roughness: 0.8,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
+  });
   const door = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.9, 1.3),
-    new THREE.MeshStandardMaterial({ color: 0x3a2415, transparent: ghost, opacity: ghost ? 0.5 : 1.0 })
+    new THREE.BoxGeometry(1.0, 1.4, 0.2),
+    doorMat
   );
-  door.position.set(0, 0.65, 2.01);
+  door.position.set(0, 0.7, 2.3);
+  door.castShadow = true;
   group.add(door);
+
+  // Windows (realistic detail)
+  const windowMat = new THREE.MeshStandardMaterial({
+    color: 0x4a6fa5,
+    roughness: 0.1,
+    metalness: 0.3,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
+  });
+
+  // Window 1 (left)
+  const win1 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.15), windowMat);
+  win1.position.set(-1.0, 1.2, 2.3);
+  win1.castShadow = true;
+  group.add(win1);
+
+  // Window 2 (right)
+  const win2 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.15), windowMat);
+  win2.position.set(1.0, 1.2, 2.3);
+  win2.castShadow = true;
+  group.add(win2);
+
+  // Side window
+  const win3 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.15), windowMat);
+  win3.position.set(2.3, 1.2, 0);
+  win3.rotation.y = Math.PI / 2;
+  win3.castShadow = true;
+  group.add(win3);
 
   // Ground footprint ring (helps aim while placing)
   const ring = new THREE.Mesh(
@@ -48,7 +94,7 @@ export function createTownCenter(scene, ghost = true) {
 
   scene.add(group);
 
-  const allMats = [wallMat, roofMat, door.material];
+  const allMats = [wallMat, roofMat, doorMat, windowMat];
 
   const building = {
     group,

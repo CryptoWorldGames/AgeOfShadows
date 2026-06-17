@@ -79,6 +79,7 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
   let mixer = null, walkAction = null, scaredAction = null;
   let liveMeshes = [], deadMeshes = [], isMovingLocal = false;
   let meatPile = null;
+  let selected = false;
 
   getChickenGLTF().then((gltf) => {
     const model = SkeletonClone(gltf.scene);
@@ -146,7 +147,7 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
     if (mixer) mixer.update(dt);
     if (world && world.camera) healthBar.faceCamera(world.camera);
     healthBar.update(hp / S.hitsToKill);
-    healthBar.group.visible = state === 'wandering';
+    healthBar.group.visible = selected;
 
     if (state === 'wandering') {
       if (scaredTimer > 0) { scaredTimer -= dt; if (scaredTimer <= 0) setWalking(isMovingLocal); }
@@ -174,6 +175,7 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
     group, type: 'chicken', position: () => group.position.clone(), state: () => state,
     foodRemaining: () => food, isDepleted: () => state === 'respawning', takeDamage,
     takeFood(n) { const give = Math.min(n, food); food -= give; if (food <= 0) { state = 'respawning'; deadMeshes.forEach((m) => { m.visible = false; }); } return give; },
+    setSelected(b) { selected = b; },
     update
   };
 }
@@ -196,6 +198,7 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
   let mixer = null, idleAction = null;
   let allMeshes = [];
   let meatPile = null;
+  let selected = false;
   let wanderTimer = Math.random() * 4 + 3;
   let targetRotation = Math.random() * Math.PI * 2;
   let currentRotation = targetRotation;
@@ -259,7 +262,7 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
     if (mixer) mixer.update(dt);
     if (world && world.camera) healthBar.faceCamera(world.camera);
     healthBar.update(hp / maxHp);
-    healthBar.group.visible = state === 'wandering' && hp < maxHp;
+    healthBar.group.visible = selected;
 
     if (state === 'dying') {
       dyingT += dt; const f = Math.min(1, dyingT / 1.5);
@@ -336,6 +339,7 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
       }
       return give;
     },
+    setSelected(b) { selected = b; },
     update
   };
 }
