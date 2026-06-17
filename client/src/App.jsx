@@ -53,6 +53,7 @@ function AuthScreen({ onAuthenticated }) {
   const [resetSent, setResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [welcomeData, setWelcomeData] = useState(null);
 
   async function handleSubmit() {
     setError('');
@@ -123,7 +124,8 @@ function AuthScreen({ onAuthenticated }) {
         if (loginData.adminToken) {
           sessionStorage.setItem('adminToken', loginData.adminToken);
         }
-        onAuthenticated({ userId: loginData.userId, email: loginData.email, displayName: loginData.displayName });
+        setWelcomeData({ userId: loginData.userId, email: loginData.email, displayName: loginData.displayName });
+        setLoading(false);
       } catch (err) {
         setError('Network error: ' + err.message);
         setSuccess('');
@@ -186,6 +188,20 @@ function AuthScreen({ onAuthenticated }) {
         }
       }
     }
+  }
+
+  if (welcomeData) {
+    return (
+      <div style={{width:'100vw',height:'100vh',background:'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Segoe UI',sans-serif",padding:'20px',boxSizing:'border-box'}}>
+        <div style={{background:'rgba(0,0,0,0.9)',border:'2px solid rgba(200,168,75,0.6)',borderRadius:'16px',padding:'clamp(24px,5vh,40px) clamp(20px,5vw,32px)',width:'min(90vw,380px)',textAlign:'center',color:'#fff',boxShadow:'0 0 60px rgba(200,168,75,0.2)'}}>
+          <div style={{fontSize:'clamp(40px,8vw,56px)',marginBottom:'12px'}}>⚔️</div>
+          <h1 style={{fontSize:'clamp(20px,5vw,26px)',fontWeight:'900',color:'#c8a84b',margin:'0 0 10px',letterSpacing:'2px'}}>WELCOME!</h1>
+          <p style={{fontSize:'clamp(16px,4vw,20px)',fontWeight:'700',margin:'0 0 6px',color:'#fff'}}>{welcomeData.displayName || welcomeData.email.split('@')[0]}</p>
+          <p style={{fontSize:'clamp(13px,3vw,15px)',opacity:0.7,margin:'0 0 28px',lineHeight:'1.6'}}>You are now registered and ready to enter the realm of Age of Shadows.</p>
+          <button onClick={()=>onAuthenticated(welcomeData)} style={{width:'100%',padding:'clamp(12px,3vh,16px)',background:'linear-gradient(135deg, #c8a84b, #ffd700)',border:'none',borderRadius:'8px',color:'#000',fontSize:'clamp(14px,3.5vw,16px)',fontWeight:'700',cursor:'pointer',letterSpacing:'2px'}}>OK - ENTER THE GAME</button>
+        </div>
+      </div>
+    );
   }
 
 return (

@@ -255,13 +255,24 @@ export default function GameScene({ auth }) {
   }
 
   if (showRotateScreen) {
+    const tryLockLandscape = () => {
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+      setTimeout(() => window.location.reload(), 500);
+    };
     return (
-      <div style={{ width: '100vw', height: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontFamily: "'Segoe UI', sans-serif", textAlign: 'center', padding: '20px', boxSizing: 'border-box' }}>
-        <div style={{ fontSize: '64px', marginBottom: '20px' }}>📱</div>
-        <h1 style={{ fontSize: '28px', margin: '0 0 16px' }}>Turn Phone Sideways</h1>
-        <p style={{ fontSize: '14px', opacity: 0.7 }}>The game works best in landscape mode</p>
-        <button onClick={() => window.location.reload()} style={{ marginTop: '40px', padding: '12px 24px', background: 'rgba(200,168,75,0.3)', border: '1px solid #c8a84b', borderRadius: '6px', color: '#c8a84b', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-          Refresh if stuck
+      <div style={{ width: '100vw', height: '100vh', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontFamily: "'Segoe UI', sans-serif", textAlign: 'center', padding: '20px', boxSizing: 'border-box' }}>
+        <div style={{ fontSize: '72px', marginBottom: '8px', animation: 'spin 2s linear infinite' }}>↻</div>
+        <style>{`@keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }`}</style>
+        <h1 style={{ fontSize: 'clamp(22px,6vw,32px)', margin: '16px 0 12px', color: '#c8a84b', fontWeight: '900' }}>Turn Your Phone Sideways</h1>
+        <p style={{ fontSize: 'clamp(13px,3.5vw,16px)', opacity: 0.7, maxWidth: '280px', lineHeight: '1.6', margin: '0 0 8px' }}>Rotate to landscape (wide) mode to play</p>
+        <p style={{ fontSize: 'clamp(11px,3vw,13px)', opacity: 0.4, margin: '0 0 40px' }}>The game requires a wide screen view</p>
+        <button onClick={tryLockLandscape} style={{ padding: 'clamp(14px,4vw,18px) clamp(24px,8vw,40px)', background: 'linear-gradient(135deg, #c8a84b, #ffd700)', border: 'none', borderRadius: '10px', color: '#000', fontSize: 'clamp(14px,4vw,17px)', fontWeight: '700', cursor: 'pointer', letterSpacing: '1px', marginBottom: '16px', width: 'min(80vw, 280px)' }}>
+          📱 Tap to Rotate Screen
+        </button>
+        <button onClick={() => window.location.reload()} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid rgba(200,168,75,0.4)', borderRadius: '8px', color: 'rgba(200,168,75,0.7)', cursor: 'pointer', fontSize: 'clamp(12px,3vw,14px)' }}>
+          Already rotated? Tap here
         </button>
       </div>
     );
