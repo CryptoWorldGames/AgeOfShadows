@@ -542,3 +542,5 @@ export function createUI(playerId, gameState, displayName) {
     onConfirmNo(cb) { document.getElementById('place-no').onclick = cb; }
   };
 }
+
+export { showInventoryModal, showHouseModal, showChatPanel };

@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import { createEnvironment } from './modules/Environment';
 import { createHuman } from './modules/Human';
 import { createTree } from './modules/Tree';
-import { createUI } from './modules/UI';
+import { createUI, showChatPanel, showInventoryModal, showHouseModal } from './modules/UI';
 import { createControls } from './modules/Controls';
 import { createTownCenter } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
@@ -50,19 +50,6 @@ export default function GameScene({ auth }) {
       const ui = createUI(auth.displayName || auth.email, null, auth.displayName);
       showChatPanel(socket);
 
-      // Add inventory button
-      const invBtn = document.createElement('button');
-      invBtn.style.cssText = `position:absolute;top:14px;left:80px;padding:10px 14px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:6px;color:#c8a84b;cursor:pointer;font-weight:600;font-size:11px;font-family:'Segoe UI',sans-serif;z-index:100;`;
-      invBtn.textContent = '📦 Inventory';
-      invBtn.onclick = () => showInventoryModal(world.resources);
-      document.body.appendChild(invBtn);
-
-      // Add house click handler
-      const tcBuilding = world.buildings[0];
-      if (tcBuilding && tcBuilding.mesh) {
-        tcBuilding.mesh.userData.onClicked = () => showHouseModal(socket, auth.userId);
-      }
-
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
 
       const world = {
@@ -70,6 +57,13 @@ export default function GameScene({ auth }) {
         units: [], trees: [], buildings: [], animals: [],
         stones: [], golds: [], resources, ui, pondPosition: env.pondPosition
       };
+
+      // Add inventory button
+      const invBtn = document.createElement('button');
+      invBtn.style.cssText = `position:absolute;top:14px;left:80px;padding:10px 14px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:6px;color:#c8a84b;cursor:pointer;font-weight:600;font-size:11px;font-family:'Segoe UI',sans-serif;z-index:100;`;
+      invBtn.textContent = '📦 Inventory';
+      invBtn.onclick = () => showInventoryModal(world.resources);
+      document.body.appendChild(invBtn);
 
       if (joinData.player.units && joinData.player.units.length > 0) {
         joinData.player.units.forEach(u => {
@@ -117,6 +111,11 @@ export default function GameScene({ auth }) {
       startTC.storage = { wood:0, stone:0, gold:0, food:0, water:0, max:100000 };
       startTC.getPosition = () => ({ x:0, z:0 });
       world.buildings.push(startTC);
+
+      // House click handler (town center now exists)
+      if (startTC && startTC.mesh) {
+        startTC.mesh.userData.onClicked = () => showHouseModal(socket, auth.userId);
+      }
 
       world.animals.push(createChicken(scene, { x:6, y:0, z:6 }));
       world.animals.push(createChicken(scene, { x:-6, y:0, z:6 }));
