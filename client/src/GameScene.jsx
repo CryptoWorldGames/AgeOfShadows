@@ -18,6 +18,8 @@ export default function GameScene({ auth }) {
   const [isPortrait, setIsPortrait] = useState(false);
   const [checkingOrientation, setCheckingOrientation] = useState(true);
 
+  console.log('[GameScene] Mounted with auth:', auth);
+
   useEffect(() => {
     const checkOrientation = () => {
       const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
