@@ -108,7 +108,7 @@ export default function GameScene({ auth }) {
       gameInfo.style.cssText = `position:absolute;top:14px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:12px 16px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);`;
       gameInfo.innerHTML = `
         <div style="color:#c8a84b;font-weight:700;font-size:14px;margin-bottom:4px;letter-spacing:1px;">AGE OF SHADOWS</div>
-        <div style="opacity:0.7;font-size:11px;margin-bottom:8px;">v2.5</div>
+        <div style="opacity:0.7;font-size:11px;margin-bottom:8px;">v2.10</div>
         <button id="game-logout-btn" style="width:100%;padding:6px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">Logout</button>
       `;
       document.body.appendChild(gameInfo);
@@ -143,6 +143,12 @@ export default function GameScene({ auth }) {
       } else {
         world.units.push(createHuman(scene, { x: -8, y: 0, z: 8 }, { team: 'red' }));
         world.units.push(createHuman(scene, { x: 8, y: 0, z: 8 }, { team: 'blue' }));
+      }
+      // Center camera on first player unit
+      if (world.units.length > 0) {
+        const firstUnit = world.units[0].group.position;
+        camera.position.set(firstUnit.x - 10, 25, firstUnit.z + 15);
+        camera.lookAt(firstUnit.x, 0, firstUnit.z);
       }
 
       const usedSpots = [];
