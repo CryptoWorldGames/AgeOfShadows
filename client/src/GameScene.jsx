@@ -14,6 +14,48 @@ import { createGold } from './modules/Gold';
 export default function GameScene({ auth }) {
   const containerRef = useRef(null);
   const [error, setError] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const portrait = window.innerHeight > window.innerWidth;
+      setIsMobile(mobile);
+      setIsPortrait(portrait);
+    };
+
+    checkOrientation();
+
+    let resizeTimeout;
+    const debouncedCheck = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(checkOrientation, 100);
+    };
+
+    window.addEventListener('orientationchange', debouncedCheck);
+    window.addEventListener('resize', debouncedCheck);
+
+    return () => {
+      window.removeEventListener('orientationchange', debouncedCheck);
+      window.removeEventListener('resize', debouncedCheck);
+      clearTimeout(resizeTimeout);
+    };
+  }, []);
+
+  if (isMobile && isPortrait) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#fff', fontFamily: "'Segoe UI', sans-serif", textAlign: 'center', padding: '20px', boxSizing: 'border-box' }}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>📱</div>
+        <h1 style={{ fontSize: '28px', margin: '0 0 16px' }}>Turn Phone Sideways</h1>
+        <p style={{ fontSize: '14px', opacity: 0.7 }}>The game works best in landscape mode</p>
+        <p style={{ fontSize: '12px', opacity: 0.5, marginTop: '20px' }}>Rotate your device to continue</p>
+        <button onClick={() => window.location.reload()} style={{ marginTop: '40px', padding: '12px 24px', background: 'rgba(200,168,75,0.3)', border: '1px solid #c8a84b', borderRadius: '6px', color: '#c8a84b', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+          Refresh if stuck
+        </button>
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (!containerRef.current || !auth) return;
