@@ -78,6 +78,9 @@ function MobileOrientationCheck() {
         <h1 style={{ fontSize: '28px', margin: '0 0 16px' }}>Turn Phone Sideways</h1>
         <p style={{ fontSize: '14px', opacity: 0.7 }}>The game works best in landscape mode</p>
         <p style={{ fontSize: '12px', opacity: 0.5, marginTop: '20px' }}>Rotate your device to continue</p>
+        <button onClick={() => window.location.reload()} style={{ marginTop: '40px', padding: '12px 24px', background: 'rgba(200,168,75,0.3)', border: '1px solid #c8a84b', borderRadius: '6px', color: '#c8a84b', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+          Refresh if stuck
+        </button>
       </div>
     );
   }
