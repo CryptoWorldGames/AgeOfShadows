@@ -1,14 +1,18 @@
 import * as THREE from 'three';
 
 export function createEnvironment(scene) {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
   scene.background = new THREE.Color(0x87ceeb);
   scene.fog = new THREE.Fog(0xb0d8f0, 90, 230);
 
   const sun = new THREE.DirectionalLight(0xfff4e0, 1.3);
   sun.position.set(60, 80, 40);
   sun.castShadow = true;
-  sun.shadow.mapSize.width = 2048;
-  sun.shadow.mapSize.height = 2048;
+  // MOBILE: Reduce shadow map quality for better performance
+  const shadowMapSize = isMobile ? 1024 : 2048;
+  sun.shadow.mapSize.width = shadowMapSize;
+  sun.shadow.mapSize.height = shadowMapSize;
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 300;
   sun.shadow.camera.left = -160;

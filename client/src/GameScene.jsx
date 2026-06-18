@@ -76,9 +76,12 @@ export default function GameScene({ auth }) {
       camera.position.set(0, 20, 28);
       camera.lookAt(0, 0, 0);
 
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
       let renderer;
       try {
-        renderer = new THREE.WebGLRenderer({ antialias: true });
+        // MOBILE: Disable antialias to improve performance on iPhone
+        renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
       } catch (e) {
         console.error('WebGL failed:', e);
         setError('WebGL not supported. Try a different browser.');
@@ -86,8 +89,16 @@ export default function GameScene({ auth }) {
       }
 
       renderer.setSize(window.innerWidth, window.innerHeight);
+      // MOBILE: Lower pixel ratio on mobile for better performance
+      if (isMobile) {
+        renderer.setPixelRatio(1);
+      } else {
+        renderer.setPixelRatio(window.devicePixelRatio);
+      }
+
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFShadowMap;
+      // MOBILE: Use simpler shadow algorithm on iPhone
+      renderer.shadowMap.type = isMobile ? THREE.BasicShadowMap : THREE.PCFShadowMap;
       console.log('📍 Canvas appending to container...');
       containerRef.current.appendChild(renderer.domElement);
 

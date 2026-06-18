@@ -461,11 +461,12 @@ export function createUI(playerId, gameState, displayName) {
   document.body.appendChild(musicPanel);
 
   let panelOpen = false;
-  musicTab.onclick = () => {
+  // Music Tab Toggle (WORKS: Desktop, iOS, Android)
+  addClickHandler(musicTab, () => {
     panelOpen = !panelOpen;
     musicPanel.style.display = panelOpen ? 'block' : 'none';
     musicTab.style.borderColor = panelOpen ? '#00ff88' : 'rgba(255,255,255,0.15)';
-  };
+  });
 
   const audio = new Audio();
   audio.volume = 0.6;
@@ -531,45 +532,56 @@ export function createUI(playerId, gameState, displayName) {
 
   audio.addEventListener('ended', () => { if (!loopMode) skipToNext(); });
 
-  onoffSwitch.onclick = () => {
+  // Helper: Add event listener that works on desktop, iOS, and Android
+  function addClickHandler(element, callback) {
+    element.addEventListener('click', (e) => { e.preventDefault(); callback(); });
+    element.addEventListener('touchend', (e) => { e.preventDefault(); callback(); });
+  }
+
+  // On/Off Switch (WORKS: Desktop, iOS, Android)
+  addClickHandler(onoffSwitch, () => {
     musicOn = !musicOn;
     if (musicOn) { audio.play().catch(()=>{}); onoffSwitch.style.background='#16a34a'; onoffBall.style.left='22px'; }
     else { audio.pause(); onoffSwitch.style.background='#555'; onoffBall.style.left='2px'; }
-  };
+  });
 
-  shuffleBtn.onclick = () => {
+  // Shuffle Button (WORKS: Desktop, iOS, Android)
+  addClickHandler(shuffleBtn, () => {
     shuffleMode = !shuffleMode;
     if (shuffleMode) { loopMode=false; audio.loop=false; loopBtn.style.background='rgba(255,255,255,0.12)'; loopBtn.textContent='↻ Loop'; }
     shuffleBtn.style.background = shuffleMode ? 'rgba(0,255,136,0.25)' : 'rgba(255,255,255,0.12)';
     shuffleBtn.textContent = shuffleMode ? '⇄ Shuffle ON' : '⇄ Shuffle';
-  };
+  });
 
-  loopBtn.onclick = () => {
+  // Loop Button (WORKS: Desktop, iOS, Android)
+  addClickHandler(loopBtn, () => {
     loopMode = !loopMode;
     if (loopMode) { shuffleMode=false; shuffleBtn.style.background='rgba(255,255,255,0.12)'; shuffleBtn.textContent='⇄ Shuffle'; }
     audio.loop = loopMode;
     loopBtn.style.background = loopMode ? 'rgba(0,255,136,0.25)' : 'rgba(255,255,255,0.12)';
     loopBtn.textContent = loopMode ? '↻ Loop ON' : '↻ Loop';
-  };
+  });
 
-  skipBtn.onclick = () => skipToNext();
+  // Skip Button (WORKS: Desktop, iOS, Android)
+  addClickHandler(skipBtn, skipToNext);
 
-  muteBtn.onclick = () => {
+  // Mute Button (WORKS: Desktop, iOS, Android - THIS WAS BROKEN ON iOS)
+  addClickHandler(muteBtn, () => {
     if (mutedTracks.has(currentTrack)) {
-      // Unmute current
       mutedTracks.delete(currentTrack);
       highlightCircle(currentTrack);
     } else {
-      // Mute current and skip to next
       const toMute = currentTrack;
       mutedTracks.add(toMute);
       const next = getNextTrack(toMute);
       highlightCircle(toMute);
       if (next !== toMute) playTrack(next);
     }
-  };
+  });
 
-  volSlider.oninput = () => { audio.volume = volSlider.value/100; };
+  // Volume Slider (different event for mobile/desktop compatibility)
+  volSlider.addEventListener('input', () => { audio.volume = volSlider.value/100; });
+  volSlider.addEventListener('change', () => { audio.volume = volSlider.value/100; });
 
   const startMusic = () => { playTrack(DEFAULT_TRACK); document.removeEventListener('click', startMusic); };
   document.addEventListener('click', startMusic);
