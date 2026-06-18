@@ -57,6 +57,43 @@ export function showHouseModal(socket, userId) {
   document.getElementById('close-house').onclick = () => modal.remove();
 }
 
+export function showTownCenterModal(building) {
+  const existingModal = document.getElementById('town-center-modal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'town-center-modal';
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
+
+  const storage = building.storage || {};
+  const storageUsed = Object.values(storage).reduce((a,b)=>a+b,0);
+  const storageMax = building.storageMax || 100000;
+  const storagePercent = Math.round((storageUsed / storageMax) * 100);
+
+  const resGrid = Object.keys(storage).map(res =>
+    `<div style="padding:10px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;">
+      <div style="font-size:10px;opacity:0.7;">${res.toUpperCase()}</div>
+      <div style="font-size:16px;font-weight:600;color:#c8a84b;">${storage[res]}</div>
+    </div>`
+  ).join('');
+
+  modal.innerHTML = `
+    <div style="background:rgba(0,0,0,0.95);border:2px solid #ffd700;border-radius:12px;padding:24px;width:90%;max-width:500px;color:#fff;font-family:'Segoe UI',sans-serif;">
+      <h2 style="margin:0 0 8px;color:#ffd700;font-size:22px;text-align:center;">🏛️ TOWN CENTER</h2>
+      <div style="text-align:center;margin-bottom:20px;padding:12px;background:rgba(255,215,0,0.1);border-radius:6px;border:1px solid rgba(255,215,0,0.3);">
+        <div style="font-size:12px;color:#ffd700;font-weight:700;margin-bottom:8px;">⚠️ 50% TAX ON DEPOSITS</div>
+        <div style="font-size:11px;opacity:0.8;margin-bottom:12px;">Build your own house to store items without paying tax!</div>
+        <div style="font-size:10px;opacity:0.7;">Storage: ${storageUsed}/${storageMax} (${storagePercent}%)</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin-bottom:20px;">${resGrid}</div>
+      <button id="close-town-center" style="width:100%;padding:12px;background:rgba(255,215,0,0.2);border:1px solid #ffd700;border-radius:4px;color:#ffd700;font-weight:600;cursor:pointer;">Close</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('close-town-center').onclick = () => modal.remove();
+}
+
 export function showChatPanel(socket) {
   const existingChat = document.getElementById('chat-panel');
   if (existingChat) return;

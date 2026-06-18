@@ -250,28 +250,53 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     return best;
   }
 
-  function findNearestBuilding(world) {
-    const me=group.position;
-    let best=null,bestDist=Infinity;
-    (world.buildings||[]).forEach((b)=>{
+  function findNearestBuilding(world, type = null) {
+    const me = group.position;
+    let best = null, bestDist = Infinity;
+    (world.buildings||[]).forEach((b) => {
       if (!b.storage) return;
-      const p=b.getPosition?b.getPosition():b.position;
+      if (type && b.type !== type) return;
+      const p = b.getPosition ? b.getPosition() : b.position;
       if (!p) return;
-      const d=Math.sqrt((p.x-me.x)**2+(p.z-me.z)**2);
-      if (d<bestDist){bestDist=d;best=b;}
+      const d = Math.sqrt((p.x - me.x) ** 2 + (p.z - me.z) ** 2);
+      if (d < bestDist) { bestDist = d; best = b; }
     });
     return best;
   }
 
-  function depositInventory(building,world) {
-    Object.keys(inventory).forEach((key)=>{
-      if (inventory[key]>0) {
-        const space=(building.storage.max||10000)-(building.storage[key]||0);
-        const dep=Math.min(inventory[key],Math.max(0,space));
-        building.storage[key]=(building.storage[key]||0)+dep;
-        inventory[key]-=dep;
+  function findDepositTarget(world) {
+    const me = group.position;
+    let house = null, townCenter = null;
+    (world.buildings || []).forEach((b) => {
+      if (!b.storage) return;
+      const p = b.getPosition ? b.getPosition() : b.position;
+      if (!p) return;
+      const d = Math.sqrt((p.x - me.x) ** 2 + (p.z - me.z) ** 2);
+      if (b.type === 'house' && (!house || d < Math.sqrt((house.getPosition ? house.getPosition() : house.position).x ** 2))) house = b;
+      if (b.type === 'townCenter' && (!townCenter || d < Math.sqrt((townCenter.getPosition ? townCenter.getPosition() : townCenter.position).x ** 2))) townCenter = b;
+    });
+    if (house) return house;
+    return townCenter;
+  }
+
+  function depositInventory(building, world) {
+    const toDeposit = {};
+    Object.keys(inventory).forEach((key) => {
+      if (inventory[key] > 0) {
+        const space = (building.storageMax || 10000) - (building.storage[key] || 0);
+        const dep = Math.min(inventory[key], Math.max(0, space));
+        toDeposit[key] = dep;
+        building.storage[key] = (building.storage[key] || 0) + dep;
+        inventory[key] -= dep;
       }
     });
+    if (Object.values(toDeposit).some(v => v > 0)) {
+      world.socket.emit('depositBuilding', {
+        buildingId: building.id,
+        buildingType: building.type,
+        resources: toDeposit
+      });
+    }
     updateWorldResources(world);
   }
 
@@ -439,9 +464,9 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       return;
     }
 
-    if (isFull()&&autoTask&&!returning) {
-      const building=findNearestBuilding(world);
-      if (building) { depositTarget=building; returning=true; return; }
+    if (isFull() && autoTask && !returning) {
+      const building = findDepositTarget(world);
+      if (building) { depositTarget = building; returning = true; return; }
     }
 
     if (animalTarget) {

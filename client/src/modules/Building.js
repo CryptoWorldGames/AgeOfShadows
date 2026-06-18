@@ -24,20 +24,38 @@ export function createTownCenter(scene, ghost = true) {
     opacity: ghost ? 0.5 : 1.0
   });
 
-  // Main wooden structure
-  const base = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.2, 4.5), wallMat);
-  base.position.y = 1.1;
+  // Main wooden structure (Town Center is 2x bigger than house)
+  const baseScale = ghost ? 1 : 2.0;
+  const base = new THREE.Mesh(new THREE.BoxGeometry(4.5 * baseScale, 2.2 * baseScale, 4.5 * baseScale), wallMat);
+  base.position.y = 1.1 * baseScale;
   base.castShadow = true;
   base.receiveShadow = true;
   group.add(base);
 
   // Pitched roof (more realistic)
-  const roofGeo = new THREE.ConeGeometry(3.4, 2.0, 4);
+  const roofGeo = new THREE.ConeGeometry(3.4 * baseScale, 2.0 * baseScale, 4);
   const roof = new THREE.Mesh(roofGeo, roofMat);
-  roof.position.y = 3.2;
+  roof.position.y = 3.2 * baseScale;
   roof.rotation.y = Math.PI / 4;
   roof.castShadow = true;
   group.add(roof);
+
+  // Add flag on top for Town Center (distinctive marker)
+  if (!ghost) {
+    const flagpole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.1, 3 * baseScale, 8),
+      new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+    );
+    flagpole.position.set(0, 3.5 * baseScale, 0);
+    group.add(flagpole);
+
+    const flag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8 * baseScale, 0.5 * baseScale, 0.05),
+      new THREE.MeshStandardMaterial({ color: 0xffff00 })
+    );
+    flag.position.set(0.5 * baseScale, 4.8 * baseScale, 0);
+    group.add(flag);
+  }
 
   // Door frame
   const doorMat = new THREE.MeshStandardMaterial({
@@ -84,7 +102,7 @@ export function createTownCenter(scene, ghost = true) {
 
   // Ground footprint ring (helps aim while placing)
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(2.6, 3.0, 32),
+    new THREE.RingGeometry(2.6 * baseScale, 3.0 * baseScale, 32),
     new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
   );
   ring.rotation.x = -Math.PI / 2;
@@ -99,8 +117,12 @@ export function createTownCenter(scene, ghost = true) {
   const building = {
     group,
     type: 'building',
-    radius: 3.0,
+    buildingType: 'townCenter',
+    radius: 3.0 * baseScale,
+    storageMax: 100000,
+    storage: { wood: 0, stone: 0, gold: 0, food: 0, water: 0 },
     isGhost: ghost,
+    isTownCenter: true,
     position: () => group.position.clone(),
     setPosition(x, z) { group.position.set(x, 0, z); },
     setValid(valid) {
@@ -110,6 +132,9 @@ export function createTownCenter(scene, ghost = true) {
       building.isGhost = false;
       allMats.forEach((m) => { m.transparent = false; m.opacity = 1.0; });
       ring.visible = false;
+    },
+    getStorageUsed() {
+      return Object.values(building.storage).reduce((a,b)=>a+b,0);
     },
     remove() { scene.remove(group); }
   };

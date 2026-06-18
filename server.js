@@ -196,12 +196,33 @@ io.on('connection', (socket) => {
     const building = {
       id: `b_${Date.now()}`,
       type: data.type, x: data.x, z: data.z,
-      ownerId: socket.id
+      ownerId: socket.id,
+      storage: { wood: 0, stone: 0, gold: 0, food: 0, water: 0 },
+      storageMax: 10000
     };
     world.buildings.push(building);
     if (!player.buildings) player.buildings = [];
     player.buildings.push(building);
     io.emit('buildingPlaced', building);
+  });
+
+  socket.on('depositBuilding', (data) => {
+    const player = world.players[socket.id];
+    if (!player) return;
+    const building = world.buildings.find(b => b.id === data.buildingId);
+    if (!building || building.ownerId !== socket.id) return;
+
+    const isTownCenter = data.buildingType === 'townCenter';
+    const taxRate = isTownCenter ? 0.5 : 0;
+
+    Object.keys(data.resources).forEach(key => {
+      const amount = data.resources[key] || 0;
+      const taxedAmount = Math.floor(amount * (1 - taxRate));
+      building.storage[key] = (building.storage[key] || 0) + taxedAmount;
+      player.resources[key] = (player.resources[key] || 0) - amount;
+    });
+
+    console.log(`[DEPOSIT] ${player.name} deposited into ${isTownCenter ? 'Town Center' : 'Building'}, tax: ${taxRate * 100}%`);
   });
 
   socket.on('chat', (data) => {
