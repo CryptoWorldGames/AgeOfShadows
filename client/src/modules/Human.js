@@ -211,7 +211,10 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       let dx=me.x-bp.x,dz=me.z-bp.z;
       const dist=Math.sqrt(dx*dx+dz*dz);
       const minD=radius+cr;
-      if (dist>1e-4&&dist<minD) { const push=(minD-dist); me.x+=(dx/dist)*push; me.z+=(dz/dist)*push; }
+      if (dist>1e-4&&dist<minD) {
+        const push=(minD-dist)*1.5; // 1.5x force to handle high-speed penetration
+        me.x+=(dx/dist)*push; me.z+=(dz/dist)*push;
+      }
     });
   }
   function walkPose(dt) {
@@ -457,7 +460,8 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
           });
           if (nearMeat) { animalTarget=nearMeat; returning=false; depositTarget=null; }
         }
-        const depositStop=(depositTarget.radius||3)*0.75+0.6;
+        const buildingWall=(depositTarget.radius||3)*0.75;
+        const depositStop=buildingWall+radius+0.3; // Stop beyond collision boundary + safety buffer
         const arrived=moveToward({x:dp.x,z:dp.z},dt,depositStop);
         moving=!arrived;
         if (arrived) {
@@ -490,7 +494,10 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
 
     if (isFull() && autoTask && !returning) {
       const building = findDepositTarget(world);
-      if (building) { depositTarget = building; returning = true; return; }
+      if (building) {
+        separate(world);
+        depositTarget = building; returning = true; return;
+      }
     }
 
     if (animalTarget) {
