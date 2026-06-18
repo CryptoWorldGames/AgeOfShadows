@@ -403,14 +403,15 @@ export default function GameScene({ auth }) {
       <div ref={containerRef} style={{ width:'100%', height:'100vh', overflow:'hidden' }} />
       {isMobile && (
         <button onClick={toggleOrientation} style={{
-          position:'fixed', bottom:'10px', left:'50%', transform:'translateX(-50%)', zIndex:1000,
-          background:'rgba(10,10,10,0.92)', border:'2px solid #c8a84b', borderRadius:'20px',
-          color:'#c8a84b', fontFamily:"'Georgia',serif", padding:'8px 18px',
-          fontSize:'13px', fontWeight:700, cursor:'pointer', display:'flex',
-          alignItems:'center', gap:'8px', boxShadow:'0 2px 10px rgba(0,0,0,0.5)'
+          position:'fixed', top:'8px', right:'8px', zIndex:10000,
+          background:'rgba(10,10,10,0.92)', border:'2px solid #c8a84b', borderRadius:'6px',
+          color:'#c8a84b', fontFamily:"'Georgia',serif", padding:'6px 12px',
+          fontSize:'12px', fontWeight:700, cursor:'pointer', display:'flex',
+          alignItems:'center', gap:'6px', boxShadow:'0 2px 10px rgba(0,0,0,0.5)',
+          pointerEvents:'auto'
         }}>
-          <span style={{ fontSize:'16px' }}>🔄</span>
-          {isPortrait ? 'Rotate to Landscape' : 'Back to Portrait'}
+          <span style={{ fontSize:'14px' }}>🔄</span>
+          {isPortrait ? 'Landscape' : 'Portrait'}
         </button>
       )}
     </>
