@@ -201,6 +201,18 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       const minD=radius+o.radius;
       if (dist>1e-4&&dist<minD) { const push=(minD-dist)*0.5; me.x+=(dx/dist)*push; me.z+=(dz/dist)*push; }
     });
+    // Building collision: push the unit out of a building's solid footprint so
+    // it can't walk through the Town Center / houses.
+    (world.buildings||[]).forEach((b)=>{
+      if (b.isGhost) return;
+      const bp=resolvePos(b);
+      if (!bp) return;
+      const cr=(b.radius||3)*0.75; // wall footprint (~4.5 for Town Center)
+      let dx=me.x-bp.x,dz=me.z-bp.z;
+      const dist=Math.sqrt(dx*dx+dz*dz);
+      const minD=radius+cr;
+      if (dist>1e-4&&dist<minD) { const push=(minD-dist); me.x+=(dx/dist)*push; me.z+=(dz/dist)*push; }
+    });
   }
   function walkPose(dt) {
     walkClock+=dt*7; const s=Math.sin(walkClock);
@@ -445,7 +457,8 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
           });
           if (nearMeat) { animalTarget=nearMeat; returning=false; depositTarget=null; }
         }
-        const arrived=moveToward({x:dp.x,z:dp.z},dt,2.0);
+        const depositStop=(depositTarget.radius||3)*0.75+0.6;
+        const arrived=moveToward({x:dp.x,z:dp.z},dt,depositStop);
         moving=!arrived;
         if (arrived) {
           depositInventory(depositTarget,world);
