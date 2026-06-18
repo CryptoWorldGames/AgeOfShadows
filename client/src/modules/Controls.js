@@ -13,11 +13,9 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   controls.maxDistance = 150;
   controls.enableZoom = true;
   if (isMobile) {
-    try {
-      controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
-    } catch (e) {
-      console.warn('Touch config failed:', e);
-    }
+    // One finger drags to pan the map; two fingers pinch to zoom.
+    // A one-finger TAP (no drag) is handled separately for select/command.
+    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
   }
   if (isMobile && playerStartPos) {
     controls.target.copy(playerStartPos);
@@ -239,54 +237,19 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
       return;
     }
 
-    // Click on ground resources (stone, gold, meat) - auto-gather with selected units
-    if (selected.size > 0) {
-      const stone = raycastGroup(e.clientX, e.clientY, world.stones || []);
-      if (stone) {
-        const arr = Array.from(selected);
-        const sp = stone.position();
-        arr.forEach((u, i) => {
-          const ang = (i / arr.length) * Math.PI * 2;
-          u.mineStone(stone, { x: sp.x + Math.cos(ang) * 1.5, z: sp.z + Math.sin(ang) * 1.5 });
-        });
-        showResourceHighlight(sp); okSound.currentTime = 0; okSound.play(); return;
-      }
-
-      const gold = raycastGroup(e.clientX, e.clientY, world.golds || []);
-      if (gold) {
-        const arr = Array.from(selected);
-        const gp = gold.position();
-        arr.forEach((u, i) => {
-          const ang = (i / arr.length) * Math.PI * 2;
-          u.mineGold(gold, { x: gp.x + Math.cos(ang) * 1.5, z: gp.z + Math.sin(ang) * 1.5 });
-        });
-        showResourceHighlight(gp); okSound.currentTime = 0; okSound.play(); return;
-      }
-
-      // Meat piles (dead animals)
-      const meat = raycastGroup(e.clientX, e.clientY, (world.animals || []).filter(a => a.state && a.state() === 'meatpile'));
-      if (meat) {
-        const arr = Array.from(selected);
-        const mp = meat.position();
-        arr.forEach((u, i) => {
-          const ang = (i / arr.length) * Math.PI * 2;
-          u.killAnimal(meat, { x: mp.x + Math.cos(ang) * 0.8, z: mp.z + Math.sin(ang) * 0.8 });
-        });
-        showResourceHighlight(mp); okSound.currentTime = 0; okSound.play(); return;
-      }
-    }
-
     const u = raycastUnit(e.clientX, e.clientY) || nearestUnit(e.clientX, e.clientY, 35);
     if (u) { if (!e.shiftKey) clearSelection(); addToSelection(u); }
     else if (!e.shiftKey) clearSelection();
   };
 
-  const onRightClick = (e) => {
-    e.preventDefault();
-    if (ghostBuilding || selected.size === 0) return;
+  // Command the currently-selected units at a screen point: gather a resource/
+  // animal if one is hit, otherwise move there. Shared by right-click (desktop)
+  // and tap (mobile). Returns true if a command was issued.
+  const commandAt = (cx, cy) => {
+    if (ghostBuilding || selected.size === 0) return false;
 
     // Chicken
-    const chicken = raycastGroup(e.clientX, e.clientY, (world.animals || []).filter(a => a.type === 'chicken' || a.type === 'deer'));
+    const chicken = raycastGroup(cx, cy, (world.animals || []).filter(a => a.type === 'chicken' || a.type === 'deer'));
     if (chicken) {
       const arr = Array.from(selected);
       const cp = chicken.position();
@@ -294,11 +257,11 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         const ang = (i / arr.length) * Math.PI * 2;
         u.killAnimal(chicken, { x: cp.x + Math.cos(ang) * 0.8, z: cp.z + Math.sin(ang) * 0.8 });
       });
-      showResourceHighlight(cp); okSound.currentTime = 0; okSound.play(); return;
+      showResourceHighlight(cp); okSound.currentTime = 0; okSound.play(); return true;
     }
 
     // Stone
-    const stone = raycastGroup(e.clientX, e.clientY, world.stones || []);
+    const stone = raycastGroup(cx, cy, world.stones || []);
     if (stone) {
       const arr = Array.from(selected);
       const sp = stone.position();
@@ -306,11 +269,11 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         const ang = (i / arr.length) * Math.PI * 2;
         u.mineStone(stone, { x: sp.x + Math.cos(ang) * 1.5, z: sp.z + Math.sin(ang) * 1.5 });
       });
-      showResourceHighlight(sp); okSound.currentTime = 0; okSound.play(); return;
+      showResourceHighlight(sp); okSound.currentTime = 0; okSound.play(); return true;
     }
 
     // Gold
-    const gold = raycastGroup(e.clientX, e.clientY, world.golds || []);
+    const gold = raycastGroup(cx, cy, world.golds || []);
     if (gold) {
       const arr = Array.from(selected);
       const gp2 = gold.position();
@@ -318,11 +281,11 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         const ang = (i / arr.length) * Math.PI * 2;
         u.mineGold(gold, { x: gp2.x + Math.cos(ang) * 1.5, z: gp2.z + Math.sin(ang) * 1.5 });
       });
-      showResourceHighlight(gp2); okSound.currentTime = 0; okSound.play(); return;
+      showResourceHighlight(gp2); okSound.currentTime = 0; okSound.play(); return true;
     }
 
     // Tree
-    const tree = raycastGroup(e.clientX, e.clientY, world.trees || []);
+    const tree = raycastGroup(cx, cy, world.trees || []);
     if (tree) {
       const arr = Array.from(selected);
       const tp = tree.position();
@@ -330,11 +293,11 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         const ang = (i / arr.length) * Math.PI * 2;
         u.chopTree(tree, { x: tp.x + Math.cos(ang) * 1.3, z: tp.z + Math.sin(ang) * 1.3 });
       });
-      showResourceHighlight(tp); okSound.currentTime = 0; okSound.play(); return;
+      showResourceHighlight(tp); okSound.currentTime = 0; okSound.play(); return true;
     }
 
     // Move
-    const gp = groundPoint(e.clientX, e.clientY);
+    const gp = groundPoint(cx, cy);
     Array.from(selected).forEach((u, i) => {
       let ox = 0, oz = 0;
       if (selected.size > 1) {
@@ -347,12 +310,65 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     markerGroup.position.set(gp.x, 0, gp.z);
     markerGroup.visible = true; markerTimer = 2.0;
     okSound.currentTime = 0; okSound.play();
+    return true;
+  };
+
+  const onRightClick = (e) => {
+    e.preventDefault();
+    commandAt(e.clientX, e.clientY);
+  };
+
+  // Unified tap handler for touch (and works for any pointer): pick a building,
+  // unit, or issue a command with already-selected units. This is what makes
+  // selecting the Town Center / units actually work on mobile.
+  const handleTap = (cx, cy) => {
+    if (ghostBuilding && !awaitingConfirm) {
+      const gp = groundPoint(cx, cy);
+      ghostBuilding.setPosition(gp.x, gp.z);
+      awaitingConfirm = true; world.ui.showConfirm(); return;
+    }
+    const building = raycastBuilding(cx, cy);
+    if (building) {
+      if (building.type === 'townCenter' || building.isTownCenter) showTownCenterModal(building);
+      return;
+    }
+    const tappedUnit = raycastUnit(cx, cy) || nearestUnit(cx, cy, 40);
+    if (tappedUnit) { clearSelection(); addToSelection(tappedUnit); okSound.currentTime = 0; okSound.play(); return; }
+    // No unit/building tapped: if we have units selected, command them here.
+    if (selected.size > 0) { commandAt(cx, cy); return; }
+    clearSelection();
+  };
+
+  // Touch: distinguish a tap (select/command) from a drag/pinch (camera).
+  let touchStart = null;
+  const onTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      touchStart = { x: t.clientX, y: t.clientY, t: performance.now(), moved: false };
+    } else {
+      touchStart = null; // multi-touch = pinch/zoom, never a tap
+    }
+  };
+  const onTouchMove = (e) => {
+    if (!touchStart || e.touches.length !== 1) { touchStart = null; return; }
+    const t = e.touches[0];
+    if (Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) > 12) touchStart.moved = true;
+  };
+  const onTouchEnd = (e) => {
+    if (!touchStart || touchStart.moved) { touchStart = null; return; }
+    if (performance.now() - touchStart.t > 500) { touchStart = null; return; }
+    const tap = { x: touchStart.x, y: touchStart.y };
+    touchStart = null;
+    handleTap(tap.x, tap.y);
   };
 
   renderer.domElement.addEventListener('mousedown', onMouseDown);
   renderer.domElement.addEventListener('mousemove', onMouseMove);
   renderer.domElement.addEventListener('mouseup', onMouseUp);
   renderer.domElement.addEventListener('contextmenu', onRightClick);
+  renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: true });
+  renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
+  renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: true });
 
   const keys = {};
   window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
@@ -392,6 +408,9 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     renderer.domElement.removeEventListener('mousemove', onMouseMove);
     renderer.domElement.removeEventListener('mouseup', onMouseUp);
     renderer.domElement.removeEventListener('contextmenu', onRightClick);
+    renderer.domElement.removeEventListener('touchstart', onTouchStart);
+    renderer.domElement.removeEventListener('touchmove', onTouchMove);
+    renderer.domElement.removeEventListener('touchend', onTouchEnd);
     document.body.removeChild(selectionBox);
     controls.dispose();
   };

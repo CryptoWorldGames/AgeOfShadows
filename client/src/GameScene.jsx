@@ -269,24 +269,44 @@ export default function GameScene({ auth }) {
         console.log('[AUTOSAVE] Syncing resources:', world.resources);
       }, 5000);
 
-      const { update, dispose } = createControls(camera, renderer, scene, world);
+      let update = () => {}, dispose = () => {};
+      try {
+        const ctrl = createControls(camera, renderer, scene, world);
+        update = ctrl.update; dispose = ctrl.dispose;
+      } catch (e) {
+        console.error('createControls failed:', e);
+        const box = document.createElement('div');
+        box.style.cssText = 'position:fixed;top:90px;left:8px;right:8px;z-index:99999;background:rgba(150,0,0,0.95);color:#fff;font:12px monospace;padding:10px;border-radius:6px;white-space:pre-wrap;';
+        box.textContent = '⚠ createControls failed:\n' + (e && e.message ? e.message : String(e)) + '\n' + (e && e.stack ? e.stack.split('\n').slice(0,4).join('\n') : '');
+        document.body.appendChild(box);
+      }
       let last = performance.now(); let time = 0;
+      let loopErrorShown = false;
+      const showLoopError = (label, err) => {
+        if (loopErrorShown) return;
+        loopErrorShown = true;
+        console.error('Game loop error in ' + label + ':', err);
+        const box = document.createElement('div');
+        box.style.cssText = 'position:fixed;top:90px;left:8px;right:8px;z-index:99999;background:rgba(150,0,0,0.95);color:#fff;font:12px monospace;padding:10px;border-radius:6px;white-space:pre-wrap;';
+        box.textContent = '⚠ Game error in ' + label + ':\n' + (err && err.message ? err.message : String(err)) + '\n' + (err && err.stack ? err.stack.split('\n').slice(0,4).join('\n') : '');
+        document.body.appendChild(box);
+      };
+      // Run one game-logic step, isolating each subsystem so a single failure
+      // never blocks the renderer (which is why the screen went fully black).
+      const safe = (label, fn) => { try { fn(); } catch (e) { showLoopError(label, e); } };
       const animate = () => {
         requestAnimationFrame(animate);
         const now = performance.now(); let dt = (now-last)/1000; last = now;
         if (dt > 0.1) dt = 0.1; time += dt;
-        update(time, dt);
+
+        safe('controls', () => update(time, dt));
 
         // Apply camera boundary limits
         const MAX_HEIGHT = 60;
         const MIN_HEIGHT = 5;
         const MAP_RADIUS = 65;
-
-        // Enforce height limits
         if (camera.position.y > MAX_HEIGHT) camera.position.y = MAX_HEIGHT;
         if (camera.position.y < MIN_HEIGHT) camera.position.y = MIN_HEIGHT;
-
-        // Enforce map radius (no going too far away)
         const dist = Math.sqrt(camera.position.x ** 2 + camera.position.z ** 2);
         if (dist > MAP_RADIUS) {
           const angle = Math.atan2(camera.position.z, camera.position.x);
@@ -294,14 +314,16 @@ export default function GameScene({ auth }) {
           camera.position.z = Math.sin(angle) * MAP_RADIUS;
         }
 
-        if (env.waterUpdate) env.waterUpdate(dt);
-        world.trees.forEach((t) => t.update(dt));
-        world.stones.forEach((s) => s.update(dt));
-        world.golds.forEach((g) => g.update(dt));
-        world.animals.forEach((a) => a.update(dt, world));
-        world.units.forEach((u) => { u.update(dt, world); u.animate(dt); });
-        Object.values(otherPlayers).forEach(units => units.forEach(u => u.animate(dt)));
-        ui.setResources(world.resources);
+        safe('water', () => { if (env.waterUpdate) env.waterUpdate(dt); });
+        safe('trees', () => world.trees.forEach((t) => t.update(dt)));
+        safe('stones', () => world.stones.forEach((s) => s.update(dt)));
+        safe('golds', () => world.golds.forEach((g) => g.update(dt)));
+        safe('animals', () => world.animals.forEach((a) => a.update(dt, world)));
+        safe('units', () => world.units.forEach((u) => { u.update(dt, world); u.animate(dt); }));
+        safe('others', () => Object.values(otherPlayers).forEach(units => units.forEach(u => u.animate(dt))));
+        safe('hud', () => ui.setResources(world.resources));
+
+        // ALWAYS render — even if game logic above failed, the world stays visible.
         renderer.render(scene, camera);
       };
       console.log('🎬 Starting animation loop...');
@@ -356,21 +378,41 @@ export default function GameScene({ auth }) {
     );
   }
 
+  const toggleOrientation = async () => {
+    const goLandscape = isPortrait;
+    try {
+      // Orientation lock requires fullscreen on most mobile browsers.
+      if (goLandscape && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen().catch(() => {});
+      }
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock(goLandscape ? 'landscape' : 'portrait');
+      } else {
+        alert('Your phone blocks auto-rotate. Please use your phone’s rotation toggle.');
+      }
+      if (!goLandscape && document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen().catch(() => {});
+      }
+    } catch (e) {
+      alert('Rotation locked by phone settings. Enable auto-rotate, then try again.');
+    }
+  };
+
   return (
     <>
       <div ref={containerRef} style={{ width:'100%', height:'100vh', overflow:'hidden' }} />
-      {isMobile && isPortrait && (
-        <div style={{
-          position:'fixed', top:0, left:0, right:0, zIndex:99,
-          background:'rgba(10, 10, 10, 0.95)', borderBottom:'2px solid #c8a84b',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          color:'#c8a84b', fontFamily:"'Georgia',serif", padding:'8px 16px',
-          fontSize:'13px', textAlign:'center', pointerEvents:'none'
+      {isMobile && (
+        <button onClick={toggleOrientation} style={{
+          position:'fixed', top:'8px', right:'8px', zIndex:10000,
+          background:'rgba(10,10,10,0.92)', border:'2px solid #c8a84b', borderRadius:'6px',
+          color:'#c8a84b', fontFamily:"'Georgia',serif", padding:'6px 12px',
+          fontSize:'12px', fontWeight:700, cursor:'pointer', display:'flex',
+          alignItems:'center', gap:'6px', boxShadow:'0 2px 10px rgba(0,0,0,0.5)',
+          pointerEvents:'auto'
         }}>
-          <div style={{ marginRight:'8px', fontSize:'16px', animation:'rotateHint 1.8s ease-in-out infinite' }}>📱</div>
-          <div>Best played in landscape mode — turn your phone sideways</div>
-          <style>{`@keyframes rotateHint { 0%,100%{transform:rotate(0deg);} 50%{transform:rotate(90deg);} }`}</style>
-        </div>
+          <span style={{ fontSize:'14px' }}>🔄</span>
+          {isPortrait ? 'Landscape' : 'Portrait'}
+        </button>
       )}
     </>
   );
