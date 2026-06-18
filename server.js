@@ -132,7 +132,7 @@ io.on('connection', (socket) => {
         units = savedData.units.length > 0 ? savedData.units : createPlayerUnits(socket.id, 1);
       } else {
         units = createPlayerUnits(socket.id, 1);
-        resources = { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
+        resources = { wood: 100, food: 50, water: 20, gold: 0, stone: 20 };
         buildings = [];
       }
 
