@@ -223,19 +223,30 @@ function showHouseInventoryModal(playerId, auth) {
   };
 }
 
-function showSettingsPanel(email) {
+function showSettingsPanel(displayName, email = '') {
   const existingModal = document.getElementById('settings-modal');
   if (existingModal) existingModal.remove();
 
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const modal = document.createElement('div');
   modal.id = 'settings-modal';
-  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;overflow:auto;`;
+
+  // Mobile: full width, Desktop: centered box
+  const modalWidth = isMobile ? '95vw' : '90%';
+  const modalMaxWidth = isMobile ? 'none' : '500px';
+
   modal.innerHTML = `
-    <div style="background:rgba(0,0,0,0.9);border:1px solid rgba(200,168,75,0.4);border-radius:12px;padding:24px;width:90%;max-width:400px;color:#fff;font-family:'Segoe UI',sans-serif;">
+    <div style="background:rgba(0,0,0,0.95);border:1px solid rgba(200,168,75,0.4);border-radius:12px;padding:20px;width:${modalWidth};max-width:${modalMaxWidth};color:#fff;font-family:'Segoe UI',sans-serif;margin:20px;max-height:90vh;overflow-y:auto;">
       <h2 style="margin:0 0 20px;color:#c8a84b;font-size:20px;">Settings & Profile</h2>
 
       <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Email</label>
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Nickname (shown to other players)</label>
+        <input type="text" id="settings-nickname" value="${displayName}" disabled style="width:100%;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#fff;font-size:13px;box-sizing:border-box;font-weight:600;"/>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Email (account login)</label>
         <input type="email" id="settings-email" value="${email}" disabled style="width:100%;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#ccc;font-size:13px;box-sizing:border-box;"/>
       </div>
 
@@ -254,9 +265,9 @@ function showSettingsPanel(email) {
         <input type="text" id="settings-country" placeholder="USA" style="width:100%;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.3);border-radius:4px;color:#fff;font-size:13px;box-sizing:border-box;"/>
       </div>
 
-      <button id="save-settings-btn" style="width:100%;padding:10px;background:linear-gradient(135deg, #c8a84b, #ffd700);border:none;border-radius:4px;color:#000;font-weight:600;cursor:pointer;margin-bottom:8px;">Save Profile</button>
-      <button id="delete-account-btn" style="width:100%;padding:10px;background:rgba(255,0,0,0.15);border:1px solid #ff6b6b;border-radius:4px;color:#ff6b6b;font-weight:600;cursor:pointer;margin-bottom:8px;">Delete Account</button>
-      <button id="close-settings-btn" style="width:100%;padding:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;font-weight:600;cursor:pointer;">Close</button>
+      <button id="save-settings-btn" style="width:100%;padding:12px;background:linear-gradient(135deg, #c8a84b, #ffd700);border:none;border-radius:4px;color:#000;font-weight:600;cursor:pointer;margin-bottom:8px;font-size:14px;">✓ Save Profile</button>
+      <button id="delete-account-btn" style="width:100%;padding:12px;background:rgba(255,0,0,0.2);border:1px solid #ff6b6b;border-radius:4px;color:#ff6b6b;font-weight:600;cursor:pointer;margin-bottom:8px;font-size:14px;">🗑 Delete Account</button>
+      <button id="close-settings-btn" style="width:100%;padding:12px;background:rgba(100,100,100,0.3);border:1px solid rgba(255,255,255,0.3);border-radius:4px;color:#fff;font-weight:600;cursor:pointer;font-size:14px;">✕ Close</button>
     </div>
   `;
 
@@ -309,7 +320,8 @@ export function createUI(playerId, gameState, displayName) {
     document.body.appendChild(loginPanel);
 
     document.getElementById('settings-btn').onclick = () => {
-      showSettingsPanel(displayName);
+      const auth = JSON.parse(localStorage.getItem('auth') || '{}');
+      showSettingsPanel(displayName, auth.email || '');
     };
   }
 
