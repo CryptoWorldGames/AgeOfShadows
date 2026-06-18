@@ -44,3 +44,17 @@ Fix: @media (orientation: portrait) reposition+scale panels; collapsible.
 - Before risky edits, the current main IS the backup. If broken, `git reset --hard <last-good>` and force-push.
 - Verify `vite build` locally before pushing.
 - Don't add CSS (e.g. overflow:auto) that can interfere with the full-screen WebGL canvas.
+
+## ✅ Red error "getPosition is not a function" — commit de7cded
+**Symptom:** Red error box in game: `TypeError: getPosition is not a function` in units loop.
+**Root cause:** Buildings expose `position()` as a METHOD (returns Vector3 clone),
+NOT a `.position` property and NOT `getPosition()`. Code called `nearHome.getPosition()`
+directly (undefined → throw) and elsewhere fell back to `b.position` (the function
+reference, never called) → `.x` undefined → NaN, silently breaking deposit/home logic.
+**Fix pattern (REUSE):** Use a single `resolvePos(obj)` helper that handles
+position() method, getPosition(), Vector3 property, and group.position. Never assume
+an object's position is a plain property — buildings use a method.
+
+## ✅ Orientation toggle button — commit de7cded
+Replaced static portrait banner with a tap button: locks landscape (needs fullscreen
+first per browser rules), tap again returns to portrait. Fixes phone stuck in landscape.
