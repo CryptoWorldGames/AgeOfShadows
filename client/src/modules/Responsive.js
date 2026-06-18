@@ -135,7 +135,6 @@ export function applyResponsiveUI() {
     ['game-info-panel', 'INFO', true],
     ['login-panel', 'MENU', true],
     ['build-bar', 'BUILD', true],
-    ['selected-panel', 'SELECT', true],
     ['admin-panel', 'ADMIN', true],
   ];
   panels.forEach(([id, label, startCollapsed]) => {
