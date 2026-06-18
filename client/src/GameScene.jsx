@@ -183,6 +183,17 @@ export default function GameScene({ auth }) {
       world.animals.push(createDeer(scene, { x:10, y:0, z:5 }));
       world.animals.push(createDeer(scene, { x:-10, y:0, z:5 }));
 
+      // Create default Town Center at center of map
+      const defaultTownCenter = createTownCenter(scene, false);
+      defaultTownCenter.setPosition(0, 0);
+      defaultTownCenter.place();
+      defaultTownCenter.id = 'town-center-default';
+      defaultTownCenter.type = 'townCenter';
+      defaultTownCenter.storage = { wood: 0, stone: 0, gold: 0, food: 0, water: 0 };
+      defaultTownCenter.storageMax = 100000;
+      defaultTownCenter.ownerId = 'server';
+      world.buildings.push(defaultTownCenter);
+
       socket.on('resourceUpdate', (res) => {
         world.resources = res;
       });
