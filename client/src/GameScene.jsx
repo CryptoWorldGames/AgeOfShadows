@@ -269,24 +269,44 @@ export default function GameScene({ auth }) {
         console.log('[AUTOSAVE] Syncing resources:', world.resources);
       }, 5000);
 
-      const { update, dispose } = createControls(camera, renderer, scene, world);
+      let update = () => {}, dispose = () => {};
+      try {
+        const ctrl = createControls(camera, renderer, scene, world);
+        update = ctrl.update; dispose = ctrl.dispose;
+      } catch (e) {
+        console.error('createControls failed:', e);
+        const box = document.createElement('div');
+        box.style.cssText = 'position:fixed;top:90px;left:8px;right:8px;z-index:99999;background:rgba(150,0,0,0.95);color:#fff;font:12px monospace;padding:10px;border-radius:6px;white-space:pre-wrap;';
+        box.textContent = '⚠ createControls failed:\n' + (e && e.message ? e.message : String(e)) + '\n' + (e && e.stack ? e.stack.split('\n').slice(0,4).join('\n') : '');
+        document.body.appendChild(box);
+      }
       let last = performance.now(); let time = 0;
+      let loopErrorShown = false;
+      const showLoopError = (label, err) => {
+        if (loopErrorShown) return;
+        loopErrorShown = true;
+        console.error('Game loop error in ' + label + ':', err);
+        const box = document.createElement('div');
+        box.style.cssText = 'position:fixed;top:90px;left:8px;right:8px;z-index:99999;background:rgba(150,0,0,0.95);color:#fff;font:12px monospace;padding:10px;border-radius:6px;white-space:pre-wrap;';
+        box.textContent = '⚠ Game error in ' + label + ':\n' + (err && err.message ? err.message : String(err)) + '\n' + (err && err.stack ? err.stack.split('\n').slice(0,4).join('\n') : '');
+        document.body.appendChild(box);
+      };
+      // Run one game-logic step, isolating each subsystem so a single failure
+      // never blocks the renderer (which is why the screen went fully black).
+      const safe = (label, fn) => { try { fn(); } catch (e) { showLoopError(label, e); } };
       const animate = () => {
         requestAnimationFrame(animate);
         const now = performance.now(); let dt = (now-last)/1000; last = now;
         if (dt > 0.1) dt = 0.1; time += dt;
-        update(time, dt);
+
+        safe('controls', () => update(time, dt));
 
         // Apply camera boundary limits
         const MAX_HEIGHT = 60;
         const MIN_HEIGHT = 5;
         const MAP_RADIUS = 65;
-
-        // Enforce height limits
         if (camera.position.y > MAX_HEIGHT) camera.position.y = MAX_HEIGHT;
         if (camera.position.y < MIN_HEIGHT) camera.position.y = MIN_HEIGHT;
-
-        // Enforce map radius (no going too far away)
         const dist = Math.sqrt(camera.position.x ** 2 + camera.position.z ** 2);
         if (dist > MAP_RADIUS) {
           const angle = Math.atan2(camera.position.z, camera.position.x);
@@ -294,14 +314,16 @@ export default function GameScene({ auth }) {
           camera.position.z = Math.sin(angle) * MAP_RADIUS;
         }
 
-        if (env.waterUpdate) env.waterUpdate(dt);
-        world.trees.forEach((t) => t.update(dt));
-        world.stones.forEach((s) => s.update(dt));
-        world.golds.forEach((g) => g.update(dt));
-        world.animals.forEach((a) => a.update(dt, world));
-        world.units.forEach((u) => { u.update(dt, world); u.animate(dt); });
-        Object.values(otherPlayers).forEach(units => units.forEach(u => u.animate(dt)));
-        ui.setResources(world.resources);
+        safe('water', () => { if (env.waterUpdate) env.waterUpdate(dt); });
+        safe('trees', () => world.trees.forEach((t) => t.update(dt)));
+        safe('stones', () => world.stones.forEach((s) => s.update(dt)));
+        safe('golds', () => world.golds.forEach((g) => g.update(dt)));
+        safe('animals', () => world.animals.forEach((a) => a.update(dt, world)));
+        safe('units', () => world.units.forEach((u) => { u.update(dt, world); u.animate(dt); }));
+        safe('others', () => Object.values(otherPlayers).forEach(units => units.forEach(u => u.animate(dt))));
+        safe('hud', () => ui.setResources(world.resources));
+
+        // ALWAYS render — even if game logic above failed, the world stays visible.
         renderer.render(scene, camera);
       };
       console.log('🎬 Starting animation loop...');
