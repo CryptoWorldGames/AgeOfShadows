@@ -65,7 +65,7 @@ export function showChatPanel(socket) {
   chatPanel.id = 'chat-panel';
   chatPanel.style.cssText = `position:absolute;bottom:20px;right:20px;width:300px;height:400px;background:rgba(0,0,0,0.8);border:1px solid rgba(200,168,75,0.4);border-radius:8px;display:flex;flex-direction:column;z-index:100;font-family:'Segoe UI',sans-serif;`;
   chatPanel.innerHTML = `
-    <div style="padding:12px;border-bottom:1px solid rgba(200,168,75,0.2);color:#c8a84b;font-weight:600;font-size:13px;">💬 General Chat</div>
+    <div style="padding:12px;border-bottom:2px solid #c8a84b;color:#c8a84b;font-weight:700;font-size:14px;letter-spacing:0.5px;">💬 CHAT</div>
     <div id="chat-messages" style="flex:1;overflow-y:auto;padding:12px;font-size:11px;color:#fff;"></div>
     <div style="padding:8px;border-top:1px solid rgba(200,168,75,0.2);display:flex;gap:4px;">
       <input id="chat-input" type="text" placeholder="Type message..." style="flex:1;padding:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#fff;font-size:11px;"/>

@@ -12,13 +12,13 @@ function injectStyles() {
   style.textContent = `
     /* ---- Collapsible panels ---- */
     .ui-collapse-btn {
-      position: absolute; top: 3px; right: 3px; width: 20px; height: 20px;
-      padding: 0; border: 1px solid rgba(200,168,75,0.5);
-      background: rgba(0,0,0,0.65); color: #c8a84b; border-radius: 4px;
-      cursor: pointer; font-size: 14px; line-height: 16px; text-align: center;
-      z-index: 20; font-family: 'Segoe UI', sans-serif;
+      position: absolute; top: 3px; right: 3px; width: 26px; height: 26px;
+      padding: 0; border: 1px solid #c8a84b;
+      background: rgba(0,0,0,0.8); color: #c8a84b; border-radius: 4px;
+      cursor: pointer; font-size: 16px; line-height: 24px; text-align: center;
+      z-index: 20; font-family: 'Segoe UI', sans-serif; font-weight: bold;
     }
-    .ui-collapse-btn:hover { background: #c8a84b; color: #000; }
+    .ui-collapse-btn:hover { background: #c8a84b; color: #000; transform: scale(1.1); }
     .ui-collapsed-label {
       display: none; color: #c8a84b; font-size: 11px; font-weight: 700;
       padding: 1px 26px 1px 4px; white-space: nowrap;
@@ -131,16 +131,26 @@ export function applyResponsiveUI() {
   const portrait = window.matchMedia('(orientation: portrait)').matches;
 
   const panels = [
-    ['game-info-panel', 'AGE OF SHADOWS', false],
-    ['login-panel', 'Menu', false],
-    ['build-bar', 'Build', false],
-    ['selected-panel', 'Selected', false],
-    ['admin-panel', 'ADMIN', true], // admin starts tucked away
+    ['game-info-panel', 'INFO', true],
+    ['login-panel', 'MENU', true],
+    ['build-bar', 'BUILD', true],
+    ['selected-panel', 'SELECT', true],
+    ['admin-panel', 'ADMIN', true],
   ];
   panels.forEach(([id, label, startCollapsed]) => {
     const el = document.getElementById(id);
-    if (el) makeCollapsible(el, label, startCollapsed && portrait);
+    if (el) makeCollapsible(el, label, (startCollapsed && portrait) || portrait);
   });
+
+  // Resource bar should never collapse (always visible at top on mobile)
+  const resourceBar = document.getElementById('resource-bar');
+  if (resourceBar && resourceBar.querySelector(':scope > .ui-collapse-btn')) {
+    const btn = resourceBar.querySelector(':scope > .ui-collapse-btn');
+    btn.remove();
+    const label = resourceBar.querySelector(':scope > .ui-collapsed-label');
+    if (label) label.remove();
+    resourceBar.classList.remove('ui-collapsed');
+  }
 }
 
 // Watch for late-mounting panels (e.g. the React admin panel) and wire them up.

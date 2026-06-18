@@ -4,7 +4,7 @@ export function createEnvironment(scene) {
   scene.background = new THREE.Color(0x87ceeb);
   scene.fog = new THREE.Fog(0xb0d8f0, 90, 230);
 
-  const sun = new THREE.DirectionalLight(0xfff4e0, 1.1);
+  const sun = new THREE.DirectionalLight(0xfff4e0, 1.3);
   sun.position.set(60, 80, 40);
   sun.castShadow = true;
   sun.shadow.mapSize.width = 2048;
@@ -18,7 +18,7 @@ export function createEnvironment(scene) {
   sun.shadow.bias = -0.001;
   scene.add(sun);
 
-  const ambient = new THREE.AmbientLight(0xc8e0ff, 0.55);
+  const ambient = new THREE.AmbientLight(0xc8e0ff, 0.8);
   scene.add(ambient);
 
   const loader = new THREE.TextureLoader();

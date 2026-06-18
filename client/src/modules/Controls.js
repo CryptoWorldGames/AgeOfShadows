@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createTownCenter } from './Building.js';
 
-export function createControls(camera, renderer, scene, world) {
+export function createControls(camera, renderer, scene, world, playerStartPos) {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.screenSpacePanning = true;
-  controls.minDistance = 8;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  controls.minDistance = isMobile ? 5 : 8;
   controls.maxDistance = 150;
   controls.minPolarAngle = Math.PI / 6;
   controls.maxPolarAngle = Math.PI / 3;
