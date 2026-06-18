@@ -149,7 +149,8 @@ export default function GameScene({ auth }) {
           world.units.push(createHuman(scene, { x: u.x, y: 0, z: u.z }, { team: u.team || 'red' }));
         });
       } else {
-        world.units.push(createHuman(scene, { x: 0, y: 0, z: 5 }, { team: 'red' }));
+        // Spawn clearly OUTSIDE the Town Center footprint (wall radius ~4.5 at 2x scale).
+        world.units.push(createHuman(scene, { x: 0, y: 0, z: 12 }, { team: 'red' }));
       }
 
       const usedSpots = [];
@@ -204,6 +205,25 @@ export default function GameScene({ auth }) {
       defaultTownCenter.storageMax = 100000;
       defaultTownCenter.ownerId = 'server';
       world.buildings.push(defaultTownCenter);
+
+      // Safety: shove any unit that spawned inside the Town Center footprint out
+      // to the edge so it's visible and tap-selectable (not buried in the wall).
+      (() => {
+        const tcPos = defaultTownCenter.position();
+        const wall = (defaultTownCenter.radius || 6) * 0.75; // collision wall
+        const clearDist = wall + 1.5; // stand this far from center
+        world.units.forEach((u) => {
+          const p = u.group.position;
+          let dx = p.x - tcPos.x, dz = p.z - tcPos.z;
+          const d = Math.sqrt(dx * dx + dz * dz);
+          if (d < clearDist) {
+            if (d < 1e-4) { dx = 0; dz = 1; }
+            else { dx /= d; dz /= d; }
+            p.x = tcPos.x + dx * clearDist;
+            p.z = tcPos.z + dz * clearDist;
+          }
+        });
+      })();
 
       socket.on('resourceUpdate', (res) => {
         world.resources = res;

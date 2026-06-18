@@ -23,7 +23,7 @@ function AdminPanel({ email }) {
   };
 
   return (
-    <div id="admin-panel" style={{ position: 'fixed', bottom: 20, right: 20, background: 'rgba(255,0,0,0.2)', border: '2px solid #ff0000', borderRadius: 8, padding: 16, color: '#fff', fontFamily: "'Segoe UI', sans-serif", fontSize: 12, zIndex: 999 }}>
+    <div id="admin-panel" style={{ position: 'fixed', top: 70, left: 14, maxHeight: '60vh', overflowY: 'auto', background: 'rgba(255,0,0,0.2)', border: '2px solid #ff0000', borderRadius: 8, padding: 16, color: '#fff', fontFamily: "'Segoe UI', sans-serif", fontSize: 12, zIndex: 999 }}>
       <div style={{ fontWeight: 600, marginBottom: 8 }}>🔐 ADMIN PANEL</div>
       <button onClick={fetchStats} style={{ padding: '6px 12px', background: '#ff0000', border: 'none', borderRadius: 4, color: '#fff', cursor: 'pointer', marginBottom: 8, width: '100%' }}>Fetch Stats</button>
       {stats && (
