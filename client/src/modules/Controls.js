@@ -8,8 +8,12 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   controls.dampingFactor = 0.08;
   controls.screenSpacePanning = true;
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  controls.minDistance = isMobile ? 5 : 8;
+  controls.minDistance = isMobile ? 3 : 8;
   controls.maxDistance = 150;
+  if (isMobile && playerStartPos) {
+    controls.target.copy(playerStartPos);
+    camera.position.set(playerStartPos.x + 2, playerStartPos.y + 3, playerStartPos.z + 3);
+  }
   controls.minPolarAngle = Math.PI / 6;
   controls.maxPolarAngle = Math.PI / 3;
   controls.zoomToCursor = false;

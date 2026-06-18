@@ -151,6 +151,17 @@ export function applyResponsiveUI() {
     if (label) label.remove();
     resourceBar.classList.remove('ui-collapsed');
   }
+
+  // Collapse chat panel by default on mobile portrait to save screen space
+  if (portrait) {
+    const chatPanel = document.getElementById('chat-panel');
+    if (chatPanel) {
+      const collapseBtn = chatPanel.querySelector('#chat-collapse-btn');
+      if (collapseBtn) {
+        collapseBtn.click();
+      }
+    }
+  }
 }
 
 // Watch for late-mounting panels (e.g. the React admin panel) and wire them up.

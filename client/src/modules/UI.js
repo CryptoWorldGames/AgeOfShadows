@@ -61,20 +61,47 @@ export function showChatPanel(socket) {
   const existingChat = document.getElementById('chat-panel');
   if (existingChat) return;
 
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const chatPanel = document.createElement('div');
   chatPanel.id = 'chat-panel';
-  chatPanel.style.cssText = `position:absolute;bottom:20px;right:20px;width:300px;height:400px;background:rgba(0,0,0,0.8);border:1px solid rgba(200,168,75,0.4);border-radius:8px;display:flex;flex-direction:column;z-index:100;font-family:'Segoe UI',sans-serif;`;
+  const chatWidth = isMobile ? '90vw' : '300px';
+  const chatHeight = isMobile ? '200px' : '400px';
+  const chatBottom = isMobile ? '4px' : '20px';
+  const chatRight = isMobile ? '4px' : '20px';
+  chatPanel.style.cssText = `position:absolute;bottom:${chatBottom};right:${chatRight};width:${chatWidth};height:${chatHeight};background:rgba(0,0,0,0.85);border:1px solid #c8a84b;border-radius:8px;display:flex;flex-direction:column;z-index:100;font-family:'Segoe UI',sans-serif;`;
   chatPanel.innerHTML = `
-    <div style="padding:12px;border-bottom:2px solid #c8a84b;color:#c8a84b;font-weight:700;font-size:14px;letter-spacing:0.5px;">💬 CHAT</div>
-    <div id="chat-messages" style="flex:1;overflow-y:auto;padding:12px;font-size:11px;color:#fff;"></div>
-    <div style="padding:8px;border-top:1px solid rgba(200,168,75,0.2);display:flex;gap:4px;">
-      <input id="chat-input" type="text" placeholder="Type message..." style="flex:1;padding:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#fff;font-size:11px;"/>
-      <button id="chat-send" style="padding:6px 12px;background:#c8a84b;border:none;border-radius:4px;color:#000;font-weight:600;cursor:pointer;font-size:10px;">Send</button>
+    <div style="padding:8px 12px;border-bottom:2px solid #c8a84b;color:#c8a84b;font-weight:700;font-size:12px;letter-spacing:0.5px;display:flex;justify-content:space-between;align-items:center;">
+      <span>💬 CHAT</span>
+      <button id="chat-collapse-btn" style="background:rgba(200,168,75,0.2);border:1px solid #c8a84b;color:#c8a84b;width:20px;height:20px;padding:0;cursor:pointer;font-size:12px;border-radius:3px;font-weight:bold;">−</button>
+    </div>
+    <div id="chat-messages" style="flex:1;overflow-y:auto;padding:8px;font-size:11px;color:#fff;"></div>
+    <div style="padding:6px;border-top:1px solid rgba(200,168,75,0.2);display:flex;gap:4px;">
+      <input id="chat-input" type="text" placeholder="Msg..." style="flex:1;padding:4px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#fff;font-size:10px;"/>
+      <button id="chat-send" style="padding:4px 8px;background:#c8a84b;border:none;border-radius:4px;color:#000;font-weight:600;cursor:pointer;font-size:9px;">Send</button>
     </div>
   `;
   document.body.appendChild(chatPanel);
 
   const messagesDiv = document.getElementById('chat-messages');
+  const collapseBtn = document.getElementById('chat-collapse-btn');
+  let isCollapsed = false;
+
+  collapseBtn.onclick = (e) => {
+    e.stopPropagation();
+    isCollapsed = !isCollapsed;
+    if (isCollapsed) {
+      messagesDiv.style.display = 'none';
+      document.querySelector('div[style*="padding:6px;border-top"]').style.display = 'none';
+      chatPanel.style.height = '30px';
+      collapseBtn.textContent = '+';
+    } else {
+      messagesDiv.style.display = 'block';
+      document.querySelector('div[style*="padding:6px;border-top"]').style.display = 'flex';
+      chatPanel.style.height = isMobile ? '200px' : '400px';
+      collapseBtn.textContent = '−';
+    }
+  };
+
   document.getElementById('chat-send').onclick = () => {
     const input = document.getElementById('chat-input');
     const msg = input.value.trim();
