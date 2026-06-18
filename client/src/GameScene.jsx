@@ -10,6 +10,7 @@ import { createTownCenter } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
 import { createStone } from './modules/Stone';
 import { createGold } from './modules/Gold';
+import { startResponsiveUI } from './modules/Responsive.js';
 
 export default function GameScene({ auth }) {
   const containerRef = useRef(null);
@@ -98,6 +99,7 @@ export default function GameScene({ auth }) {
 
       // Add game info panel (version & title) - top left, with inventory below
       const gameInfo = document.createElement('div');
+      gameInfo.id = 'game-info-panel';
       gameInfo.style.cssText = `position:absolute;top:14px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);min-width:130px;`;
       gameInfo.innerHTML = `
         <div style="color:#c8a84b;font-weight:700;font-size:13px;margin-bottom:2px;letter-spacing:1px;">AGE OF SHADOWS</div>
@@ -281,6 +283,7 @@ export default function GameScene({ auth }) {
         renderer.render(scene, camera);
       };
       console.log('🎬 Starting animation loop...');
+      const responsiveObserver = startResponsiveUI();
       animate();
       console.log('✅ Game initialized successfully');
 
@@ -331,5 +334,22 @@ export default function GameScene({ auth }) {
     );
   }
 
-  return React.createElement('div', { ref: containerRef, style: { width:'100%', height:'100vh', overflow:'hidden' } });
+  return (
+    <>
+      <div ref={containerRef} style={{ width:'100%', height:'100vh', overflow:'hidden' }} />
+      {isMobile && isPortrait && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, zIndex:99,
+          background:'rgba(10, 10, 10, 0.95)', borderBottom:'2px solid #c8a84b',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          color:'#c8a84b', fontFamily:"'Georgia',serif", padding:'8px 16px',
+          fontSize:'13px', textAlign:'center', pointerEvents:'none'
+        }}>
+          <div style={{ marginRight:'8px', fontSize:'16px', animation:'rotateHint 1.8s ease-in-out infinite' }}>📱</div>
+          <div>Best played in landscape mode — turn your phone sideways</div>
+          <style>{`@keyframes rotateHint { 0%,100%{transform:rotate(0deg);} 50%{transform:rotate(90deg);} }`}</style>
+        </div>
+      )}
+    </>
+  );
 }

@@ -263,6 +263,7 @@ export function createUI(playerId, gameState, displayName) {
     { key:'stone', img:'/icons/stone2.png', color:'#bcbcbc' }
   ];
   const resourceBar = document.createElement('div');
+  resourceBar.id = 'resource-bar';
   resourceBar.style.cssText = `position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:16px;align-items:center;color:#fff;font-family:'Segoe UI',sans-serif;font-size:16px;font-weight:600;background:rgba(0,0,0,0.6);padding:8px 18px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);z-index:100;white-space:nowrap;`;
   resDefs.forEach((r) => {
     const span = document.createElement('span');
@@ -283,11 +284,13 @@ export function createUI(playerId, gameState, displayName) {
 
   // Selected count in far left corner (above HUD)
   const selDiv = document.createElement('div');
+  selDiv.id = 'selected-panel';
   selDiv.style.cssText = `position:absolute;bottom:90px;left:20px;background:rgba(0,0,0,0.6);border:1px solid rgba(200,168,75,0.3);border-radius:8px;padding:12px 16px;color:#c8a84b;font-family:'Segoe UI',sans-serif;font-size:14px;z-index:100;`;
   selDiv.innerHTML = `Selected: <span id="unit-count" style="font-weight:600;">0</span>`;
   document.body.appendChild(selDiv);
 
   const buildBar = document.createElement('div');
+  buildBar.id = 'build-bar';
   buildBar.style.cssText = `position:absolute;top:150px;left:14px;z-index:100;`;
   const tcButton = document.createElement('button');
   tcButton.id = 'tc-button';
@@ -315,11 +318,13 @@ export function createUI(playerId, gameState, displayName) {
   const DEFAULT_TRACK = 7;
 
   const musicTab = document.createElement('div');
+  musicTab.id = 'music-tab';
   musicTab.style.cssText = `position:absolute;top:110px;right:14px;background:rgba(0,0,0,0.65);border-radius:8px;border:1px solid rgba(255,255,255,0.15);padding:6px 12px;z-index:101;font-family:'Segoe UI',sans-serif;color:#fff;font-size:13px;font-weight:600;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;`;
   musicTab.innerHTML = `🎵 <span id="music-tab-label">Music</span>`;
   document.body.appendChild(musicTab);
 
   const musicPanel = document.createElement('div');
+  musicPanel.id = 'music-panel';
   musicPanel.style.cssText = `position:absolute;top:148px;right:14px;background:rgba(0,0,0,0.88);border-radius:10px;border:1px solid rgba(255,255,255,0.15);padding:12px;z-index:100;font-family:'Segoe UI',sans-serif;color:#fff;width:224px;display:none;`;
 
   const topRow = document.createElement('div');
