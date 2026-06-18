@@ -231,6 +231,43 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
       return;
     }
 
+    // Click on ground resources (stone, gold, meat) - auto-gather with selected units
+    if (selected.size > 0) {
+      const stone = raycastGroup(e.clientX, e.clientY, world.stones || []);
+      if (stone) {
+        const arr = Array.from(selected);
+        const sp = stone.position();
+        arr.forEach((u, i) => {
+          const ang = (i / arr.length) * Math.PI * 2;
+          u.mineStone(stone, { x: sp.x + Math.cos(ang) * 1.5, z: sp.z + Math.sin(ang) * 1.5 });
+        });
+        showResourceHighlight(sp); okSound.currentTime = 0; okSound.play(); return;
+      }
+
+      const gold = raycastGroup(e.clientX, e.clientY, world.golds || []);
+      if (gold) {
+        const arr = Array.from(selected);
+        const gp = gold.position();
+        arr.forEach((u, i) => {
+          const ang = (i / arr.length) * Math.PI * 2;
+          u.mineGold(gold, { x: gp.x + Math.cos(ang) * 1.5, z: gp.z + Math.sin(ang) * 1.5 });
+        });
+        showResourceHighlight(gp); okSound.currentTime = 0; okSound.play(); return;
+      }
+
+      // Meat piles (dead animals)
+      const meat = raycastGroup(e.clientX, e.clientY, (world.animals || []).filter(a => a.state && a.state() === 'meatpile'));
+      if (meat) {
+        const arr = Array.from(selected);
+        const mp = meat.position();
+        arr.forEach((u, i) => {
+          const ang = (i / arr.length) * Math.PI * 2;
+          u.killAnimal(meat, { x: mp.x + Math.cos(ang) * 0.8, z: mp.z + Math.sin(ang) * 0.8 });
+        });
+        showResourceHighlight(mp); okSound.currentTime = 0; okSound.play(); return;
+      }
+    }
+
     const u = raycastUnit(e.clientX, e.clientY) || nearestUnit(e.clientX, e.clientY, 35);
     if (u) { if (!e.shiftKey) clearSelection(); addToSelection(u); }
     else if (!e.shiftKey) clearSelection();

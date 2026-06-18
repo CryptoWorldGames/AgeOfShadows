@@ -129,6 +129,7 @@ export function applyResponsiveUI() {
   injectStyles();
 
   const portrait = window.matchMedia('(orientation: portrait)').matches;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   const panels = [
     ['game-info-panel', 'INFO', true],
@@ -139,7 +140,9 @@ export function applyResponsiveUI() {
   ];
   panels.forEach(([id, label, startCollapsed]) => {
     const el = document.getElementById(id);
-    if (el) makeCollapsible(el, label, (startCollapsed && portrait) || portrait);
+    // MOBILE PORTRAIT: Start collapsed | MOBILE LANDSCAPE: Expanded | DESKTOP: Expanded with collapse button available
+    const shouldStartCollapsed = isMobile && portrait && startCollapsed;
+    if (el) makeCollapsible(el, label, shouldStartCollapsed);
   });
 
   // Resource bar should never collapse (always visible at top on mobile)
