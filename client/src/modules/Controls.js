@@ -11,6 +11,10 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   controls.minDistance = isMobile ? 3 : 8;
   controls.maxDistance = 150;
+  controls.enableZoom = true;
+  if (isMobile) {
+    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+  }
   if (isMobile && playerStartPos) {
     controls.target.copy(playerStartPos);
     camera.position.set(playerStartPos.x + 2, playerStartPos.y + 3, playerStartPos.z + 3);
