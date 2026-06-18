@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createTownCenter } from './Building.js';
+import { showTownCenterModal } from './UI.js';
 
 export function createControls(camera, renderer, scene, world, playerStartPos) {
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -125,6 +126,19 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     return best;
   }
 
+  function raycastBuilding(cx, cy) {
+    setMouseFromEvent(cx, cy);
+    raycaster.setFromCamera(mouse, camera);
+    for (const building of (world.buildings || [])) {
+      if (!building.group) continue;
+      const meshes = [];
+      building.group.updateMatrixWorld(true);
+      building.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
+      if (raycaster.intersectObjects(meshes, true).length > 0) return building;
+    }
+    return null;
+  }
+
   function clearSelection() {
     selected.forEach((u) => { u.setSelected(false); ringFor(u).visible = false; });
     selected.clear(); world.ui.setSelectedCount(0);
@@ -150,7 +164,14 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   world.ui.onConfirmYes(() => {
     if (!ghostBuilding) return;
     world.resources.wood -= 100;
-    ghostBuilding.place(); world.buildings.push(ghostBuilding);
+    ghostBuilding.place();
+    world.buildings.push(ghostBuilding);
+    const pos = ghostBuilding.group.position;
+    world.socket.emit('placeBuilding', {
+      type: 'townCenter',
+      x: pos.x,
+      z: pos.z
+    });
     ghostBuilding = null; awaitingConfirm = false;
     world.ui.hideConfirm(); world.ui.showToast('Town Center placed! (-100 wood)');
   });
@@ -202,6 +223,14 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
       });
       return;
     }
+    const building = raycastBuilding(e.clientX, e.clientY);
+    if (building) {
+      if (building.type === 'townCenter') {
+        showTownCenterModal(building);
+      }
+      return;
+    }
+
     const u = raycastUnit(e.clientX, e.clientY) || nearestUnit(e.clientX, e.clientY, 35);
     if (u) { if (!e.shiftKey) clearSelection(); addToSelection(u); }
     else if (!e.shiftKey) clearSelection();
