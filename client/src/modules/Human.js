@@ -622,6 +622,23 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
         }
       } else moving=true;
     }
+    // AUTO-TASK: Continue searching if task is still active but target is null
+    else if (autoTask==='chop'&&!chopTarget) {
+      const next=findNearest(world,'chop');
+      if (next) chopTarget=next;
+    }
+    else if (autoTask==='stone'&&!stoneTarget) {
+      const next=findNearest(world,'stone');
+      if (next) stoneTarget=next;
+    }
+    else if (autoTask==='gold'&&!goldTarget) {
+      const next=findNearest(world,'gold');
+      if (next) goldTarget=next;
+    }
+    else if (autoTask==='hunt'&&!animalTarget) {
+      const next=getNextHuntTarget(world);
+      if (next) animalTarget=next;
+    }
 
     if (moving) walkPose(dt); else modelHolder.position.y*=0.7;
     if (!chopActive) { axeRot.x+=(axeRestRot.x-axeRot.x)*0.3; axeRot.y+=(axeRestRot.y-axeRot.y)*0.3; axeRot.z+=(axeRestRot.z-axeRot.z)*0.3; }
