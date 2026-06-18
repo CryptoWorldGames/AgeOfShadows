@@ -215,6 +215,14 @@ io.on('connection', (socket) => {
     console.log(`[CHAT] ${data.playerName}: ${data.message}`);
   });
 
+  socket.on('resourceSync', (data) => {
+    const player = world.players[socket.id];
+    if (player && data.resources) {
+      player.resources = data.resources;
+      console.log(`[SYNC] ${player.name} resources:`, data.resources);
+    }
+  });
+
   socket.on('disconnect', async () => {
     const player = world.players[socket.id];
     if (player) {

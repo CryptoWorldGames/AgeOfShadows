@@ -48,16 +48,8 @@ export default function GameScene({ auth }) {
     };
   }, []);
 
-  if (checkingOrientation) {
-    return (
-      <div style={{ width: '100vw', height: '100vh', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8a84b', fontSize: '16px' }}>
-        Loading...
-      </div>
-    );
-  }
-
   useEffect(() => {
-    if (!containerRef.current || !auth) return;
+    if (checkingOrientation || !containerRef.current || !auth) return;
 
     const socket = io('/', { reconnection: true });
 
@@ -99,26 +91,21 @@ export default function GameScene({ auth }) {
       containerRef.current.appendChild(renderer.domElement);
 
       const env = createEnvironment(scene);
-      const ui = createUI(auth.displayName || auth.email, null, auth.displayName);
+      const playerName = auth.displayName || auth.email.split('@')[0];
+      sessionStorage.setItem('playerName', playerName);
+      const ui = createUI(playerName, null, playerName);
       showChatPanel(socket);
 
-      // Add game info panel (version & title) - top left
+      // Add game info panel (version & title) - top left, with inventory below
       const gameInfo = document.createElement('div');
-      gameInfo.style.cssText = `position:absolute;top:14px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:12px 16px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);`;
+      gameInfo.style.cssText = `position:absolute;top:14px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);min-width:130px;`;
       gameInfo.innerHTML = `
-        <div style="color:#c8a84b;font-weight:700;font-size:14px;margin-bottom:4px;letter-spacing:1px;">AGE OF SHADOWS</div>
-        <div style="opacity:0.7;font-size:11px;margin-bottom:8px;">v2.12</div>
-        <button id="game-logout-btn" style="width:100%;padding:6px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">Logout</button>
+        <div style="color:#c8a84b;font-weight:700;font-size:13px;margin-bottom:2px;letter-spacing:1px;">AGE OF SHADOWS</div>
+        <div style="opacity:0.7;font-size:10px;margin-bottom:8px;">v2.14</div>
+        <button id="inv-btn-inline" style="width:100%;padding:5px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">📦 Inventory</button>
+        <button id="game-logout-btn" style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">Logout</button>
       `;
       document.body.appendChild(gameInfo);
-
-      document.getElementById('game-logout-btn').onclick = () => {
-        if (confirm('Logout?')) {
-          localStorage.removeItem('auth');
-          sessionStorage.removeItem('adminToken');
-          window.location.href = '/';
-        }
-      };
 
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
 
@@ -128,12 +115,21 @@ export default function GameScene({ auth }) {
         stones: [], golds: [], resources, ui, pondPosition: env.pondPosition
       };
 
-      // Add inventory button
-      const invBtn = document.createElement('button');
-      invBtn.style.cssText = `position:absolute;top:14px;left:80px;padding:10px 14px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:6px;color:#c8a84b;cursor:pointer;font-weight:600;font-size:11px;font-family:'Segoe UI',sans-serif;z-index:100;`;
-      invBtn.textContent = '📦 Inventory';
-      invBtn.onclick = () => showInventoryModal(world.resources);
-      document.body.appendChild(invBtn);
+      document.getElementById('inv-btn-inline').onclick = () => showInventoryModal(world.resources);
+
+      document.getElementById('game-logout-btn').onclick = () => {
+        if (confirm('Logout?')) {
+          const logoutBtn = document.getElementById('game-logout-btn');
+          logoutBtn.disabled = true;
+          logoutBtn.textContent = 'Saving...';
+          socket.emit('resourceSync', { resources: world.resources });
+          setTimeout(() => {
+            localStorage.removeItem('auth');
+            sessionStorage.removeItem('adminToken');
+            window.location.href = '/';
+          }, 4000);
+        }
+      };
 
       if (joinData.player.units && joinData.player.units.length > 0) {
         joinData.player.units.forEach(u => {
@@ -198,6 +194,11 @@ export default function GameScene({ auth }) {
         world.buildings.push(building);
       });
 
+      const syncInterval = setInterval(() => {
+        socket.emit('resourceSync', { resources: world.resources });
+        console.log('[AUTOSAVE] Syncing resources:', world.resources);
+      }, 5000);
+
       const { update, dispose } = createControls(camera, renderer, scene, world);
       let last = performance.now(); let time = 0;
       const animate = () => {
@@ -244,6 +245,7 @@ export default function GameScene({ auth }) {
       window.addEventListener('resize', handleResize);
 
       return () => {
+        clearInterval(syncInterval);
         window.removeEventListener('resize', handleResize);
         dispose();
         if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
@@ -255,7 +257,15 @@ export default function GameScene({ auth }) {
     return () => {
       socket.disconnect();
     };
-  }, [auth]);
+  }, [auth, checkingOrientation]);
+
+  if (checkingOrientation) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: 'linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8a84b', fontSize: '16px' }}>
+        Loading...
+      </div>
+    );
+  }
 
   if (!auth) {
     return (
