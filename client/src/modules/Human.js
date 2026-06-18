@@ -341,7 +341,8 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     // HP/Hunger/Thirst deduction: 100% per 24 hours = 0.0694% per minute
     const deductRate = 0.00694 * dt; // per second
     const nearHome = world.buildings && world.buildings[0];
-    const distToHome = nearHome ? Math.sqrt((group.position.x - nearHome.getPosition().x)**2 + (group.position.z - nearHome.getPosition().z)**2) : Infinity;
+    const homePos = nearHome ? (nearHome.getPosition ? nearHome.getPosition() : nearHome.position) : null;
+    const distToHome = homePos ? Math.sqrt((group.position.x - homePos.x)**2 + (group.position.z - homePos.z)**2) : Infinity;
     const inHouse = distToHome < 15; // Safe zone around town center
 
     if (inHouse) {
@@ -360,7 +361,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     if (!inHouse && (hunger <= 5 || thirst <= 5 || hp <= 5)) {
       if (!returning) {
         returning = true;
-        target = nearHome ? nearHome.getPosition() : group.position;
+        target = homePos || group.position;
         depositTarget = nearHome;
         chopTarget = null;
         animalTarget = null;
