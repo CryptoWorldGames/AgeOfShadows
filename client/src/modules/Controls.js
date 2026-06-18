@@ -13,7 +13,11 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   controls.maxDistance = 150;
   controls.enableZoom = true;
   if (isMobile) {
-    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+    try {
+      controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    } catch (e) {
+      console.warn('Touch config failed:', e);
+    }
   }
   if (isMobile && playerStartPos) {
     controls.target.copy(playerStartPos);
