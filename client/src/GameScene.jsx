@@ -378,21 +378,40 @@ export default function GameScene({ auth }) {
     );
   }
 
+  const toggleOrientation = async () => {
+    const goLandscape = isPortrait;
+    try {
+      // Orientation lock requires fullscreen on most mobile browsers.
+      if (goLandscape && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen().catch(() => {});
+      }
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock(goLandscape ? 'landscape' : 'portrait');
+      } else {
+        alert('Your phone blocks auto-rotate. Please use your phone’s rotation toggle.');
+      }
+      if (!goLandscape && document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen().catch(() => {});
+      }
+    } catch (e) {
+      alert('Rotation locked by phone settings. Enable auto-rotate, then try again.');
+    }
+  };
+
   return (
     <>
       <div ref={containerRef} style={{ width:'100%', height:'100vh', overflow:'hidden' }} />
-      {isMobile && isPortrait && (
-        <div style={{
-          position:'fixed', top:0, left:0, right:0, zIndex:99,
-          background:'rgba(10, 10, 10, 0.95)', borderBottom:'2px solid #c8a84b',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          color:'#c8a84b', fontFamily:"'Georgia',serif", padding:'8px 16px',
-          fontSize:'13px', textAlign:'center', pointerEvents:'none'
+      {isMobile && (
+        <button onClick={toggleOrientation} style={{
+          position:'fixed', bottom:'10px', left:'50%', transform:'translateX(-50%)', zIndex:1000,
+          background:'rgba(10,10,10,0.92)', border:'2px solid #c8a84b', borderRadius:'20px',
+          color:'#c8a84b', fontFamily:"'Georgia',serif", padding:'8px 18px',
+          fontSize:'13px', fontWeight:700, cursor:'pointer', display:'flex',
+          alignItems:'center', gap:'8px', boxShadow:'0 2px 10px rgba(0,0,0,0.5)'
         }}>
-          <div style={{ marginRight:'8px', fontSize:'16px', animation:'rotateHint 1.8s ease-in-out infinite' }}>📱</div>
-          <div>Best played in landscape mode — turn your phone sideways</div>
-          <style>{`@keyframes rotateHint { 0%,100%{transform:rotate(0deg);} 50%{transform:rotate(90deg);} }`}</style>
-        </div>
+          <span style={{ fontSize:'16px' }}>🔄</span>
+          {isPortrait ? 'Rotate to Landscape' : 'Back to Portrait'}
+        </button>
       )}
     </>
   );

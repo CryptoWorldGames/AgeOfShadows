@@ -6,6 +6,16 @@ const MODEL_URL = 'https://pub-9e79279ca165496da153d64ecb88f99c.r2.dev/balkan__c
 const SKIN_MATS = ['tm_balkan_v2_head_varianta.001'];
 
 let audioCtx = null;
+// Resolve a world object's position whether it exposes position() as a method
+// (buildings), getPosition() (legacy), a Vector3 property, or .group.position.
+function resolvePos(obj) {
+  if (!obj) return null;
+  if (typeof obj.position === 'function') return obj.position();
+  if (typeof obj.getPosition === 'function') return obj.getPosition();
+  if (obj.position && typeof obj.position.x === 'number') return obj.position;
+  if (obj.group && obj.group.position) return obj.group.position;
+  return null;
+}
 function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -256,7 +266,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     (world.buildings||[]).forEach((b) => {
       if (!b.storage) return;
       if (type && b.type !== type) return;
-      const p = b.getPosition ? b.getPosition() : b.position;
+      const p = resolvePos(b);
       if (!p) return;
       const d = Math.sqrt((p.x - me.x) ** 2 + (p.z - me.z) ** 2);
       if (d < bestDist) { bestDist = d; best = b; }
@@ -269,11 +279,11 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     let house = null, townCenter = null;
     (world.buildings || []).forEach((b) => {
       if (!b.storage) return;
-      const p = b.getPosition ? b.getPosition() : b.position;
+      const p = resolvePos(b);
       if (!p) return;
       const d = Math.sqrt((p.x - me.x) ** 2 + (p.z - me.z) ** 2);
-      if (b.type === 'house' && (!house || d < Math.sqrt((house.getPosition ? house.getPosition() : house.position).x ** 2))) house = b;
-      if (b.type === 'townCenter' && (!townCenter || d < Math.sqrt((townCenter.getPosition ? townCenter.getPosition() : townCenter.position).x ** 2))) townCenter = b;
+      if (b.type === 'house' && !house) house = b;
+      if (b.type === 'townCenter' && !townCenter) townCenter = b;
     });
     if (house) return house;
     return townCenter;
@@ -341,7 +351,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     // HP/Hunger/Thirst deduction: 100% per 24 hours = 0.0694% per minute
     const deductRate = 0.00694 * dt; // per second
     const nearHome = world.buildings && world.buildings[0];
-    const homePos = nearHome ? (nearHome.getPosition ? nearHome.getPosition() : nearHome.position) : null;
+    const homePos = resolvePos(nearHome);
     const distToHome = homePos ? Math.sqrt((group.position.x - homePos.x)**2 + (group.position.z - homePos.z)**2) : Infinity;
     const inHouse = distToHome < 15; // Safe zone around town center
 
@@ -424,7 +434,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     }
 
     if (returning&&depositTarget) {
-      const dp=depositTarget.getPosition?depositTarget.getPosition():depositTarget.position;
+      const dp=resolvePos(depositTarget);
       if (dp) {
         if (!isFull()&&autoTask==='hunt') {
           const nearMeat=(world.animals||[]).find((a)=>{
