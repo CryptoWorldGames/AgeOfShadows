@@ -194,6 +194,52 @@ export default function GameScene({ auth }) {
         world.buildings.push(building);
       });
 
+      // Other players: render and update their units
+      const otherPlayers = {};
+
+      function addOtherPlayer(playerId, player) {
+        if (playerId === world.playerId || otherPlayers[playerId]) return;
+        const units = [];
+        (player.units || []).forEach(u => {
+          const human = createHuman(scene, { x: u.x, y: 0, z: u.z }, { team: u.team || 'blue' });
+          units.push(human);
+        });
+        otherPlayers[playerId] = units;
+      }
+
+      function removeOtherPlayer(playerId) {
+        if (!otherPlayers[playerId]) return;
+        otherPlayers[playerId].forEach(u => scene.remove(u.group));
+        delete otherPlayers[playerId];
+      }
+
+      socket.on('playerJoined', ({ playerId, player }) => {
+        addOtherPlayer(playerId, player);
+      });
+
+      socket.on('playerLeft', ({ playerId }) => {
+        removeOtherPlayer(playerId);
+      });
+
+      socket.on('worldUpdate', (data) => {
+        if (!data.players) return;
+        Object.entries(data.players).forEach(([pId, player]) => {
+          if (pId === world.playerId) return;
+          if (!otherPlayers[pId]) {
+            addOtherPlayer(pId, player);
+          } else {
+            (player.units || []).forEach((u, i) => {
+              const mesh = otherPlayers[pId][i];
+              if (mesh) mesh.group.position.set(u.x, 0, u.z);
+            });
+          }
+        });
+        // Remove players that left
+        Object.keys(otherPlayers).forEach(pId => {
+          if (!data.players[pId]) removeOtherPlayer(pId);
+        });
+      });
+
       const syncInterval = setInterval(() => {
         socket.emit('resourceSync', { resources: world.resources });
         console.log('[AUTOSAVE] Syncing resources:', world.resources);
@@ -230,6 +276,7 @@ export default function GameScene({ auth }) {
         world.golds.forEach((g) => g.update(dt));
         world.animals.forEach((a) => a.update(dt, world));
         world.units.forEach((u) => { u.update(dt, world); u.animate(dt); });
+        Object.values(otherPlayers).forEach(units => units.forEach(u => u.animate(dt)));
         ui.setResources(world.resources);
         renderer.render(scene, camera);
       };
@@ -246,6 +293,7 @@ export default function GameScene({ auth }) {
 
       return () => {
         clearInterval(syncInterval);
+        Object.keys(otherPlayers).forEach(removeOtherPlayer);
         window.removeEventListener('resize', handleResize);
         dispose();
         if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {

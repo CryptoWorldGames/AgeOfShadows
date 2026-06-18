@@ -236,21 +236,13 @@ export function createUI(playerId, gameState, displayName) {
   if (displayName) {
     const loginPanel = document.createElement('div');
     loginPanel.id = 'login-panel';
-    loginPanel.style.cssText = `position:absolute;top:14px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:12px 16px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdropFilter:blur(4px)`;
+    loginPanel.style.cssText = `position:absolute;top:14px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);min-width:120px;`;
     loginPanel.innerHTML = `
-      <div style="opacity:0.7;margin-bottom:6px;">👤 Playing as</div>
-      <div style="color:#c8a84b;font-weight:600;margin-bottom:8px;word-break:break-all;">${displayName}</div>
-      <button id="settings-btn" style="width:100%;padding:6px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:11px;font-weight:600;margin-bottom:6px;">⚙️ Settings</button>
-      <button id="logout-btn" style="width:100%;padding:6px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:11px;font-weight:600;">Logout</button>
+      <div style="opacity:0.7;font-size:10px;margin-bottom:4px;">👤 Playing as</div>
+      <div style="color:#c8a84b;font-weight:600;margin-bottom:8px;word-break:break-all;font-size:11px;">${displayName}</div>
+      <button id="settings-btn" style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">⚙️ Settings</button>
     `;
     document.body.appendChild(loginPanel);
-
-    document.getElementById('logout-btn').onclick = () => {
-      if (confirm('Logout?')) {
-        localStorage.removeItem('auth');
-        window.location.href = '/';
-      }
-    };
 
     document.getElementById('settings-btn').onclick = () => {
       showSettingsPanel(displayName);
@@ -296,7 +288,7 @@ export function createUI(playerId, gameState, displayName) {
   document.body.appendChild(selDiv);
 
   const buildBar = document.createElement('div');
-  buildBar.style.cssText = `position:absolute;top:14px;left:14px;z-index:100;`;
+  buildBar.style.cssText = `position:absolute;top:150px;left:14px;z-index:100;`;
   const tcButton = document.createElement('button');
   tcButton.id = 'tc-button';
   tcButton.innerHTML = '🏛️<div style="font-size:9px;margin-top:2px;">Town Center<br><span style="color:#e8c84a;">100 🪵</span></div>';
@@ -323,12 +315,12 @@ export function createUI(playerId, gameState, displayName) {
   const DEFAULT_TRACK = 7;
 
   const musicTab = document.createElement('div');
-  musicTab.style.cssText = `position:absolute;top:14px;right:14px;background:rgba(0,0,0,0.65);border-radius:8px;border:1px solid rgba(255,255,255,0.15);padding:6px 12px;z-index:101;font-family:'Segoe UI',sans-serif;color:#fff;font-size:13px;font-weight:600;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;`;
+  musicTab.style.cssText = `position:absolute;top:110px;right:14px;background:rgba(0,0,0,0.65);border-radius:8px;border:1px solid rgba(255,255,255,0.15);padding:6px 12px;z-index:101;font-family:'Segoe UI',sans-serif;color:#fff;font-size:13px;font-weight:600;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;`;
   musicTab.innerHTML = `🎵 <span id="music-tab-label">Music</span>`;
   document.body.appendChild(musicTab);
 
   const musicPanel = document.createElement('div');
-  musicPanel.style.cssText = `position:absolute;top:48px;right:14px;background:rgba(0,0,0,0.88);border-radius:10px;border:1px solid rgba(255,255,255,0.15);padding:12px;z-index:100;font-family:'Segoe UI',sans-serif;color:#fff;width:224px;display:none;`;
+  musicPanel.style.cssText = `position:absolute;top:148px;right:14px;background:rgba(0,0,0,0.88);border-radius:10px;border:1px solid rgba(255,255,255,0.15);padding:12px;z-index:100;font-family:'Segoe UI',sans-serif;color:#fff;width:224px;display:none;`;
 
   const topRow = document.createElement('div');
   topRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
