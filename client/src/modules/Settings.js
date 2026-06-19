@@ -1,4 +1,34 @@
 export const SETTINGS = {
+  // ============ COMBAT SYSTEM ============
+  // Relationship: Attack × Swings = Total Damage = Enemy HP
+  // Example: Man (10 attack) × 10 swings = 100 damage = Deer (100 HP)
+  //
+  // UNIT (Player Man)
+  //   - HP: 100
+  //   - Attack Power: 10 (damage per swing)
+  //   - Work Damage: 0.1 per swing (exertion/fatigue)
+  //   - Total work swings before health depleted: ~1000 swings = full work day
+  //   - Critical Health: 5% (5 HP remaining triggers retreat)
+  //   - Regeneration: Scales by missing HP (1 hour at 1%, 30 min at 50%)
+  //
+  // ANIMALS
+  //   Chicken:
+  //     - HP: 10
+  //     - Attack Power: 1 (damage per counter-attack)
+  //     - Swings to kill from man: 1 swing (10 damage > 10 HP)
+  //
+  //   Deer:
+  //     - HP: 100
+  //     - Attack Power: 2 (damage per counter-attack)
+  //     - Swings to kill from man: 10 swings (10 damage × 10 = 100 HP)
+  //
+  // BALANCE RATIOS
+  //   - 1 Deer kill (10 swings) = 10% work day
+  //   - Deer (2 dmg) × 50 hits needed to kill man (100 HP)
+  //   - Chicken (1 dmg) × 100 hits needed to kill man
+  //   - Blood splat: every 3 hits (visual feedback)
+  //   - Attack sound: on each counter-attack (audio feedback)
+  //
   tree: { hitsToKill: 10, hitsPerResource: 10, yield: 10, pickupInterval: 1.0, respawnTime: 900 },
   stone: { hitsToKill: 50, hitsPerResource: 20, yield: 10, pickupInterval: 1.0, respawnTime: 7200 },
   gold: { hitsToKill: 100, hitsPerResource: 40, yield: 10, pickupInterval: 1.0, respawnTime: 10800 },

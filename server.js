@@ -118,7 +118,27 @@ setInterval(() => {
 
       // Each work tick = ~1 swing action
       // Take 0.1 damage per swing regardless of task
+      const oldHealth = unit.health;
       unit.health = Math.max(0, unit.health - 0.1);
+
+      // Track hits for visual feedback (every 3 hits = blood splat)
+      if (!unit.hitCount) unit.hitCount = 0;
+      unit.hitCount++;
+
+      // Trigger effects every 3 hits
+      if (unit.hitCount % 3 === 0) {
+        // Emit to client: damage taken, show blood splat and play sound
+        const socketId = Object.keys(socketUserMap).find(sid =>
+          world.players[sid]?.units?.includes(unit)
+        );
+        if (socketId) {
+          io.to(socketId).emit('unitDamage', {
+            unitIndex: world.players[socketId].units.indexOf(unit),
+            health: unit.health,
+            splat: true // show blood splat every 3 hits
+          });
+        }
+      }
     });
   });
 }, 5000); // Every 5 seconds (each tick = 1 swing)

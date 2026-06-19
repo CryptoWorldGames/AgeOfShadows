@@ -301,6 +301,53 @@ export default function GameScene({ auth }) {
         world.ui.showToast(msg);
       });
 
+      // Play attack sound and show blood splat on damage
+      socket.on('unitDamage', (data) => {
+        if (!world.units[data.unitIndex]) return;
+
+        // Play attack sound (beep/impact noise)
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+          osc.frequency.value = 400 + Math.random() * 200; // 400-600 Hz impact sound
+          gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+          osc.start(audioContext.currentTime);
+          osc.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+          // Audio context not available, skip sound
+        }
+
+        // Show blood splat effect every 3 hits
+        if (data.splat) {
+          const unit = world.units[data.unitIndex];
+          const splat = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.5, 0.5),
+            new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.7 })
+          );
+          splat.position.copy(unit.group.position);
+          splat.position.y += 1.5;
+          splat.rotation.y = Math.random() * Math.PI * 2;
+          scene.add(splat);
+
+          // Fade and remove after 0.3 seconds
+          let t = 0;
+          const removeSplat = () => {
+            t += 0.016; // ~60 FPS
+            if (t >= 0.3) {
+              scene.remove(splat);
+            } else {
+              splat.material.opacity = 0.7 * (1 - t / 0.3);
+              requestAnimationFrame(removeSplat);
+            }
+          };
+          removeSplat();
+        }
+      });
+
       socket.on('treeUpdate', (tree) => {
         const t = world.trees.find(x => x.id === tree.id);
         if (t) { t.hp = tree.hp; t.wood = tree.wood; t.state = tree.state; }
