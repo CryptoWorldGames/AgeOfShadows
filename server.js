@@ -159,23 +159,47 @@ setInterval(() => {
 
       // If currently working
       if (unit.isWorking && !pastWorkLimit) {
-        // Simulate work: gather 1 food per tick, take 0.5 damage per tick (simulate combat/exertion)
-        unit.carrying.food += 1;
-        unit.health = Math.max(0, unit.health - 0.5);
+        // Gather resources based on task type with weight-based carrying
+        if (!unit.carrying) unit.carrying = {};
+        if (!unit.carryingWeight) unit.carryingWeight = 0;
 
-        // Auto-deposit when full
-        if (unit.carrying.food >= 100) {
+        const resourceWeights = { food: 1, wood: 2, stone: 3, gold: 25 };
+        const gatherRates = { hunt: 'food', wood: 'wood', stone: 'stone', gold: 'gold' };
+        const resourceType = gatherRates[unit.taskType] || 'food';
+
+        // Gather amounts: food/wood/stone = 1/tick, gold = 0.2/tick (rare, slow)
+        const gatherAmount = (resourceType === 'gold') ? 0.2 : 1;
+        unit.carrying[resourceType] = (unit.carrying[resourceType] || 0) + gatherAmount;
+
+        // Calculate total weight being carried
+        unit.carryingWeight = 0;
+        Object.entries(unit.carrying).forEach(([type, amount]) => {
+          unit.carryingWeight += amount * (resourceWeights[type] || 1);
+        });
+
+        unit.health = Math.max(0, unit.health - 0.1);
+
+        // Auto-deposit when weight capacity full (100 weight units)
+        // Food: 100 food (1 weight each)
+        // Gold: 4 gold (25 weight each)
+        if (unit.carryingWeight >= 100) {
           const house = world.buildings.find(b => b.ownerId === player.id && b.type === 'house');
+          const deposit = unit.carrying;
           if (house) {
             house.storage = house.storage || {};
-            house.storage.food = (house.storage.food || 0) + unit.carrying.food;
+            Object.entries(deposit).forEach(([type, amount]) => {
+              house.storage[type] = (house.storage[type] || 0) + amount;
+            });
           } else {
             const tc = world.townCenterLedger = world.townCenterLedger || { ledger: {} };
             tc.ledger[player.id] = tc.ledger[player.id] || { name: player.name };
-            const stored = Math.floor(unit.carrying.food * 0.5);
-            tc.ledger[player.id].food = (tc.ledger[player.id].food || 0) + stored;
+            Object.entries(deposit).forEach(([type, amount]) => {
+              const stored = Math.floor(amount * 0.5); // 50% tax
+              tc.ledger[player.id][type] = (tc.ledger[player.id][type] || 0) + stored;
+            });
           }
-          unit.carrying.food = 0;
+          unit.carrying = {};
+          unit.carryingWeight = 0;
         }
 
         // Critical health: retreat to house
@@ -430,7 +454,8 @@ io.on('connection', (socket) => {
     unit.taskType = data.task; // 'hunt', 'wood', 'stone', 'gold', etc.
     unit.workStartTime = Date.now();
     unit.health = 100;
-    unit.carrying = { food: 0 };
+    unit.carrying = {};
+    unit.carryingWeight = 0;
     unit.isRegenerating = false;
 
     socket.emit('toast', `Unit started ${data.task} (24 hour shift)`);

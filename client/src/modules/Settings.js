@@ -38,7 +38,20 @@ export const SETTINGS = {
   drain: { foodInterval: 2160, waterInterval: 2160 },
   unit: {
     speed: 2.4, swingInterval: 0.7, chopRange: 1.8, gatherRange: 2.5,
-    carryMax: 100, huntRadius: 8
+    carryCapacity: 100,  // Weight units, not item count
+    huntRadius: 8
+  },
+  // Resource weights (affects carrying capacity)
+  // carryCapacity 100 = different hauls depending on resource
+  // Food: 1 weight → 100 food per trip (fast farming)
+  // Wood: 2 weight → 50 wood per trip (medium)
+  // Stone: 3 weight → 33 stone per trip (slow)
+  // Gold: 25 weight → 4 gold per trip (very slow, rare)
+  resourceWeights: {
+    food: 1,      // Light, abundant
+    wood: 2,      // Medium
+    stone: 3,     // Heavy
+    gold: 25      // Very heavy, rare (100 capacity / 25 weight = 4 pieces max)
   },
   building: {
     townCenter: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 30, label: 'Town Center', storageMax: 100000 },
