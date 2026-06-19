@@ -382,9 +382,9 @@ io.on('connection', (socket) => {
 
   socket.on('setUnitTask', (data) => {
     const player = world.players[socket.id];
-    if (!player || !data.unitId || !data.task) return;
+    if (!player || data.unitIndex === undefined || !data.task) return;
 
-    const unit = player.units.find(u => u.id === data.unitId);
+    const unit = player.units[data.unitIndex];
     if (!unit) return;
 
     unit.isWorking = true;
@@ -395,7 +395,7 @@ io.on('connection', (socket) => {
     unit.isRegenerating = false;
 
     socket.emit('toast', `Unit started ${data.task} (24 hour shift)`);
-    console.log(`[TASK] Unit set to ${data.task} for 24 hours`);
+    console.log(`[TASK] Unit ${data.unitIndex} set to ${data.task} for 24 hours`);
   });
 
   socket.on('disconnect', async () => {

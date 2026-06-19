@@ -133,6 +133,12 @@ export default function GameScene({ auth }) {
         <div style="opacity:0.7;font-size:10px;margin-bottom:8px;">v2.14</div>
         <button id="inv-btn-inline" style="width:100%;padding:5px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">📦 Inventory</button>
         <button id="build-unit-btn" style="width:100%;padding:5px;background:rgba(100,200,75,0.15);border:1px solid rgba(100,200,75,0.5);border-radius:4px;color:#64c84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">👤 Build Man (10F)</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:5px;">
+          <button id="task-hunt-btn" style="padding:4px;background:rgba(255,100,100,0.15);border:1px solid rgba(255,100,100,0.5);border-radius:3px;color:#ff6464;cursor:pointer;font-size:9px;font-weight:600;">🎯 Hunt</button>
+          <button id="task-wood-btn" style="padding:4px;background:rgba(150,100,50,0.15);border:1px solid rgba(150,100,50,0.5);border-radius:3px;color:#d4a574;cursor:pointer;font-size:9px;font-weight:600;">🪓 Wood</button>
+          <button id="task-stone-btn" style="padding:4px;background:rgba(180,180,180,0.15);border:1px solid rgba(180,180,180,0.5);border-radius:3px;color:#b0b0b0;cursor:pointer;font-size:9px;font-weight:600;">⛏ Stone</button>
+          <button id="task-gold-btn" style="padding:4px;background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.5);border-radius:3px;color:#ffd700;cursor:pointer;font-size:9px;font-weight:600;">💛 Gold</button>
+        </div>
         <button id="game-logout-btn" style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">Logout</button>
       `;
       document.body.appendChild(gameInfo);
@@ -150,6 +156,20 @@ export default function GameScene({ auth }) {
       document.getElementById('build-unit-btn').onclick = () => {
         socket.emit('buildUnit', {});
       };
+
+      const setUnitTask = (task) => {
+        if (world.units.length === 0) {
+          world.ui.showToast('No units to command');
+          return;
+        }
+        // Send first unit index to server
+        socket.emit('setUnitTask', { unitIndex: 0, task });
+      };
+
+      document.getElementById('task-hunt-btn').onclick = () => setUnitTask('hunt');
+      document.getElementById('task-wood-btn').onclick = () => setUnitTask('wood');
+      document.getElementById('task-stone-btn').onclick = () => setUnitTask('stone');
+      document.getElementById('task-gold-btn').onclick = () => setUnitTask('gold');
 
       document.getElementById('game-logout-btn').onclick = () => {
         if (confirm('Logout?')) {
