@@ -105,6 +105,8 @@ export default function GameScene({ auth }) {
       const env = createEnvironment(scene);
       const playerName = auth.displayName || auth.email.split('@')[0];
       sessionStorage.setItem('playerName', playerName);
+      sessionStorage.setItem('displayName', auth.displayName || 'Player');
+      sessionStorage.setItem('userEmail', auth.email);
       const ui = createUI(playerName, null, playerName);
       showChatPanel(socket);
 

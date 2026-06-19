@@ -185,7 +185,37 @@ export function showChatPanel(socket) {
     const input = document.getElementById('chat-input');
     const msg = input.value.trim();
     if (!msg) return;
-    socket.emit('chat', { message: msg, playerName: sessionStorage.getItem('playerName') || 'Player' });
+
+    // Handle admin commands
+    if (msg.startsWith('/admin')) {
+      const adminToken = sessionStorage.getItem('adminToken');
+      if (!adminToken) {
+        const msgEl = document.createElement('div');
+        msgEl.style.cssText = `margin-bottom:6px;padding:4px;background:rgba(255,0,0,0.2);border-radius:3px;color:#ff6b6b;`;
+        msgEl.textContent = '❌ Admin commands disabled. Not authenticated as admin.';
+        messagesDiv.appendChild(msgEl);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        input.value = '';
+        return;
+      }
+
+      const parts = msg.split(' ');
+      if (parts[1] === 'give' && parts[2]) {
+        const amount = parseInt(parts[2]) || 1000;
+        // Send admin command to server
+        socket.emit('adminCommand', { command: 'give', amount, token: adminToken });
+        const msgEl = document.createElement('div');
+        msgEl.style.cssText = `margin-bottom:6px;padding:4px;background:rgba(0,255,0,0.1);border-radius:3px;color:#00ff88;`;
+        msgEl.textContent = `📊 Admin: Requesting ${amount} of each resource...`;
+        messagesDiv.appendChild(msgEl);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+      input.value = '';
+      return;
+    }
+
+    const displayName = sessionStorage.getItem('playerName') || sessionStorage.getItem('displayName') || 'Player';
+    socket.emit('chat', { message: msg, playerName: displayName });
     input.value = '';
   };
 
@@ -283,13 +313,13 @@ function showSettingsPanel(displayName, email = '') {
       <h2 style="margin:0 0 20px;color:#c8a84b;font-size:20px;">Settings & Profile</h2>
 
       <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Nickname (shown to other players)</label>
-        <input type="text" id="settings-nickname" value="${displayName}" disabled style="width:100%;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#fff;font-size:13px;box-sizing:border-box;font-weight:600;"/>
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Display Name (shown to other players)</label>
+        <input type="text" id="settings-nickname" value="${displayName}" style="width:100%;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.3);border-radius:4px;color:#fff;font-size:13px;box-sizing:border-box;font-weight:600;"/>
       </div>
 
       <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Email (account login)</label>
-        <input type="email" id="settings-email" value="${email}" disabled style="width:100%;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#ccc;font-size:13px;box-sizing:border-box;"/>
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Email (account login - full address)</label>
+        <input type="email" id="settings-email" value="${email}" disabled style="width:100%;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#ccc;font-size:13px;box-sizing:border-box;word-break:break-all;"/>
       </div>
 
       <div style="margin-bottom:16px;">
