@@ -623,7 +623,7 @@ export default function GameScene({ auth }) {
 
   return (
     <>
-      <div ref={containerRef} style={{ width:'100%', height:'100vh', overflow:'hidden' }} />
+      <div ref={containerRef} style={{ width:'100%', height:'100vh', overflow:'hidden', userSelect:'none', WebkitUserSelect:'none', WebkitTouchCallout:'none' }} onContextMenu={(e) => e.preventDefault()} />
       {isMobile && (
         <button onClick={toggleOrientation} style={{
           position:'fixed', top:'8px', right:'8px', zIndex:10000,

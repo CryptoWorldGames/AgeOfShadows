@@ -167,6 +167,35 @@ setInterval(() => {
         const gatherRates = { hunt: 'food', wood: 'wood', stone: 'stone', gold: 'gold' };
         const resourceType = gatherRates[unit.taskType] || 'food';
 
+        // Auto-find target resource if none exists or current is depleted
+        if (!unit.targetResourceId || !unit.targetResourceType) {
+          // Search for available resource using spiral pattern
+          let foundResource = null;
+          const searchRadius = 100;
+
+          if (resourceType === 'food') {
+            // For hunting, look for animals (limit by distance from unit)
+            foundResource = world.animals && world.animals.length > 0
+              ? world.animals[Math.floor(Math.random() * world.animals.length)]
+              : null;
+          } else if (resourceType === 'wood') {
+            foundResource = world.trees.find(t => t.state === 'standing' && t.wood > 0);
+          } else if (resourceType === 'stone') {
+            foundResource = world.stones && world.stones.length > 0
+              ? world.stones.find(s => s && s.hp && s.hp > 0)
+              : null;
+          } else if (resourceType === 'gold') {
+            foundResource = world.golds && world.golds.length > 0
+              ? world.golds.find(g => g && g.hp && g.hp > 0)
+              : null;
+          }
+
+          if (foundResource) {
+            unit.targetResourceId = foundResource.id;
+            unit.targetResourceType = resourceType;
+          }
+        }
+
         // Gather amounts: food/wood/stone = 1/tick, gold = 0.2/tick (rare, slow)
         const gatherAmount = (resourceType === 'gold') ? 0.2 : 1;
         unit.carrying[resourceType] = (unit.carrying[resourceType] || 0) + gatherAmount;
