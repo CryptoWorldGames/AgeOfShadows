@@ -165,7 +165,9 @@ export default function GameScene({ auth }) {
 
       if (joinData.player.units && joinData.player.units.length > 0) {
         joinData.player.units.forEach(u => {
-          world.units.push(createHuman(scene, { x: u.x, y: 0, z: u.z }, { team: u.team || 'red' }));
+          const human = createHuman(scene, { x: u.x, y: 0, z: u.z }, { team: u.team || 'red' });
+          human.serverId = u.id;   // remember the server unit id so we can sync his position
+          world.units.push(human);
         });
       } else {
         // Spawn clearly in front of Town Center, visible to camera looking from +Z at (0,20,28)
@@ -235,23 +237,21 @@ export default function GameScene({ auth }) {
       defaultTownCenter.ownerId = 'server';
       world.buildings.push(defaultTownCenter);
 
-      // Safety: shove any unit that spawned inside the Town Center footprint out
-      // to the FRONT (south, +z) so the man stands clearly in front of the Town
-      // Center — where the starting camera looks from — and never buried in a wall
-      // or behind the building (which made the camera clip into the roof).
+      // Safety ONLY: if a unit's restored position lands literally inside the Town
+      // Center footprint (e.g. a brand-new spawn at the map origin), nudge it just
+      // clear of the wall. We intentionally do NOT relocate units that are already
+      // out in the world — their saved position must be respected so a refresh
+      // resumes the worker where he was instead of teleporting him home.
       (() => {
         const tcPos = defaultTownCenter.position();
         const wall = (defaultTownCenter.radius || 6) * 0.75; // collision wall
-        const clearDist = wall + 3.0; // stand this far in front of center
         world.units.forEach((u, i) => {
           const p = u.group.position;
-          const dz = p.z - tcPos.z;
-          // If the unit is inside the footprint OR on the far (north) side, move
-          // it to the front of the Town Center so it's always visible.
-          if (dz < clearDist) {
+          const inside = Math.sqrt((p.x - tcPos.x) ** 2 + (p.z - tcPos.z) ** 2) < wall;
+          if (inside) {
             const spread = (i - (world.units.length - 1) / 2) * 2.0; // line them up
             p.x = tcPos.x + spread;
-            p.z = tcPos.z + clearDist;
+            p.z = tcPos.z + wall + 3.0; // step out the front
           }
         });
       })();
@@ -318,10 +318,24 @@ export default function GameScene({ auth }) {
         });
       });
 
-      const syncInterval = setInterval(() => {
-        socket.emit('resourceSync', { resources: world.resources });
-        console.log('[AUTOSAVE] Syncing resources:', world.resources);
-      }, 5000);
+      // Resources are now the server-authoritative stockpile (the server saves them
+      // periodically and on disconnect), so the client no longer pushes its local
+      // total — that old sync clobbered the real stockpile and lost deposited wood.
+      // Keep the stockpile fresh from the server instead.
+      socket.on('depositResult', ({ stockpile }) => {
+        if (stockpile) world.resources = stockpile;
+      });
+
+      // Report each of our workers' positions to the server so it persists WHERE he
+      // is. Without this the server only knows his spawn point, so a refresh would
+      // teleport him home. (Server-side movement itself comes in the next milestone.)
+      const posSyncInterval = setInterval(() => {
+        world.units.forEach((u) => {
+          if (!u.serverId || !u.group) return;
+          const p = u.group.position;
+          socket.emit('unitMove', { unitId: u.serverId, x: p.x, z: p.z });
+        });
+      }, 1500);
 
       let update = () => {}, dispose = () => {};
       try {
@@ -405,7 +419,7 @@ export default function GameScene({ auth }) {
       window.addEventListener('resize', handleResize);
 
       gameCleanup = () => {
-        clearInterval(syncInterval);
+        clearInterval(posSyncInterval);
         Object.keys(otherPlayers).forEach(removeOtherPlayer);
         window.removeEventListener('resize', handleResize);
         dispose();

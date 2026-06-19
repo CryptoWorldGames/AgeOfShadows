@@ -7,6 +7,7 @@ const path = require('path');
 const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerData, createPasswordResetToken, resetPassword, verifyEmail, updateUserProfile, deleteUserAccount } = require('./auth');
 const { isEmailConfigured } = require('./email');
 const { initializeDatabase } = require('./database');
+const worldsim = require('./worldsim');
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
 
@@ -29,7 +30,7 @@ const io = new Server(server, {
 });
 
 const world = {
-  trees: generateTrees(20),
+  trees: worldsim.generateTrees(),   // ONE shared, server-owned forest for everyone
   buildings: [],
   players: {}
 };
@@ -53,30 +54,6 @@ function checkRateLimit(ip) {
   return true;
 }
 
-function generateTrees(n) {
-  const trees = [];
-  const used = [];
-  let attempts = 0;
-  while (trees.length < n && attempts < 200) {
-    attempts++;
-    const x = (Math.random() - 0.5) * 120;
-    const z = (Math.random() - 0.5) * 120;
-    if (Math.sqrt(x*x + z*z) < 8) continue;
-    let tooClose = false;
-    for (const s of used) {
-      if (Math.sqrt((x-s.x)**2 + (z-s.z)**2) < 5) { tooClose = true; break; }
-    }
-    if (tooClose) continue;
-    used.push({ x, z });
-    trees.push({
-      id: `tree_${trees.length}`,
-      x, z, hp: 10, maxHp: 10,
-      wood: 10, state: 'standing', respawnTimer: 0
-    });
-  }
-  return trees;
-}
-
 function createPlayerUnits(socketId, count = 1) {
   const spawnX = (Math.random() - 0.5) * 20;
   const spawnZ = (Math.random() - 0.5) * 20;
@@ -93,28 +70,32 @@ function createPlayerUnits(socketId, count = 1) {
   return units;
 }
 
+// Authoritative tree clock: advance fall->woodpile and respawn transitions, and
+// broadcast just the trees that changed so every client sees the same forest.
 setInterval(() => {
-  let changed = false;
-  world.trees.forEach((t) => {
-    if (t.state === 'respawning') {
-      t.respawnTimer += 0.5;
-      if (t.respawnTimer >= 60) {
-        t.hp = 10; t.wood = 10;
-        t.state = 'standing'; t.respawnTimer = 0;
-        changed = true;
-      }
-    }
-  });
-  if (changed) io.emit('worldUpdate', { trees: world.trees });
-}, 500);
+  const changed = worldsim.tickTrees(world.trees);
+  if (changed.length) io.emit('treesUpdate', changed);
+}, 250);
 
+// Regular world snapshot (unit positions, players, buildings) for everyone.
 setInterval(() => {
   io.emit('worldUpdate', {
-    trees: world.trees,
     players: world.players,
     buildings: world.buildings
   });
 }, 100);
+
+// Periodic autosave: persist every connected player's stockpile/units so progress
+// survives a crash or refresh without relying on a clean disconnect.
+setInterval(() => {
+  Object.keys(world.players).forEach((sid) => {
+    const player = world.players[sid];
+    const userId = socketUserMap[sid];
+    if (!player || !userId) return;
+    savePlayerData(userId, player.resources, player.units, player.buildings || [])
+      .catch((err) => console.error(`[AUTOSAVE] ${player.name}:`, err.message));
+  });
+}, 30000);
 
 io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
@@ -177,27 +158,30 @@ io.on('connection', (socket) => {
     if (unit) { unit.x = data.x; unit.z = data.z; }
   });
 
+  // A swing at a tree. Server is authoritative: it decrements hp, assigns
+  // ownership to the feller, and broadcasts so EVERY player sees it fall.
   socket.on('chopTree', (data) => {
     const tree = world.trees.find(t => t.id === data.treeId);
-    if (!tree || tree.state !== 'standing') return;
-    tree.hp -= 1;
-    if (tree.hp <= 0) {
-      tree.hp = 0; tree.state = 'falling';
-      setTimeout(() => { tree.state = 'woodpile'; io.emit('treeUpdate', tree); }, 2000);
-    }
-    io.emit('treeUpdate', tree);
+    const player = world.players[socket.id];
+    if (!tree || !player) return;
+    const changed = worldsim.chopTree(tree, player);
+    if (changed) io.emit('treesUpdate', [tree]);
   });
 
+  // Take one wood from a felled pile. Ownership is enforced: only the feller may
+  // gather it for the first 5 minutes; after that anyone can grab it.
   socket.on('gatherWood', (data) => {
     const tree = world.trees.find(t => t.id === data.treeId);
     const player = world.players[socket.id];
-    if (!tree || !player || tree.state !== 'woodpile' || tree.wood <= 0) return;
-    const got = Math.min(1, tree.wood);
-    tree.wood -= got;
-    player.resources.wood += got;
-    if (tree.wood <= 0) { tree.state = 'respawning'; tree.respawnTimer = 0; }
-    socket.emit('resourceUpdate', player.resources);
-    io.emit('treeUpdate', tree);
+    if (!tree || !player) return;
+    const got = worldsim.gatherWood(tree, player);
+    if (got > 0) {
+      socket.emit('woodGathered', { treeId: tree.id, unitId: data.unitId, amount: got });
+      io.emit('treesUpdate', [tree]);
+    } else if (tree.state === 'woodpile') {
+      // Denied — it isn't theirs yet. Tell them whose it is so the client can react.
+      socket.emit('gatherDenied', { treeId: tree.id, ownerName: tree.ownerName });
+    }
   });
 
   socket.on('placeBuilding', (data) => {
@@ -216,36 +200,25 @@ io.on('connection', (socket) => {
     io.emit('buildingPlaced', building);
   });
 
+  // Worker drops its carried load at a building. The Town Center takes a 50%
+  // tax; your own house is tax-free. The kept amount is banked into the player's
+  // PERSISTENT stockpile (player.resources) — the single source of truth that
+  // the Town Center panel shows and that gets saved to the database.
   socket.on('depositBuilding', (data) => {
     const player = world.players[socket.id];
     if (!player || !data || !data.resources) return;
 
     const isTownCenter = data.buildingType === 'townCenter';
     // Houses are private (owner only); the Town Center is public to all players.
-    let building = world.buildings.find(b => b.id === data.buildingId);
+    const building = world.buildings.find(b => b.id === data.buildingId);
     if (building && !isTownCenter && building.ownerId !== socket.id) return;
 
-    const taxRate = isTownCenter ? 0.5 : 0;
+    const banked = worldsim.applyDeposit(player.resources, data.resources, isTownCenter);
 
-    // Keep a per-player ledger on the building so it knows who deposited what.
-    // (The Town Center may live only on clients, so we track its ledger here.)
-    if (!building) building = (isTownCenter
-      ? (world.townCenterLedger = world.townCenterLedger || { id: data.buildingId, ledger: {} })
-      : null);
-    if (!building) return;
-    building.ledger = building.ledger || {};
-    const led = building.ledger[socket.id] = building.ledger[socket.id] || { name: player.name };
-
-    Object.keys(data.resources).forEach(key => {
-      const amount = data.resources[key] || 0;
-      const kept = Math.floor(amount * (1 - taxRate));
-      if (building.storage) building.storage[key] = (building.storage[key] || 0) + kept;
-      led[key] = (led[key] || 0) + kept;
-    });
-    // player.resources is kept authoritative by the 5s resourceSync, so we do
-    // not mutate it here (avoids double-counting against the client total).
-
-    console.log(`[DEPOSIT] ${player.name} -> ${isTownCenter ? 'Town Center' : 'house'} (tax ${taxRate * 100}%)`);
+    // The stockpile is authoritative — push it back so the HUD/Town Center match.
+    socket.emit('resourceUpdate', player.resources);
+    socket.emit('depositResult', { banked, isTownCenter, stockpile: player.resources });
+    console.log(`[DEPOSIT] ${player.name} banked`, banked, isTownCenter ? '(Town Center -50%)' : '(house)');
   });
 
   socket.on('chat', (data) => {
@@ -259,13 +232,10 @@ io.on('connection', (socket) => {
     console.log(`[CHAT] ${data.playerName}: ${data.message}`);
   });
 
-  socket.on('resourceSync', (data) => {
-    const player = world.players[socket.id];
-    if (player && data.resources) {
-      player.resources = data.resources;
-      console.log(`[SYNC] ${player.name} resources:`, data.resources);
-    }
-  });
+  // NOTE: the client used to push its locally-computed resource total here every
+  // 5s, which clobbered the authoritative stockpile (that's how deposited wood
+  // "disappeared"). The server now owns player.resources, so this is ignored.
+  socket.on('resourceSync', () => { /* server-authoritative: intentionally ignored */ });
 
   socket.on('disconnect', async () => {
     const player = world.players[socket.id];

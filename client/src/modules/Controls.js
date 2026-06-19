@@ -306,7 +306,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     const building = raycastBuilding(e.clientX, e.clientY);
     if (building) {
       if (building.type === 'townCenter') {
-        showTownCenterModal(building);
+        showTownCenterModal(building, world.resources);
       }
       return;
     }
@@ -425,7 +425,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         playOk();
         return;
       }
-      if (building.type === 'townCenter' || building.isTownCenter) showTownCenterModal(building);
+      if (building.type === 'townCenter' || building.isTownCenter) showTownCenterModal(building, world.resources);
       return;
     }
     const tappedUnit = raycastUnit(cx, cy) || nearestUnit(cx, cy, 40);

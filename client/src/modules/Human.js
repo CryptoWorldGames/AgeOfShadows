@@ -347,18 +347,12 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     updateWorldResources(world);
   }
 
-  function updateWorldResources(world) {
-    const totals={wood:0,stone:0,gold:0,food:0,water:0};
-    (world.buildings||[]).forEach((b)=>{
-      if (!b.storage) return;
-      Object.keys(totals).forEach((k)=>{totals[k]+=(b.storage[k]||0);});
-    });
-    (world.units||[]).forEach((u)=>{
-      if (!u.inventory) return;
-      Object.keys(totals).forEach((k)=>{totals[k]+=(u.inventory[k]||0);});
-    });
-    Object.keys(totals).forEach((k)=>{world.resources[k]=totals[k];});
-  }
+  // The player's spendable total (world.resources) is now the SERVER-authoritative
+  // stockpile, updated via the socket 'resourceUpdate' event when a worker deposits.
+  // We intentionally no longer recompute it from local building storage + carried
+  // loads — that local recompute was overwriting the real stockpile with a tiny
+  // number, which is why deposited wood appeared to vanish.
+  function updateWorldResources() { /* server-authoritative: no-op */ }
 
   function getNextHuntTarget(world) {
     if (lastKillPos) {

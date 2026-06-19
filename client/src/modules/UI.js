@@ -118,7 +118,7 @@ export function showBuildMenu(onBuildSelect) {
   document.getElementById('build-stone-fence').onclick = () => { onBuildSelect('stoneFence'); modal.remove(); };
 }
 
-export function showTownCenterModal(building) {
+export function showTownCenterModal(building, stockpile) {
   const existingModal = document.getElementById('town-center-modal');
   if (existingModal) existingModal.remove();
 
@@ -126,27 +126,30 @@ export function showTownCenterModal(building) {
   modal.id = 'town-center-modal';
   modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
 
-  const storage = building.storage || {};
-  const storageUsed = Object.values(storage).reduce((a,b)=>a+b,0);
-  const storageMax = building.storageMax || 100000;
-  const storagePercent = Math.round((storageUsed / storageMax) * 100);
+  // Show the player's OWN persistent stockpile (the server-authoritative bank
+  // that deposits land in). This is "MY RESOURCES" — what you've banked here.
+  const stock = stockpile || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
+  const ICONS = { wood: '🪵', food: '🍖', water: '💧', gold: '💰', stone: '⛏️' };
+  const order = ['wood', 'food', 'water', 'stone', 'gold'];
+  const banked = order.reduce((a, k) => a + (stock[k] || 0), 0);
 
-  const resGrid = Object.keys(storage).map(res =>
+  const resGrid = order.map(res =>
     `<div style="padding:10px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;">
-      <div style="font-size:10px;opacity:0.7;">${res.toUpperCase()}</div>
-      <div style="font-size:16px;font-weight:600;color:#c8a84b;">${storage[res]}</div>
+      <div style="font-size:10px;opacity:0.7;">${ICONS[res] || ''} ${res.toUpperCase()}</div>
+      <div style="font-size:18px;font-weight:700;color:#c8a84b;">${Math.floor(stock[res] || 0)}</div>
     </div>`
   ).join('');
 
   modal.innerHTML = `
     <div style="background:rgba(0,0,0,0.95);border:2px solid #ffd700;border-radius:12px;padding:24px;width:90%;max-width:500px;color:#fff;font-family:'Segoe UI',sans-serif;">
       <h2 style="margin:0 0 8px;color:#ffd700;font-size:22px;text-align:center;">🏛️ TOWN CENTER</h2>
-      <div style="text-align:center;margin-bottom:20px;padding:12px;background:rgba(255,215,0,0.1);border-radius:6px;border:1px solid rgba(255,215,0,0.3);">
-        <div style="font-size:12px;color:#ffd700;font-weight:700;margin-bottom:8px;">⚠️ 50% TAX ON DEPOSITS</div>
-        <div style="font-size:11px;opacity:0.8;margin-bottom:12px;">Build your own house to store items without paying tax!</div>
-        <div style="font-size:10px;opacity:0.7;">Storage: ${storageUsed}/${storageMax} (${storagePercent}%)</div>
+      <div style="text-align:center;font-size:13px;color:#fff;margin-bottom:14px;">Your banked resources</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin-bottom:16px;">${resGrid}</div>
+      <div style="text-align:center;margin-bottom:18px;padding:10px;background:rgba(255,215,0,0.1);border-radius:6px;border:1px solid rgba(255,215,0,0.3);">
+        <div style="font-size:12px;color:#ffd700;font-weight:700;margin-bottom:4px;">⚠️ 50% TAX ON DEPOSITS</div>
+        <div style="font-size:11px;opacity:0.8;">Workers depositing here keep only half. Build your own house to store tax-free.</div>
+        <div style="font-size:10px;opacity:0.6;margin-top:6px;">Total banked: ${Math.floor(banked)}</div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin-bottom:20px;">${resGrid}</div>
       <button id="close-town-center" style="width:100%;padding:12px;background:rgba(255,215,0,0.2);border:1px solid #ffd700;border-radius:4px;color:#ffd700;font-weight:600;cursor:pointer;">Close</button>
     </div>
   `;
