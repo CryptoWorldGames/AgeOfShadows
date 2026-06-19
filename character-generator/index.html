@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Age of Shadows — Character Generator</title>
+<style>
+  :root{
+    --bg:#15171c; --panel:#1c1f27; --panel2:#232733; --line:#2e3340;
+    --text:#e6e8ee; --muted:#9aa3b2; --accent:#c79a4b; --accent2:#7ec8e3;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+  #app{display:flex;height:100%}
+  #stage{position:relative;flex:1;min-width:0}
+  #canvas-host{position:absolute;inset:0}
+  #hud{position:absolute;left:14px;top:12px;font-size:12px;color:var(--muted);
+    background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px;pointer-events:none;line-height:1.5}
+  #hud b{color:var(--text)}
+  #panel{width:330px;background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;height:100%}
+  #panel header{padding:14px 16px;border-bottom:1px solid var(--line)}
+  #panel header h1{margin:0;font-size:16px;letter-spacing:.5px}
+  #panel header p{margin:4px 0 0;font-size:11px;color:var(--muted)}
+  #scroll{overflow-y:auto;padding:10px 14px 24px;flex:1}
+  .group{margin:8px 0 14px}
+  .group>.gtitle{font-size:11px;text-transform:uppercase;letter-spacing:.8px;
+    color:var(--accent);margin:0 0 8px;font-weight:700}
+  .row{margin:9px 0}
+  .row label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px}
+  .row label .val{color:var(--text);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent);height:18px}
+  input[type=color]{width:100%;height:30px;border:1px solid var(--line);
+    background:var(--panel2);border-radius:6px;cursor:pointer;padding:2px}
+  .btns{display:flex;flex-wrap:wrap;gap:6px}
+  .btns button{flex:1 1 auto;min-width:64px;background:var(--panel2);color:var(--text);
+    border:1px solid var(--line);border-radius:7px;padding:8px 6px;font-size:12px;cursor:pointer;transition:.12s}
+  .btns button:hover{border-color:var(--accent)}
+  .btns button.active{background:var(--accent);color:#15171c;border-color:var(--accent);font-weight:700}
+  .toggle{display:flex;align-items:center;justify-content:space-between;font-size:12px;
+    padding:7px 0;color:var(--muted)}
+  .switch{position:relative;width:42px;height:22px}
+  .switch input{display:none}
+  .slider{position:absolute;inset:0;background:#3a3f4c;border-radius:22px;cursor:pointer;transition:.15s}
+  .slider:before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;
+    background:#fff;border-radius:50%;transition:.15s}
+  .switch input:checked + .slider{background:var(--accent)}
+  .switch input:checked + .slider:before{transform:translateX(20px)}
+  .actions{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+  .actions button{flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);font-size:12px;cursor:pointer;font-weight:600}
+  .actions button.primary{background:var(--accent);color:#15171c;border-color:var(--accent)}
+  #toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
+    background:rgba(0,0,0,.8);color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;
+    opacity:0;transition:.25s;pointer-events:none}
+  #toast.show{opacity:1}
+  .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
+  select{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:6px;padding:7px;font-size:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="canvas-host"></div>
+    <div id="hud">
+      <b>Age of Shadows — Character Generator</b><br>
+      Left-drag: rotate &nbsp;•&nbsp; Right-drag: pan &nbsp;•&nbsp; Scroll: zoom
+    </div>
+    <div id="toast"></div>
+  </div>
+
+  <div id="panel">
+    <header>
+      <h1>Character Generator</h1>
+      <p>Live preview — tweak, then we bake it into the game.</p>
+    </header>
+    <div id="scroll"></div>
+    <div class="actions">
+      <button id="resetBtn">Reset</button>
+      <button id="copyBtn" class="primary">Copy Config</button>
+      <button id="shotBtn">Snapshot</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from './vendor/OrbitControls.js';
+
+/* ============================================================
+   STATE — every customizable value lives here
+   ============================================================ */
+const DEFAULTS = {
+  height: 1.80,      // metres
+  build: 1.00,       // limb thickness multiplier (skinny..muscular)
+  belly: 0.00,       // torso girth / weight
+  shoulders: 1.00,   // shoulder width
+  headSize: 1.00,
+  skin: '#c68642',
+  hairStyle: 'short',// none | short | long | mohawk
+  hairColor: '#2b1d12',
+  beard: 'none',     // none | stubble | full
+  tunic: '#5a4632',
+  tunicStyle: 'tunic', // tunic | shirtless | armor
+  pants: '#3b3128',
+  boots: '#2a1f17',
+  belt: true,
+  cape: false,
+  capeColor: '#6e2b2b',
+  eyeColor: '#3b2a18',
+  weapon: 'none',    // none | sword | axe | pick
+  anim: 'walk',      // idle | walk
+  walkSpeed: 1.6,
+  autoSpin: false,
+  showGrid: true,
+  bgColor: '#1b2330',
+};
+let S = structuredClone(DEFAULTS);
+
+/* ============================================================
+   THREE.JS SCENE
+   ============================================================ */
+const host = document.getElementById('canvas-host');
+const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+host.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(S.bgColor);
+scene.fog = new THREE.Fog(S.bgColor, 14, 36);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+camera.position.set(2.6, 1.7, 4.4);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 1.6;
+controls.maxDistance = 14;
+controls.maxPolarAngle = Math.PI * 0.92;
+controls.target.set(0, 1.0, 0);
+
+// Lights
+const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x3a3326, 0.9);
+scene.add(hemi);
+const key = new THREE.DirectionalLight(0xfff2dd, 1.5);
+key.position.set(4, 8, 5);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+key.shadow.camera.left = -6; key.shadow.camera.right = 6;
+key.shadow.camera.top = 6; key.shadow.camera.bottom = -6;
+key.shadow.bias = -0.0004;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x88aaff, 0.5);
+rim.position.set(-5, 4, -4);
+scene.add(rim);
+
+// Ground
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(20, 64),
+  new THREE.MeshStandardMaterial({ color:0x2c3322, roughness:1 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const grid = new THREE.GridHelper(40, 40, 0x4a5568, 0x39414f);
+grid.material.opacity = 0.35; grid.material.transparent = true;
+scene.add(grid);
+
+/* ============================================================
+   PROCEDURAL HUMAN RIG
+   Joints are Object3D pivots; limb meshes hang from them so a
+   rotation on the joint swings the whole limb about that joint.
+   ============================================================ */
+const character = new THREE.Group();
+scene.add(character);
+let RIG = null;        // holds joint references for animation
+let walkPhase = 0;     // kept continuous across rebuilds
+
+function mat(color, rough=0.85, metal=0.0){
+  return new THREE.MeshStandardMaterial({ color:new THREE.Color(color), roughness:rough, metalness:metal });
+}
+
+// A limb: pivot at the TOP, capsule hangs DOWN by `len`.
+function limb(parent, x, y, z, len, radius, material){
+  const joint = new THREE.Object3D();
+  joint.position.set(x, y, z);
+  parent.add(joint);
+  const geo = new THREE.CapsuleGeometry(radius, Math.max(0.001,len - radius*2), 6, 12);
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.position.y = -len/2;
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  joint.add(mesh);
+  return joint;
+}
+
+function box(parent, x,y,z, w,h,d, material){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), material);
+  m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true;
+  parent.add(m); return m;
+}
+
+function disposeGroup(g){
+  g.traverse(o=>{ if(o.geometry) o.geometry.dispose();
+    if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose()); } });
+}
+
+function buildCharacter(){
+  // clear
+  while(character.children.length) character.remove(character.children[0]);
+  if (RIG && RIG.root) disposeGroup(RIG.root);
+
+  const s = S.height / 1.80;                 // global scale from height
+  const t = S.build;                          // limb thickness
+  const skinMat = mat(S.skin, 0.65);
+  const tunicMat = mat(S.tunic, 0.9);
+  const pantsMat = mat(S.pants, 0.92);
+  const bootMat  = mat(S.boots, 0.7);
+  const hairMat  = mat(S.hairColor, 0.85);
+
+  const root = new THREE.Group();
+  character.add(root);
+
+  // --- proportions (metres, before scale) ---
+  const thighLen = 0.45, shinLen = 0.45, footLen = 0.26;
+  const hipW = 0.11 * (1 + S.belly*0.15);
+  const pelvisY = thighLen + shinLen + 0.14;   // hip height so boots rest on ground
+
+  const pelvis = new THREE.Object3D();
+  pelvis.position.y = pelvisY;
+  root.add(pelvis);
+
+  // pelvis block
+  box(pelvis, 0, 0, 0, 0.30*S.shoulders*0.8, 0.18, 0.20*(1+S.belly*0.25), pantsMat);
+
+  // ---- Torso chain ----
+  const torsoMat = (S.tunicStyle === 'shirtless') ? skinMat : tunicMat;
+  const lowerLen = 0.26, chestLen = 0.30;
+  const spine = new THREE.Object3D();          // pivot at pelvis top
+  spine.position.y = 0.09;
+  pelvis.add(spine);
+  // lower torso
+  box(spine, 0, lowerLen/2, 0, 0.32*(1+S.belly*0.5), lowerLen, 0.22*(1+S.belly*0.5), torsoMat);
+
+  const chest = new THREE.Object3D();
+  chest.position.y = lowerLen;
+  spine.add(chest);
+  const chestW = 0.40 * S.shoulders * (0.9 + t*0.15);
+  box(chest, 0, chestLen/2, 0, chestW, chestLen, 0.24*(1+S.belly*0.3), torsoMat);
+  if (S.tunicStyle === 'armor'){
+    box(chest, 0, chestLen/2, 0.01, chestW*1.05, chestLen*0.95, 0.26*(1+S.belly*0.3), mat('#5b6470',0.4,0.7));
+    box(chest, 0, chestLen*0.85, 0, chestW*1.08, 0.06, 0.27, mat('#7d8794',0.4,0.7));
+  }
+
+  // belt
+  if (S.belt){
+    box(spine, 0, 0.02, 0, 0.34*(1+S.belly*0.5), 0.06, 0.24*(1+S.belly*0.5), mat('#241a12',0.6));
+    box(spine, 0, 0.02, 0.13, 0.07, 0.07, 0.03, mat('#caa64b',0.4,0.6));
+  }
+
+  // ---- Neck + Head ----
+  const neck = new THREE.Object3D();
+  neck.position.y = chestLen;
+  chest.add(neck);
+  box(neck, 0, 0.05, 0, 0.10, 0.10, 0.10, skinMat);
+
+  const head = new THREE.Object3D();
+  head.position.y = 0.10;
+  neck.add(head);
+  const hsz = 0.135 * S.headSize;
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(hsz, 24, 20), skinMat);
+  skull.scale.set(0.92, 1.06, 0.96);
+  skull.position.y = hsz*0.9;
+  skull.castShadow = true;
+  head.add(skull);
+  // jaw
+  box(head, 0, hsz*0.45, hsz*0.18, hsz*1.2, hsz*0.7, hsz*1.1, skinMat);
+  // nose
+  box(head, 0, hsz*0.85, hsz*0.95, 0.03, 0.05, 0.05, skinMat);
+  // eyes
+  const eyeMat = mat(S.eyeColor, 0.3);
+  const eyeW = mat('#f2efe6',0.3);
+  for(const sx of [-1,1]){
+    const e = new THREE.Mesh(new THREE.SphereGeometry(hsz*0.16,12,10), eyeW);
+    e.position.set(sx*hsz*0.4, hsz*1.0, hsz*0.82); head.add(e);
+    const ir = new THREE.Mesh(new THREE.SphereGeometry(hsz*0.07,10,8), eyeMat);
+    ir.position.set(sx*hsz*0.4, hsz*1.0, hsz*0.94); head.add(ir);
+  }
+
+  // hair
+  if (S.hairStyle !== 'none'){
+    if (S.hairStyle === 'short'){
+      const h = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.02,20,16,0,Math.PI*2,0,Math.PI*0.62), hairMat);
+      h.scale.set(0.95,1.05,0.98); h.position.y = hsz*0.95; head.add(h);
+    } else if (S.hairStyle === 'long'){
+      const h = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.04,20,16,0,Math.PI*2,0,Math.PI*0.6), hairMat);
+      h.scale.set(0.97,1.05,1.0); h.position.y = hsz*0.95; head.add(h);
+      box(head, 0, hsz*0.35, -hsz*0.7, hsz*1.6, hsz*1.6, hsz*0.4, hairMat); // back length
+    } else if (S.hairStyle === 'mohawk'){
+      box(head, 0, hsz*1.4, 0, hsz*0.3, hsz*0.8, hsz*1.7, hairMat);
+    }
+  }
+  // beard
+  if (S.beard !== 'none'){
+    const d = S.beard === 'full' ? hsz*0.55 : hsz*0.18;
+    box(head, 0, hsz*0.35, hsz*0.55, hsz*1.15, hsz*0.9, d, hairMat);
+  }
+
+  // ---- Arms ----
+  const armR = 0.052 * t;
+  const upperLen = 0.30, foreLen = 0.28;
+  const shoulderX = chestW*0.55;
+  const shoulderY = chestLen*0.85;
+  const arms = {};
+  for(const side of ['L','R']){
+    const sx = side==='L' ? -1 : 1;
+    const sleeveMat = (S.tunicStyle === 'shirtless') ? skinMat : tunicMat;
+    const shoulder = limb(chest, sx*shoulderX, shoulderY, 0, upperLen, armR*1.15, sleeveMat);
+    const elbow = limb(shoulder, 0, -upperLen, 0, foreLen, armR, skinMat);
+    // hand
+    const hand = new THREE.Object3D();
+    hand.position.y = -foreLen;
+    elbow.add(hand);
+    box(hand, 0, -0.05, 0, armR*2.2, 0.11, armR*1.8, skinMat);
+    arms[side] = { shoulder, elbow, hand };
+  }
+
+  // ---- Legs ----
+  const legR = 0.07 * t;
+  const legs = {};
+  for(const side of ['L','R']){
+    const sx = side==='L' ? -1 : 1;
+    const hip = limb(pelvis, sx*hipW, -0.06, 0, thighLen, legR, pantsMat);
+    const knee = limb(hip, 0, -thighLen, 0, shinLen, legR*0.85, pantsMat);
+    // foot
+    const ankle = new THREE.Object3D();
+    ankle.position.y = -shinLen;
+    knee.add(ankle);
+    box(ankle, 0, -0.04, footLen*0.28, 0.12, 0.08, footLen, bootMat);
+    legs[side] = { hip, knee, ankle };
+  }
+
+  // ---- Cape ----
+  let cape = null;
+  if (S.cape){
+    cape = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.85, 4, 6),
+      new THREE.MeshStandardMaterial({ color:new THREE.Color(S.capeColor), roughness:0.9, side:THREE.DoubleSide }));
+    cape.position.set(0, chestLen*0.7, -0.14);
+    cape.castShadow = true;
+    chest.add(cape);
+  }
+
+  // ---- Weapon (attached to right hand) ----
+  if (S.weapon !== 'none'){
+    const w = buildWeapon(S.weapon);
+    arms.R.hand.add(w);
+  }
+
+  root.scale.setScalar(s);
+  RIG = { root, pelvis, spine, chest, neck, head, arms, legs, cape };
+}
+
+function buildWeapon(kind){
+  const g = new THREE.Group();
+  // grip sits in the hand, blade points away
+  const steel = mat('#b9c0c9', 0.35, 0.85);
+  const dark  = mat('#3a2a1c', 0.7);
+  const woodH = mat('#6b4a2b', 0.8);
+  if (kind === 'sword'){
+    box(g, 0, 0.0, 0, 0.035, 0.16, 0.035, woodH);          // handle
+    box(g, 0, 0.10, 0, 0.18, 0.03, 0.04, steel);            // guard
+    box(g, 0, 0.46, 0, 0.05, 0.62, 0.02, steel);            // blade
+    box(g, 0, -0.10, 0, 0.06, 0.06, 0.06, mat('#caa64b',0.4,0.7)); // pommel
+  } else if (kind === 'axe'){
+    box(g, 0, 0.05, 0, 0.04, 0.62, 0.04, woodH);            // haft
+    const head = box(g, 0.0, 0.40, 0.0, 0.04, 0.22, 0.04, steel);
+    const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.05,16,1,false,-0.5,1.6), steel);
+    blade.rotation.z = Math.PI/2; blade.position.set(0.0, 0.42, 0.1);
+    g.add(blade);
+  } else if (kind === 'pick'){
+    box(g, 0, 0.05, 0, 0.04, 0.66, 0.04, woodH);            // handle
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.012,0.7,8), steel);
+    head.rotation.x = Math.PI/2; head.position.set(0,0.42,0); head.rotation.z=0;
+    head.geometry.rotateZ(Math.PI/2);
+    g.add(head);
+    // slight curve tips
+    box(g, 0.32, 0.42, 0, 0.06, 0.03, 0.03, steel);
+    box(g, -0.32,0.42, 0, 0.06, 0.03, 0.03, steel);
+  }
+  // orient so it's gripped in the fist, pointing forward/up
+  g.position.set(0, -0.08, 0.04);
+  g.rotation.x = -Math.PI*0.5;
+  return g;
+}
+
+/* ============================================================
+   ANIMATION
+   ============================================================ */
+function animateRig(dt){
+  if (!RIG) return;
+  const holding = S.weapon !== 'none';
+
+  if (S.anim === 'walk'){
+    walkPhase += dt * S.walkSpeed * 3.4;
+    const p = walkPhase;
+    const swing = 0.62, armSwing = 0.5, kneeBend = 0.9;
+
+    // legs (opposite phase)
+    RIG.legs.L.hip.rotation.x = Math.sin(p) * swing;
+    RIG.legs.R.hip.rotation.x = Math.sin(p + Math.PI) * swing;
+    RIG.legs.L.knee.rotation.x = Math.max(0, -Math.sin(p - 0.4)) * kneeBend;
+    RIG.legs.R.knee.rotation.x = Math.max(0, -Math.sin(p + Math.PI - 0.4)) * kneeBend;
+    RIG.legs.L.ankle.rotation.x = Math.cos(p)*0.2;
+    RIG.legs.R.ankle.rotation.x = Math.cos(p+Math.PI)*0.2;
+
+    // arms (opposite to same-side leg)
+    if (holding){
+      // right arm holds weapon shouldered, left arm swings normally
+      RIG.arms.R.shoulder.rotation.x = -0.5 + Math.sin(p)*0.05;
+      RIG.arms.R.elbow.rotation.x = -1.7;
+      RIG.arms.R.shoulder.rotation.z = -0.12;
+      RIG.arms.L.shoulder.rotation.x = Math.sin(p)*armSwing;
+      RIG.arms.L.elbow.rotation.x = -0.25 - Math.max(0,Math.sin(p))*0.3;
+    } else {
+      RIG.arms.L.shoulder.rotation.x = Math.sin(p)*armSwing;
+      RIG.arms.R.shoulder.rotation.x = Math.sin(p+Math.PI)*armSwing;
+      RIG.arms.L.elbow.rotation.x = -0.2 - Math.max(0,Math.sin(p))*0.3;
+      RIG.arms.R.elbow.rotation.x = -0.2 - Math.max(0,Math.sin(p+Math.PI))*0.3;
+      RIG.arms.R.shoulder.rotation.z = 0;
+    }
+    // body bob + sway
+    RIG.root.position.y = Math.abs(Math.sin(p)) * 0.04;
+    RIG.pelvis.rotation.y = Math.sin(p)*0.08;
+    RIG.pelvis.rotation.z = Math.sin(p)*0.04;
+    RIG.chest.rotation.y = -Math.sin(p)*0.06;
+    RIG.head.rotation.y = Math.sin(p)*0.03;
+  } else {
+    // idle: gentle breathing + relaxed arms
+    walkPhase += dt;
+    const b = Math.sin(walkPhase*1.5);
+    RIG.legs.L.hip.rotation.x = 0; RIG.legs.R.hip.rotation.x = 0;
+    RIG.legs.L.knee.rotation.x = 0; RIG.legs.R.knee.rotation.x = 0;
+    RIG.legs.L.ankle.rotation.x = 0; RIG.legs.R.ankle.rotation.x = 0;
+    RIG.root.position.y = b*0.008;
+    RIG.pelvis.rotation.set(0,0,0); RIG.chest.rotation.set(0,0,0);
+    if (holding){
+      RIG.arms.R.shoulder.rotation.set(-0.5,0,-0.12);
+      RIG.arms.R.elbow.rotation.x = -1.7;
+      RIG.arms.L.shoulder.rotation.set(0.04,0,0.08);
+      RIG.arms.L.elbow.rotation.x = -0.25;
+    } else {
+      RIG.arms.L.shoulder.rotation.set(0.04 + b*0.02,0,0.10);
+      RIG.arms.R.shoulder.rotation.set(0.04 - b*0.02,0,-0.10);
+      RIG.arms.L.elbow.rotation.x = -0.18;
+      RIG.arms.R.elbow.rotation.x = -0.18;
+    }
+    RIG.head.rotation.y = Math.sin(walkPhase*0.5)*0.05;
+  }
+
+  if (RIG.cape){
+    const sway = (S.anim==='walk'? 0.25:0.06);
+    RIG.cape.rotation.x = 0.15 + Math.sin(walkPhase*2)*sway*0.3;
+  }
+}
+
+/* ============================================================
+   RENDER LOOP
+   ============================================================ */
+const clock = new THREE.Clock();
+function tick(){
+  const dt = Math.min(clock.getDelta(), 0.05);
+  animateRig(dt);
+  if (S.autoSpin) character.rotation.y += dt*0.6;
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+function resize(){
+  const w = host.clientWidth, h = host.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+
+/* ============================================================
+   APPLY visual-only changes without full rebuild where possible
+   (we just rebuild — it's cheap and keeps code simple/correct)
+   ============================================================ */
+function refreshScene(){
+  scene.background.set(S.bgColor);
+  scene.fog.color.set(S.bgColor);
+  grid.visible = S.showGrid;
+  ground.visible = S.showGrid ? true : true;
+}
+function rebuild(){ buildCharacter(); refreshScene(); }
+
+/* ============================================================
+   UI — build controls from a schema
+   ============================================================ */
+const scroll = document.getElementById('scroll');
+function el(tag, cls, html){ const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e; }
+
+function addGroup(title){ const g=el('div','group'); g.appendChild(el('div','gtitle',title)); scroll.appendChild(g); return g; }
+
+function addSlider(g, key, label, min, max, step, fmt){
+  const row = el('div','row');
+  const lab = el('label'); lab.innerHTML = `<span>${label}</span><span class="val"></span>`;
+  const val = lab.querySelector('.val');
+  const input = el('input'); input.type='range'; input.min=min; input.max=max; input.step=step; input.value=S[key];
+  const show=()=> val.textContent = fmt ? fmt(S[key]) : S[key];
+  show();
+  input.addEventListener('input', ()=>{ S[key]=parseFloat(input.value); show();
+    if (key==='walkSpeed'||key==='autoSpin') return; rebuild(); });
+  if (key==='walkSpeed') input.addEventListener('input', ()=>{ /* no rebuild needed */ });
+  row.appendChild(lab); row.appendChild(input); g.appendChild(row);
+  return input;
+}
+
+function addColor(g, key, label){
+  const row = el('div','row');
+  const lab = el('label', null, `<span>${label}</span>`);
+  const input = el('input'); input.type='color'; input.value=S[key];
+  input.addEventListener('input', ()=>{ S[key]=input.value;
+    if(key==='bgColor'){ refreshScene(); } else rebuild(); });
+  row.appendChild(lab); row.appendChild(input); g.appendChild(row);
+  return input;
+}
+
+function addButtons(g, key, label, options){
+  const row = el('div','row');
+  row.appendChild(el('label', null, `<span>${label}</span>`));
+  const wrap = el('div','btns');
+  options.forEach(([val,txt])=>{
+    const b=el('button',null,txt);
+    if(S[key]===val) b.classList.add('active');
+    b.addEventListener('click', ()=>{
+      S[key]=val;
+      wrap.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      if(key==='anim') return rebuild(); // safe
+      rebuild();
+    });
+    wrap.appendChild(b);
+  });
+  row.appendChild(wrap); g.appendChild(row);
+}
+
+function addToggle(g, key, label){
+  const t = el('div','toggle');
+  t.appendChild(el('span',null,label));
+  const sw = el('label','switch');
+  const input=el('input'); input.type='checkbox'; input.checked=!!S[key];
+  const sl=el('span','slider');
+  sw.appendChild(input); sw.appendChild(sl); t.appendChild(sw);
+  input.addEventListener('change', ()=>{ S[key]=input.checked;
+    if(key==='showGrid'){ refreshScene(); }
+    else if(key==='autoSpin'){ /* loop handles */ }
+    else rebuild();
+  });
+  g.appendChild(t);
+}
+
+function buildUI(){
+  scroll.innerHTML='';
+
+  let g = addGroup('Pose & Equipment');
+  addButtons(g, 'weapon', 'In hand', [['none','None'],['sword','Sword'],['axe','Axe'],['pick','Mining Pick']]);
+  addButtons(g, 'anim', 'Animation', [['idle','Idle'],['walk','Walking']]);
+  addSlider(g, 'walkSpeed', 'Walk speed', 0.4, 3.0, 0.1, v=>v.toFixed(1)+'x');
+
+  g = addGroup('Body');
+  addSlider(g, 'height', 'Height', 1.4, 2.1, 0.01, v=>v.toFixed(2)+' m');
+  addSlider(g, 'build', 'Build / muscle', 0.7, 1.6, 0.01, v=>Math.round(v*100)+'%');
+  addSlider(g, 'belly', 'Weight / girth', 0, 1, 0.02, v=>Math.round(v*100)+'%');
+  addSlider(g, 'shoulders', 'Shoulder width', 0.8, 1.3, 0.01, v=>Math.round(v*100)+'%');
+  addSlider(g, 'headSize', 'Head size', 0.8, 1.25, 0.01, v=>Math.round(v*100)+'%');
+  addColor(g, 'skin', 'Skin tone');
+
+  g = addGroup('Hair & Face');
+  addButtons(g, 'hairStyle', 'Hair', [['none','Bald'],['short','Short'],['long','Long'],['mohawk','Mohawk']]);
+  addColor(g, 'hairColor', 'Hair color');
+  addButtons(g, 'beard', 'Beard', [['none','None'],['stubble','Stubble'],['full','Full']]);
+  addColor(g, 'eyeColor', 'Eye color');
+
+  g = addGroup('Clothing');
+  addButtons(g, 'tunicStyle', 'Top', [['tunic','Tunic'],['armor','Armor'],['shirtless','Bare']]);
+  addColor(g, 'tunic', 'Tunic / armor color');
+  addColor(g, 'pants', 'Pants');
+  addColor(g, 'boots', 'Boots');
+  addToggle(g, 'belt', 'Belt');
+  addToggle(g, 'cape', 'Cape');
+  addColor(g, 'capeColor', 'Cape color');
+
+  g = addGroup('Scene');
+  addToggle(g, 'autoSpin', 'Auto-rotate');
+  addToggle(g, 'showGrid', 'Show ground grid');
+  addColor(g, 'bgColor', 'Background');
+}
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove('show'),1600);
+}
+document.getElementById('resetBtn').onclick = ()=>{
+  S = structuredClone(DEFAULTS); buildUI(); rebuild(); toast('Reset to defaults');
+};
+document.getElementById('copyBtn').onclick = async ()=>{
+  const json = JSON.stringify(S, null, 2);
+  try{ await navigator.clipboard.writeText(json); toast('Config copied to clipboard'); }
+  catch(e){ console.log(json); toast('Copied to console (clipboard blocked)'); }
+};
+document.getElementById('shotBtn').onclick = ()=>{
+  renderer.render(scene,camera);
+  const url = renderer.domElement.toDataURL('image/png');
+  const a=document.createElement('a'); a.href=url; a.download='aos-character.png'; a.click();
+  toast('Snapshot saved');
+};
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+buildUI();
+rebuild();
+resize();
+tick();
+window.__AOS = { get state(){return S;}, rebuild };  // handy for debugging
+</script>
+</body>
+</html>
