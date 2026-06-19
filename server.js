@@ -108,23 +108,20 @@ setInterval(() => {
   if (changed) io.emit('worldUpdate', { trees: world.trees });
 }, 500);
 
-// Combat damage - units take damage while hunting (from animal counter-attacks)
-// Average: chickens do 1 dmg, deer do 2 dmg, roughly 2-5 animals encountered per work tick
-// Simulating as ~1-2 damage per tick on average while hunting
+// Work damage - units take 0.1 damage per work swing/action
+// This represents exertion and combat while working
 setInterval(() => {
   Object.values(world.players).forEach((player) => {
     if (!player.units) return;
     player.units.forEach((unit) => {
       if (!unit.isWorking || unit.health <= 0 || !unit.taskType) return;
 
-      // Only hunting generates combat damage (animals counter-attack)
-      if (unit.taskType === 'hunt') {
-        const combatDamage = 0.5 + Math.random() * 1.5; // 0.5-2 damage per tick
-        unit.health = Math.max(0, unit.health - combatDamage);
-      }
+      // Each work tick = ~1 swing action
+      // Take 0.1 damage per swing regardless of task
+      unit.health = Math.max(0, unit.health - 0.1);
     });
   });
-}, 5000); // Every 5 seconds
+}, 5000); // Every 5 seconds (each tick = 1 swing)
 
 // Unit AI simulation - men work, hunt, defend, and regenerate
 setInterval(() => {
