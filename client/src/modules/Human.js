@@ -192,28 +192,37 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     return false;
   }
   function separate(world) {
-    if (frozen) return;
     const me=group.position;
-    world.units.forEach((o)=>{
-      if (o===unit) return;
-      let dx=me.x-o.group.position.x,dz=me.z-o.group.position.z;
+    // Soft circular separation from movable things. Skipped while frozen
+    // (actively gathering) so harvesters can stand close without jitter.
+    const softPush=(ox,oz,or)=>{
+      let dx=me.x-ox,dz=me.z-oz;
       const dist=Math.sqrt(dx*dx+dz*dz);
-      const minD=radius+o.radius;
-      if (dist>1e-4&&dist<minD) { const push=(minD-dist)*0.5; me.x+=(dx/dist)*push; me.z+=(dz/dist)*push; }
-    });
-    // Building collision: push the unit out of a building's solid footprint so
-    // it can't walk through the Town Center / houses.
+      const minD=radius+or;
+      if (dist>1e-4&&dist<minD){const p=(minD-dist)*0.5;me.x+=(dx/dist)*p;me.z+=(dz/dist)*p;}
+    };
+    if (!frozen) {
+      world.units.forEach((o)=>{ if(o===unit)return; softPush(o.group.position.x,o.group.position.z,o.radius); });
+      // Trees / stones / gold / animals are solid too — but never block the
+      // resource this unit is actively going to harvest, or it could never reach it.
+      (world.trees||[]).forEach((t)=>{ if(t===chopTarget)return; const p=t.position(); softPush(p.x,p.z,0.9); });
+      (world.stones||[]).forEach((s)=>{ if(s===stoneTarget)return; const p=s.position(); softPush(p.x,p.z,1.0); });
+      (world.golds||[]).forEach((g)=>{ if(g===goldTarget)return; const p=g.position(); softPush(p.x,p.z,1.0); });
+      (world.animals||[]).forEach((a)=>{ if(a===animalTarget)return; const p=a.position(); softPush(p.x,p.z,0.5); });
+    }
+    // HARD building collision (Town Center / houses are big SQUARES, not circles).
+    // Clamp the unit to the outside of the box so it can never enter the walls.
+    // Runs even while frozen.
     (world.buildings||[]).forEach((b)=>{
       if (b.isGhost) return;
       const bp=resolvePos(b);
       if (!bp) return;
-      const cr=(b.radius||3)*0.75; // wall footprint (~4.5 for Town Center)
+      const ext=(b.radius||3)*0.75+radius; // box half-width + unit radius
       let dx=me.x-bp.x,dz=me.z-bp.z;
-      const dist=Math.sqrt(dx*dx+dz*dz);
-      const minD=radius+cr;
-      if (dist>1e-4&&dist<minD) {
-        const push=(minD-dist)*1.5; // 1.5x force to handle high-speed penetration
-        me.x+=(dx/dist)*push; me.z+=(dz/dist)*push;
+      if (Math.abs(dx)<ext && Math.abs(dz)<ext) {
+        const penX=ext-Math.abs(dx), penZ=ext-Math.abs(dz);
+        if (penX<penZ) { me.x=bp.x+(dx>=0?ext:-ext); }
+        else { me.z=bp.z+(dz>=0?ext:-ext); }
       }
     });
   }

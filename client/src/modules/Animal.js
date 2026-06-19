@@ -9,6 +9,24 @@ const loader = new GLTFLoader();
 let chickenLoadPromise = null;
 let deerLoadPromise = null;
 
+// Keep an animal outside every building's solid square footprint.
+function clampOutOfBuildings(group, world, r = 0.6) {
+  if (!world || !world.buildings) return;
+  const me = group.position;
+  world.buildings.forEach((b) => {
+    if (b.isGhost) return;
+    const bp = (typeof b.position === 'function') ? b.position() : (b.position || null);
+    if (!bp || typeof bp.x !== 'number') return;
+    const ext = (b.radius || 3) * 0.75 + r;
+    const dx = me.x - bp.x, dz = me.z - bp.z;
+    if (Math.abs(dx) < ext && Math.abs(dz) < ext) {
+      const penX = ext - Math.abs(dx), penZ = ext - Math.abs(dz);
+      if (penX < penZ) me.x = bp.x + (dx >= 0 ? ext : -ext);
+      else me.z = bp.z + (dz >= 0 ? ext : -ext);
+    }
+  });
+}
+
 function getChickenGLTF() {
   if (chickenLoadPromise) return chickenLoadPromise;
   chickenLoadPromise = new Promise((resolve, reject) => {
@@ -160,6 +178,7 @@ export function createChicken(scene, position = { x: 0, y: 0, z: 0 }) {
       const moving = wanderTimer > 1.5;
       if (moving !== isMovingLocal) { isMovingLocal = moving; if (scaredTimer <= 0) setWalking(moving); }
       if (moving) { group.position.x += wanderDir.x*cfg.wanderSpeed*dt; group.position.z += wanderDir.z*cfg.wanderSpeed*dt; group.rotation.y = Math.atan2(wanderDir.x, wanderDir.z); }
+      clampOutOfBuildings(group, world, 0.4);
     } else if (state === 'dying') {
       dyingT += dt; const f = Math.min(1, dyingT/1.0);
       group.rotation.z = f*Math.PI/2; group.position.y = -f*0.1;
@@ -322,6 +341,7 @@ export function createDeer(scene, position = { x: 0, y: 0, z: 0 }) {
       currentRotation += diff * dt * 0.5;
       group.rotation.y = currentRotation;
     }
+    clampOutOfBuildings(group, world, 0.6);
   }
 
   return {
