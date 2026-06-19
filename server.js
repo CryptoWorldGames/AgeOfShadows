@@ -108,37 +108,77 @@ setInterval(() => {
   if (changed) io.emit('worldUpdate', { trees: world.trees });
 }, 500);
 
-// Unit work simulation - men gather resources even when players are offline
+// Unit AI simulation - men work, hunt, defend, and regenerate
 setInterval(() => {
   Object.values(world.players).forEach((player) => {
     if (!player.units) return;
     player.units.forEach((unit) => {
-      // Each unit gathers 1 food per tick (adjust rate as needed)
+      if (!unit.health) unit.health = 100;
       if (!unit.carrying) unit.carrying = { food: 0 };
 
-      // Simulate gathering: find nearby food/animals
-      // For now, just give free food (simplified - real version would check nearby resources)
-      unit.carrying.food += 1;
+      // Check if past 24-hour work limit
+      const now = Date.now();
+      const workStartTime = unit.workStartTime || now;
+      const elapsedSeconds = (now - workStartTime) / 1000;
+      const pastWorkLimit = elapsedSeconds >= 86400; // 24 hours
 
-      // Auto-deposit when full (100 capacity)
-      if (unit.carrying.food >= 100) {
-        const deposit = unit.carrying.food;
+      // If currently working
+      if (unit.isWorking && !pastWorkLimit) {
+        // Simulate work: gather 1 food per tick, take 0.5 damage per tick (simulate combat/exertion)
+        unit.carrying.food += 1;
+        unit.health = Math.max(0, unit.health - 0.5);
 
-        // Try to deposit to player's house first (no tax)
-        const house = world.buildings.find(b => b.ownerId === player.id && b.type === 'house');
-        if (house) {
-          house.storage = house.storage || {};
-          house.storage.food = (house.storage.food || 0) + deposit;
-          console.log(`[AUTO-DEPOSIT] Unit deposited ${deposit} food to house (no tax)`);
-        } else {
-          // Deposit to town center with 50% tax
-          const tc = world.townCenterLedger = world.townCenterLedger || { ledger: {} };
-          tc.ledger[player.id] = tc.ledger[player.id] || { name: player.name };
-          const stored = Math.floor(deposit * 0.5);
-          tc.ledger[player.id].food = (tc.ledger[player.id].food || 0) + stored;
-          console.log(`[AUTO-DEPOSIT] Unit deposited ${stored} food to town center (50% tax from ${deposit})`);
+        // Auto-deposit when full
+        if (unit.carrying.food >= 100) {
+          const house = world.buildings.find(b => b.ownerId === player.id && b.type === 'house');
+          if (house) {
+            house.storage = house.storage || {};
+            house.storage.food = (house.storage.food || 0) + unit.carrying.food;
+          } else {
+            const tc = world.townCenterLedger = world.townCenterLedger || { ledger: {} };
+            tc.ledger[player.id] = tc.ledger[player.id] || { name: player.name };
+            const stored = Math.floor(unit.carrying.food * 0.5);
+            tc.ledger[player.id].food = (tc.ledger[player.id].food || 0) + stored;
+          }
+          unit.carrying.food = 0;
         }
-        unit.carrying.food = 0;
+
+        // Critical health: retreat to house
+        if (unit.health <= 5) {
+          unit.isWorking = false;
+          unit.isRegenerating = true;
+          unit.regenStartTime = now;
+          console.log(`[RETREAT] Unit retreated to house (${unit.health}% HP)`);
+        }
+      } else if (unit.isWorking && pastWorkLimit) {
+        // Work time expired - stop working
+        unit.isWorking = false;
+        console.log(`[WORK-END] Unit work ended after 24 hours`);
+      }
+
+      // If idle (not working, not regenerating): lose 1 HP per hour (0.0028 per 5-sec tick)
+      if (!unit.isWorking && !unit.isRegenerating) {
+        unit.health = Math.max(0, unit.health - 0.0139); // 1 HP per hour ≈ 0.0139 per 5 seconds
+      }
+
+      // Regenerating in house: 1 hour to full health
+      if (unit.isRegenerating) {
+        const regenElapsed = (now - (unit.regenStartTime || now)) / 1000;
+        if (regenElapsed >= 3600) { // 1 hour
+          unit.health = 100;
+          unit.isRegenerating = false;
+          // Auto-resume work if still within 24 hours
+          const newElapsed = (now - workStartTime) / 1000;
+          if (newElapsed < 86400 && unit.taskType) {
+            unit.isWorking = true;
+            console.log(`[RESUME] Unit resumed ${unit.taskType} after regeneration`);
+          } else {
+            console.log(`[REGEN-DONE] Unit fully healed but work time expired`);
+          }
+        } else {
+          // Heal 100 HP over 3600 seconds = 0.0278 per 5-sec tick
+          unit.health = Math.min(100, unit.health + (100 / 3600) * 5);
+        }
       }
     });
   });
@@ -325,13 +365,37 @@ io.on('connection', (socket) => {
       z: spawnZ,
       team: 'red',
       ownerId: socket.id,
-      carrying: { food: 0 }
+      health: 100,
+      carrying: { food: 0 },
+      isWorking: false,
+      isRegenerating: false,
+      taskType: null,
+      workStartTime: null,
+      regenStartTime: null
     };
     player.units.push(newUnit);
 
     socket.emit('resourceUpdate', player.resources);
     socket.emit('toast', `Built a new man for ${cost} food!`);
     console.log(`[BUILD] ${player.name} built a new unit. Total: ${player.units.length}`);
+  });
+
+  socket.on('setUnitTask', (data) => {
+    const player = world.players[socket.id];
+    if (!player || !data.unitId || !data.task) return;
+
+    const unit = player.units.find(u => u.id === data.unitId);
+    if (!unit) return;
+
+    unit.isWorking = true;
+    unit.taskType = data.task; // 'hunt', 'wood', 'stone', 'gold', etc.
+    unit.workStartTime = Date.now();
+    unit.health = 100;
+    unit.carrying = { food: 0 };
+    unit.isRegenerating = false;
+
+    socket.emit('toast', `Unit started ${data.task} (24 hour shift)`);
+    console.log(`[TASK] Unit set to ${data.task} for 24 hours`);
   });
 
   socket.on('disconnect', async () => {
