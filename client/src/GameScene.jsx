@@ -132,7 +132,7 @@ export default function GameScene({ auth }) {
         <div style="color:#c8a84b;font-weight:700;font-size:13px;margin-bottom:2px;letter-spacing:1px;">AGE OF SHADOWS</div>
         <div style="opacity:0.7;font-size:10px;margin-bottom:8px;">v2.14</div>
         <button id="inv-btn-inline" style="width:100%;padding:5px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">📦 Inventory</button>
-        <button id="build-unit-btn" style="width:100%;padding:5px;background:rgba(100,200,75,0.15);border:1px solid rgba(100,200,75,0.5);border-radius:4px;color:#64c84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">👤 Build Man (10F)</button>
+        <button id="build-unit-btn" style="width:100%;padding:5px;background:rgba(100,200,75,0.15);border:1px solid rgba(100,200,75,0.5);border-radius:4px;color:#64c84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">👤 Build Man (100F)</button>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:5px;">
           <button id="task-hunt-btn" style="padding:4px;background:rgba(255,100,100,0.15);border:1px solid rgba(255,100,100,0.5);border-radius:3px;color:#ff6464;cursor:pointer;font-size:9px;font-weight:600;">🎯 Hunt</button>
           <button id="task-wood-btn" style="padding:4px;background:rgba(150,100,50,0.15);border:1px solid rgba(150,100,50,0.5);border-radius:3px;color:#d4a574;cursor:pointer;font-size:9px;font-weight:600;">🪓 Wood</button>

@@ -161,10 +161,13 @@ setInterval(() => {
         unit.health = Math.max(0, unit.health - 0.0139); // 1 HP per hour ≈ 0.0139 per 5 seconds
       }
 
-      // Regenerating in house: 1 hour to full health
+      // Regenerating in house: scales by missing HP (1 hour at 1% HP, 30 min at 50% HP)
       if (unit.isRegenerating) {
         const regenElapsed = (now - (unit.regenStartTime || now)) / 1000;
-        if (regenElapsed >= 3600) { // 1 hour
+        const missingHP = 100 - unit.health;
+        const regenTime = (missingHP / 100) * 3600; // 1 hour at 100 damage, scales down
+
+        if (regenElapsed >= regenTime) {
           unit.health = 100;
           unit.isRegenerating = false;
           // Auto-resume work if still within 24 hours
@@ -176,8 +179,9 @@ setInterval(() => {
             console.log(`[REGEN-DONE] Unit fully healed but work time expired`);
           }
         } else {
-          // Heal 100 HP over 3600 seconds = 0.0278 per 5-sec tick
-          unit.health = Math.min(100, unit.health + (100 / 3600) * 5);
+          // Heal proportionally: at 1% health takes 1 hour, at 50% takes 30 min, etc.
+          const healRate = missingHP / regenTime; // HP per second
+          unit.health = Math.min(100, unit.health + (healRate * 5));
         }
       }
     });
@@ -347,7 +351,7 @@ io.on('connection', (socket) => {
     const player = world.players[socket.id];
     if (!player) return;
 
-    const cost = 10; // food cost to build one man
+    const cost = 100; // food cost to build one man
     if (player.resources.food < cost) {
       socket.emit('toast', `Need ${cost} food to build a man (you have ${player.resources.food})`);
       return;
