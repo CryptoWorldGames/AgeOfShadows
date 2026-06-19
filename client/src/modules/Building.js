@@ -291,17 +291,43 @@ function attachConstruction(building, group, allMats, scene, barHeight) {
   const bar = makeConstructionBar();
   bar.group.position.y = barHeight; bar.group.visible = false;
   group.add(bar.group);
+
+  // Create hammers that animate during construction
+  const hammers = [];
+  for (let i = 0; i < 4; i++) {
+    const hammerGroup = new THREE.Group();
+    const hammerHead = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.08), new THREE.MeshStandardMaterial({ color: 0x888888 }));
+    hammerHead.position.y = 0.05;
+    const hammerHandle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), new THREE.MeshStandardMaterial({ color: 0x654321 }));
+    hammerHandle.position.y = 0.25;
+    hammerGroup.add(hammerHead);
+    hammerGroup.add(hammerHandle);
+    hammerGroup.position.set((i - 1.5) * 0.8, 0, 1.2);
+    group.add(hammerGroup);
+    hammers.push({ group: hammerGroup, startY: hammerGroup.position.y, phase: i * 0.5 });
+  }
+
   let t = 0, dur = 0;
   building.constructing = false;
   building.startConstruction = (seconds) => {
     building.constructing = true; t = 0; dur = Math.max(0.1, seconds);
     allMats.forEach((m) => { m.transparent = true; m.opacity = 0.4; });
     bar.set(0); bar.group.visible = true;
+    hammers.forEach(h => h.group.visible = true);
   };
   building.tickConstruction = (dt, camera) => {
     if (!building.constructing) return false;
     t += dt; bar.set(t / dur);
     if (camera) bar.group.quaternion.copy(camera.quaternion);
+
+    // Animate hammers: bounce up and down
+    hammers.forEach((h, i) => {
+      const hammerTime = t + h.phase;
+      const bounce = Math.sin(hammerTime * 8) * 0.3;
+      h.group.position.y = h.startY + Math.max(0, bounce);
+      h.group.rotation.z = Math.sin(hammerTime * 8) * 0.3;
+    });
+
     if (t >= dur) { building.completeConstruction(); return true; }
     return false;
   };
@@ -309,6 +335,7 @@ function attachConstruction(building, group, allMats, scene, barHeight) {
     building.constructing = false;
     allMats.forEach((m) => { m.transparent = false; m.opacity = 1.0; });
     bar.group.visible = false;
+    hammers.forEach(h => h.group.visible = false);
     if (building.place) building.place();
   };
   building.buildProgress = () => (building.constructing ? t / dur : 1);

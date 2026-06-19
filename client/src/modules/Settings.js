@@ -55,7 +55,7 @@ export const SETTINGS = {
   },
   building: {
     townCenter: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 30, label: 'Town Center', storageMax: 100000 },
-    house: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 180, label: 'House', maxUnits: 10, storageMax: 10000, decayInterval: 3600 },
+    house: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 30, label: 'House', maxUnits: 10, storageMax: 10000, decayInterval: 3600 },
     woodFence: { woodCost: 10, stoneCost: 0, goldCost: 0, buildTime: 10, hitsToDestroy: 25, label: 'Wood Fence' },
     stoneFence: { woodCost: 0, stoneCost: 50, goldCost: 0, buildTime: 20, hitsToDestroy: 100, label: 'Stone Fence' },
     farm: { woodCost: 40, stoneCost: 0, goldCost: 0, buildTime: 15, label: 'Farm' },
