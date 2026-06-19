@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SETTINGS } from './Settings.js';
 
 // Create canvas texture for Town Center wooden sign
 function createSignTexture() {
@@ -260,5 +261,156 @@ export function createTownCenter(scene, ghost = true) {
     remove() { scene.remove(group); }
   };
 
+  return building;
+}
+
+// ---------------------------------------------------------------------------
+// Construction progress bar (billboard) shown above a building while it builds.
+// ---------------------------------------------------------------------------
+function makeConstructionBar() {
+  const g = new THREE.Group();
+  const bg = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.2, 0.34),
+    new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.85, depthTest: false })
+  );
+  const fill = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.1, 0.24),
+    new THREE.MeshBasicMaterial({ color: 0x00d26a, depthTest: false })
+  );
+  fill.position.z = 0.001; g.add(bg); g.add(fill); g.renderOrder = 999;
+  return {
+    group: g,
+    set(frac) { frac = Math.max(0, Math.min(1, frac)); fill.scale.x = frac; fill.position.x = -(1 - frac) * 1.05; }
+  };
+}
+
+// Give any building object timed-construction behaviour. While building, the
+// structure is semi-transparent with a progress bar; when the timer elapses it
+// becomes solid and usable.
+function attachConstruction(building, group, allMats, scene, barHeight) {
+  const bar = makeConstructionBar();
+  bar.group.position.y = barHeight; bar.group.visible = false;
+  group.add(bar.group);
+  let t = 0, dur = 0;
+  building.constructing = false;
+  building.startConstruction = (seconds) => {
+    building.constructing = true; t = 0; dur = Math.max(0.1, seconds);
+    allMats.forEach((m) => { m.transparent = true; m.opacity = 0.4; });
+    bar.set(0); bar.group.visible = true;
+  };
+  building.tickConstruction = (dt, camera) => {
+    if (!building.constructing) return false;
+    t += dt; bar.set(t / dur);
+    if (camera) bar.group.quaternion.copy(camera.quaternion);
+    if (t >= dur) { building.completeConstruction(); return true; }
+    return false;
+  };
+  building.completeConstruction = () => {
+    building.constructing = false;
+    allMats.forEach((m) => { m.transparent = false; m.opacity = 1.0; });
+    bar.group.visible = false;
+    if (building.place) building.place();
+  };
+  building.buildProgress = () => (building.constructing ? t / dur : 1);
+}
+
+// ---------------------------------------------------------------------------
+// House — a personal home: smaller than the Town Center, tax-free storage.
+// ---------------------------------------------------------------------------
+export function createHouse(scene, ghost = true) {
+  const group = new THREE.Group();
+  const s = 1.4; // house scale (smaller than town center)
+
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xc9a877, roughness: 0.9, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x7a3b25, roughness: 0.85, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x3a2414, roughness: 0.8, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
+  const winMat = new THREE.MeshStandardMaterial({ color: 0x6fa8d4, roughness: 0.1, metalness: 0.3, emissive: 0x244a66, emissiveIntensity: ghost ? 0 : 0.25, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(3.0 * s, 2.0 * s, 3.0 * s), wallMat);
+  base.position.y = 1.0 * s; base.castShadow = true; base.receiveShadow = true; group.add(base);
+
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.5 * s, 1.5 * s, 4), roofMat);
+  roof.position.y = 2.75 * s; roof.rotation.y = Math.PI / 4; roof.castShadow = true; group.add(roof);
+
+  const front = 1.5 * s;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.8 * s, 1.3 * s, 0.16 * s), doorMat);
+  door.position.set(0, 0.65 * s, front + 0.02 * s); door.castShadow = true; group.add(door);
+  [-0.85, 0.85].forEach((mx) => {
+    const w = new THREE.Mesh(new THREE.BoxGeometry(0.55 * s, 0.55 * s, 0.12 * s), winMat);
+    w.position.set(mx * s, 1.25 * s, front + 0.02 * s); w.castShadow = true; group.add(w);
+  });
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.8 * s, 2.1 * s, 28),
+    new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
+  );
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; ring.visible = ghost; group.add(ring);
+
+  scene.add(group);
+  const allMats = [wallMat, roofMat, doorMat, winMat];
+
+  const building = {
+    group, type: 'house', buildingType: 'house',
+    radius: 2.1 * s, storageMax: 10000,
+    storage: { wood: 0, stone: 0, gold: 0, food: 0, water: 0 },
+    isGhost: ghost,
+    position: () => group.position.clone(),
+    setPosition(x, z) { group.position.set(x, 0, z); },
+    setValid(valid) { ring.material.color.setHex(valid ? 0x00ff88 : 0xff3333); },
+    place() { building.isGhost = false; allMats.forEach((m) => { m.transparent = false; m.opacity = 1.0; }); ring.visible = false; },
+    getStorageUsed() { return Object.values(building.storage).reduce((a, b) => a + b, 0); },
+    remove() { scene.remove(group); }
+  };
+  attachConstruction(building, group, allMats, scene, 4.5 * s);
+  return building;
+}
+
+// ---------------------------------------------------------------------------
+// Fence section — wood or stone. Small solid obstacle; chain them by clicking.
+// ---------------------------------------------------------------------------
+export function createFence(scene, kind = 'woodFence', ghost = true) {
+  const group = new THREE.Group();
+  const isStone = kind === 'stoneFence';
+  const matColor = isStone ? 0x9a958c : 0x8a5a2b;
+  const mat = new THREE.MeshStandardMaterial({ color: matColor, roughness: 0.9, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
+
+  const width = 1.8, height = isStone ? 1.3 : 1.1, thick = isStone ? 0.35 : 0.2;
+  if (isStone) {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(width, height, thick), mat);
+    wall.position.y = height / 2; wall.castShadow = true; wall.receiveShadow = true; group.add(wall);
+  } else {
+    // wood: two rails + posts
+    [-0.8, 0, 0.8].forEach((px) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, height, 0.16), mat);
+      post.position.set(px, height / 2, 0); post.castShadow = true; group.add(post);
+    });
+    [0.35, 0.8].forEach((ry) => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(width, 0.14, 0.1), mat);
+      rail.position.set(0, ry, 0); rail.castShadow = true; group.add(rail);
+    });
+  }
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.7, 0.9, 20),
+    new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
+  );
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; ring.visible = ghost; group.add(ring);
+
+  scene.add(group);
+  const allMats = [mat];
+  const S = SETTINGS.building[kind] || {};
+
+  const building = {
+    group, type: kind, buildingType: kind,
+    radius: 0.95, hitsToDestroy: S.hitsToDestroy || 25,
+    isGhost: ghost,
+    position: () => group.position.clone(),
+    setPosition(x, z) { group.position.set(x, 0, z); },
+    setRotation(ry) { group.rotation.y = ry; },
+    setValid(valid) { ring.material.color.setHex(valid ? 0x00ff88 : 0xff3333); },
+    place() { building.isGhost = false; allMats.forEach((m) => { m.transparent = false; m.opacity = 1.0; }); ring.visible = false; },
+    remove() { scene.remove(group); }
+  };
+  attachConstruction(building, group, allMats, scene, height + 0.6);
   return building;
 }

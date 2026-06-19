@@ -1,3 +1,5 @@
+import { SETTINGS } from './Settings.js';
+
 let globalSocket = null;
 // Track the active music player so a second createUI() can't leave a duplicate
 // audio element playing on top of the first.
@@ -6,7 +8,7 @@ let activeMusicAudio = null;
 // Remove any previously-created HUD panels so building the UI again can never
 // stack a second copy (duplicate Town Center button, music player, etc.).
 function clearExistingHUD() {
-  ['login-panel','hud','resource-bar','selected-panel','build-bar',
+  ['login-panel','hud','resource-bar','selected-panel','build-bar','build-menu',
    'music-tab','music-panel','chat-panel'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.remove();
@@ -384,17 +386,58 @@ export function createUI(playerId, gameState, displayName) {
   selDiv.innerHTML = `Selected: <span id="unit-count" style="font-weight:600;">0</span>`;
   document.body.appendChild(selDiv);
 
+  // --- Build system: hammer button (far left) opens a build menu ---
   const buildBar = document.createElement('div');
   buildBar.id = 'build-bar';
   buildBar.style.cssText = `position:absolute;top:150px;left:14px;z-index:100;`;
-  const tcButton = document.createElement('button');
-  tcButton.id = 'tc-button';
-  tcButton.innerHTML = '🏛️<div style="font-size:9px;margin-top:2px;">Town Center<br><span style="color:#e8c84a;">100 🪵</span></div>';
-  tcButton.style.cssText = `width:72px;height:72px;background:rgba(0,0,0,0.6);color:#fff;border:2px solid rgba(255,255,255,0.2);border-radius:10px;font-size:22px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
-  tcButton.onmouseenter = () => { tcButton.style.borderColor='#00ff88'; };
-  tcButton.onmouseleave = () => { tcButton.style.borderColor='rgba(255,255,255,0.2)'; };
-  buildBar.appendChild(tcButton);
+  const hammerBtn = document.createElement('button');
+  hammerBtn.id = 'build-hammer';
+  hammerBtn.title = 'Build';
+  hammerBtn.innerHTML = '🔨<div style="font-size:9px;margin-top:2px;">Build</div>';
+  hammerBtn.style.cssText = `width:64px;height:64px;background:rgba(0,0,0,0.6);color:#fff;border:2px solid rgba(255,255,255,0.2);border-radius:10px;font-size:24px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
+  hammerBtn.onmouseenter = () => { hammerBtn.style.borderColor='#00ff88'; };
+  hammerBtn.onmouseleave = () => { hammerBtn.style.borderColor='rgba(255,255,255,0.2)'; };
+  buildBar.appendChild(hammerBtn);
   document.body.appendChild(buildBar);
+
+  // Build menu listing what the player can build (cost + time)
+  const buildMenu = document.createElement('div');
+  buildMenu.id = 'build-menu';
+  buildMenu.style.cssText = `position:absolute;top:150px;left:88px;z-index:101;background:rgba(0,0,0,0.9);border:1px solid #c8a84b;border-radius:10px;padding:10px;width:210px;display:none;font-family:'Segoe UI',sans-serif;color:#fff;`;
+  const buildables = [
+    { key: 'house', icon: '🏠' },
+    { key: 'woodFence', icon: '🪵' },
+    { key: 'stoneFence', icon: '🧱' }
+  ];
+  let buildSelectCb = () => {};
+  const fmtTime = (s) => s >= 60 ? `${Math.round(s/60)} min` : `${s} sec`;
+  buildMenu.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:12px;margin-bottom:8px;letter-spacing:1px;">BUILD</div>`;
+  buildables.forEach(({ key, icon }) => {
+    const b = SETTINGS.building[key];
+    if (!b) return;
+    const costs = [];
+    if (b.woodCost) costs.push(`${b.woodCost}🪵`);
+    if (b.stoneCost) costs.push(`${b.stoneCost}🪨`);
+    if (b.goldCost) costs.push(`${b.goldCost}💰`);
+    const card = document.createElement('button');
+    card.className = 'build-option';
+    card.dataset.key = key;
+    card.style.cssText = `width:100%;text-align:left;background:rgba(200,168,75,0.12);border:1px solid rgba(200,168,75,0.4);border-radius:6px;color:#fff;cursor:pointer;padding:8px;margin-bottom:6px;font-size:12px;`;
+    card.innerHTML = `<div style="font-weight:600;">${icon} ${b.label}</div>
+      <div style="font-size:10px;opacity:0.85;margin-top:2px;color:#e8c84a;">${costs.join(' ')} · ⏱ ${fmtTime(b.buildTime)}</div>`;
+    card.onclick = () => { buildMenu.style.display = 'none'; buildSelectCb(key); };
+    buildMenu.appendChild(card);
+  });
+  // Fence hint
+  const fenceHint = document.createElement('div');
+  fenceHint.style.cssText = 'font-size:9px;opacity:0.55;margin-top:2px;';
+  fenceHint.textContent = 'Fences: click repeatedly to place a line. Right-click / Esc to stop.';
+  buildMenu.appendChild(fenceHint);
+  document.body.appendChild(buildMenu);
+
+  hammerBtn.onclick = () => {
+    buildMenu.style.display = buildMenu.style.display === 'none' ? 'block' : 'none';
+  };
 
   const tracks = [
     { file:'kaazoom-the-ballad-of-my-sweet-fair-maiden-medieval-style-music-358306.mp3', label:'Ballad' },
@@ -630,7 +673,7 @@ export function createUI(playerId, gameState, displayName) {
   const popup = document.createElement('div');
   popup.style.cssText = `position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);color:#fff;font-family:'Segoe UI',sans-serif;padding:18px 22px;border-radius:12px;border:1px solid rgba(255,255,255,0.18);text-align:center;z-index:200;display:none;`;
   popup.innerHTML = `
-    <div style="font-size:15px;margin-bottom:14px;">Place Town Center here?</div>
+    <div id="place-prompt" style="font-size:15px;margin-bottom:14px;">Place building here?</div>
     <div style="display:flex;gap:10px;justify-content:center;">
       <button id="place-yes" style="padding:8px 18px;border:none;border-radius:6px;background:#16a34a;color:#fff;cursor:pointer;font-weight:600;">Yes</button>
       <button id="place-move" style="padding:8px 18px;border:none;border-radius:6px;background:#475569;color:#fff;cursor:pointer;font-weight:600;">Move it</button>
@@ -658,8 +701,12 @@ export function createUI(playerId, gameState, displayName) {
       if (toastTimer) clearTimeout(toastTimer);
       toastTimer = setTimeout(()=>{ toast.style.display='none'; }, duration);
     },
-    onTownCenterClick(cb) { tcButton.onclick = cb; },
-    showConfirm() { popup.style.display='block'; },
+    onBuildSelect(cb) { buildSelectCb = cb; },
+    showConfirm(label) {
+      const p = document.getElementById('place-prompt');
+      if (p && label) p.textContent = label;
+      popup.style.display='block';
+    },
     hideConfirm() { popup.style.display='none'; },
     onConfirmYes(cb) { document.getElementById('place-yes').onclick = cb; },
     onConfirmMove(cb) { document.getElementById('place-move').onclick = cb; },

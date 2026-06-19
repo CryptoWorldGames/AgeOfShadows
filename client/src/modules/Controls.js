@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { createTownCenter } from './Building.js';
+import { createTownCenter, createHouse, createFence } from './Building.js';
+import { SETTINGS } from './Settings.js';
 import { showTownCenterModal } from './UI.js';
 
 export function createControls(camera, renderer, scene, world, playerStartPos) {
@@ -165,34 +166,93 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     resHighlight.visible = true; resHighlightTimer = 3.0;
   }
 
-  world.ui.onTownCenterClick(() => {
-    if (ghostBuilding) return;
-    if (world.resources.wood < 100) {
-      world.ui.showToast('Need 100 wood to build Town Center!'); return;
+  // ---- Build system ----
+  let currentBuildKind = null;   // 'house' | 'woodFence' | 'stoneFence'
+  let fenceMode = false;         // fences place repeatedly without a confirm
+  const constructing = [];       // buildings currently being built (timed)
+
+  const makeGhost = (kind) => {
+    if (kind === 'house') return createHouse(scene, true);
+    if (kind === 'woodFence' || kind === 'stoneFence') return createFence(scene, kind, true);
+    if (kind === 'townCenter') return createTownCenter(scene, true);
+    return null;
+  };
+  const canAfford = (kind) => {
+    const b = SETTINGS.building[kind]; if (!b) return false;
+    return (world.resources.wood||0) >= (b.woodCost||0)
+      && (world.resources.stone||0) >= (b.stoneCost||0)
+      && (world.resources.gold||0) >= (b.goldCost||0);
+  };
+  const payFor = (kind) => {
+    const b = SETTINGS.building[kind];
+    world.resources.wood = (world.resources.wood||0) - (b.woodCost||0);
+    world.resources.stone = (world.resources.stone||0) - (b.stoneCost||0);
+    world.resources.gold = (world.resources.gold||0) - (b.goldCost||0);
+  };
+  const costLabel = (kind) => {
+    const b = SETTINGS.building[kind]; const p = [];
+    if (b.woodCost) p.push(`${b.woodCost} wood`);
+    if (b.stoneCost) p.push(`${b.stoneCost} stone`);
+    if (b.goldCost) p.push(`${b.goldCost} gold`);
+    return p.join(', ');
+  };
+  const cancelBuild = () => {
+    if (ghostBuilding) ghostBuilding.remove();
+    ghostBuilding = null; currentBuildKind = null; fenceMode = false;
+    awaitingConfirm = false; world.ui.hideConfirm();
+  };
+  // Commit a building at (x,z): deduct cost, start its construction timer.
+  const commitBuild = (kind, x, z) => {
+    if (!canAfford(kind)) { world.ui.showToast(`Need ${costLabel(kind)}`); return false; }
+    payFor(kind);
+    const b = ghostBuilding;
+    b.setPosition(x, z);
+    b.isGhost = false;                 // occupy the footprint (collision) while building
+    b.id = `b_${world.playerId||'me'}_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+    b.ownerId = world.playerId;
+    b.startConstruction(SETTINGS.building[kind].buildTime);
+    world.buildings.push(b);
+    constructing.push(b);
+    world.socket.emit('placeBuilding', { type: kind, x, z });
+    return true;
+  };
+
+  // Place one fence section and immediately ready the next one (chain building).
+  const placeFenceSection = (x, z) => {
+    const kind = currentBuildKind;
+    if (!commitBuild(kind, x, z)) { cancelBuild(); return; }
+    if (canAfford(kind)) {
+      ghostBuilding = makeGhost(kind);
+      ghostBuilding.setPosition(x, z);
+    } else {
+      ghostBuilding = null; currentBuildKind = null; fenceMode = false;
+      world.ui.showToast('Out of resources for more fence.');
     }
-    ghostBuilding = createTownCenter(scene, true);
+  };
+
+  world.ui.onBuildSelect((kind) => {
+    cancelBuild();
+    if (!canAfford(kind)) { world.ui.showToast(`Need ${costLabel(kind)} to build ${SETTINGS.building[kind].label}`); return; }
+    currentBuildKind = kind;
+    fenceMode = (kind === 'woodFence' || kind === 'stoneFence');
+    ghostBuilding = makeGhost(kind);
     ghostBuilding.setPosition(0, 0);
     awaitingConfirm = false; world.ui.hideConfirm();
+    world.ui.showToast(fenceMode ? 'Click to place each fence section. Right-click / Esc to stop.' : `Move ${SETTINGS.building[kind].label}, then click to place.`);
   });
+
+  // House / Town Center: confirm popup before committing.
   world.ui.onConfirmYes(() => {
-    if (!ghostBuilding) return;
-    world.resources.wood -= 100;
-    ghostBuilding.place();
-    world.buildings.push(ghostBuilding);
+    if (!ghostBuilding || !currentBuildKind) return;
     const pos = ghostBuilding.group.position;
-    world.socket.emit('placeBuilding', {
-      type: 'townCenter',
-      x: pos.x,
-      z: pos.z
-    });
-    ghostBuilding = null; awaitingConfirm = false;
-    world.ui.hideConfirm(); world.ui.showToast('Town Center placed! (-100 wood)');
+    const kind = currentBuildKind;
+    if (commitBuild(kind, pos.x, pos.z)) {
+      ghostBuilding = null; currentBuildKind = null; awaitingConfirm = false;
+      world.ui.hideConfirm(); world.ui.showToast(`${SETTINGS.building[kind].label} under construction…`);
+    }
   });
   world.ui.onConfirmMove(() => { awaitingConfirm = false; world.ui.hideConfirm(); });
-  world.ui.onConfirmNo(() => {
-    if (ghostBuilding) ghostBuilding.remove();
-    ghostBuilding = null; awaitingConfirm = false; world.ui.hideConfirm();
-  });
+  world.ui.onConfirmNo(() => { cancelBuild(); });
 
   const onMouseDown = (e) => {
     if (e.button !== 0) return;
@@ -221,7 +281,10 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     if (ghostBuilding && !awaitingConfirm) {
       const gp = groundPoint(e.clientX, e.clientY);
       ghostBuilding.setPosition(gp.x, gp.z);
-      awaitingConfirm = true; world.ui.showConfirm(); return;
+      if (fenceMode) { placeFenceSection(gp.x, gp.z); return; }
+      awaitingConfirm = true;
+      world.ui.showConfirm(`Place ${SETTINGS.building[currentBuildKind].label} here?`);
+      return;
     }
     selectionBox.style.display = 'none';
     if (isDragging) {
@@ -332,6 +395,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
 
   const onRightClick = (e) => {
     e.preventDefault();
+    if (ghostBuilding) { cancelBuild(); world.ui.showToast('Build cancelled.'); return; }
     commandAt(e.clientX, e.clientY);
   };
 
@@ -342,7 +406,10 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     if (ghostBuilding && !awaitingConfirm) {
       const gp = groundPoint(cx, cy);
       ghostBuilding.setPosition(gp.x, gp.z);
-      awaitingConfirm = true; world.ui.showConfirm(); return;
+      if (fenceMode) { placeFenceSection(gp.x, gp.z); return; }
+      awaitingConfirm = true;
+      world.ui.showConfirm(`Place ${SETTINGS.building[currentBuildKind].label} here?`);
+      return;
     }
     const building = raycastBuilding(cx, cy);
     if (building) {
@@ -396,7 +463,10 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: true });
 
   const keys = {};
-  window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && ghostBuilding) { cancelBuild(); world.ui.showToast('Build cancelled.'); return; }
+    keys[e.key.toLowerCase()] = true;
+  });
   window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
   window.addEventListener('blur', () => Object.keys(keys).forEach(k => keys[k] = false));
   document.addEventListener('visibilitychange', () => { if (document.hidden) Object.keys(keys).forEach(k => keys[k] = false); });
@@ -424,6 +494,15 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
       resHighlight.material.opacity = 0.7 + Math.sin(time * 5) * 0.2;
       resHighlightTimer -= dt;
       if (resHighlightTimer <= 0) resHighlight.visible = false;
+    }
+    // Advance any buildings under construction; drop them from the list when done.
+    for (let i = constructing.length - 1; i >= 0; i--) {
+      const done = constructing[i].tickConstruction(dt, camera);
+      if (done) {
+        const b = constructing[i];
+        world.ui.showToast(`${SETTINGS.building[b.buildingType]?.label || 'Building'} complete!`);
+        constructing.splice(i, 1);
+      }
     }
     controls.update();
   };

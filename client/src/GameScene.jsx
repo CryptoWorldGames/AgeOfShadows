@@ -259,6 +259,9 @@ export default function GameScene({ auth }) {
       });
 
       socket.on('buildingPlaced', (building) => {
+        // We already render our own buildings locally as real meshes; only add
+        // OTHER players' buildings (and skip the meshless self-echo from the server).
+        if (building.ownerId && building.ownerId === world.playerId) return;
         world.buildings.push(building);
       });
 

@@ -289,7 +289,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     const me = group.position;
     let best = null, bestDist = Infinity;
     (world.buildings||[]).forEach((b) => {
-      if (!b.storage) return;
+      if (!b.storage || b.constructing) return;
       if (type && b.type !== type) return;
       const p = resolvePos(b);
       if (!p) return;
@@ -303,7 +303,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     const me = group.position;
     let house = null, townCenter = null;
     (world.buildings || []).forEach((b) => {
-      if (!b.storage) return;
+      if (!b.storage || b.constructing) return;
       const p = resolvePos(b);
       if (!p) return;
       const d = Math.sqrt((p.x - me.x) ** 2 + (p.z - me.z) ** 2);
