@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createTownCenter, createHouse, createFence } from './Building.js';
-import { SETTINGS } from './Settings.js';
 import { showTownCenterModal } from './UI.js';
+import { SETTINGS } from './Settings.js';
 
 export function createControls(camera, renderer, scene, world, playerStartPos) {
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -45,6 +45,57 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.2, 8), new THREE.MeshPhongMaterial({ color: 0x8B4513 }));
   shaft.position.y = 2.4; markerGroup.add(shaft);
   markerGroup.visible = false; scene.add(markerGroup);
+
+  // Building system
+  const buildCosts = {
+    house: { wood: 100 },
+    woodFence: { wood: 10 },
+    stoneFence: { stone: 50 }
+  };
+
+  function canAfford(kind) {
+    const cost = buildCosts[kind] || {};
+    for (const [res, amt] of Object.entries(cost)) {
+      if ((world.resources[res] || 0) < amt) return false;
+    }
+    return true;
+  }
+
+  function payFor(kind) {
+    const cost = buildCosts[kind] || {};
+    for (const [res, amt] of Object.entries(cost)) {
+      world.resources[res] = (world.resources[res] || 0) - amt;
+    }
+  }
+
+  function makeGhost(kind) {
+    if (kind === 'house') return createHouse(scene, true);
+    if (kind === 'woodFence') return createFence(scene, 'wood', true);
+    if (kind === 'stoneFence') return createFence(scene, 'stone', true);
+    return null;
+  }
+
+  function commitBuild(kind, x, z) {
+    if (!canAfford(kind)) {
+      world.ui.showToast('Cannot afford: ' + kind);
+      return false;
+    }
+    payFor(kind);
+    const building = makeGhost(kind);
+    if (!building) return false;
+    building.setPosition(x, z);
+    building.place();
+    world.buildings.push(building);
+    const pos = building.group.position;
+    world.socket.emit('placeBuilding', {
+      type: kind,
+      x: pos.x,
+      z: pos.z
+    });
+    const costStr = Object.entries(buildCosts[kind]).map(([r, a]) => `${a} ${r}`).join(', ');
+    world.ui.showToast(`${kind} placed! (-${costStr})`);
+    return true;
+  }
 
   const resHighlight = new THREE.Mesh(
     new THREE.RingGeometry(0.9, 1.15, 32),
@@ -166,6 +217,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     resHighlight.visible = true; resHighlightTimer = 3.0;
   }
 
+<<<<<<< HEAD
   // ---- Build system ----
   let currentBuildKind = null;   // 'house' | 'woodFence' | 'stoneFence'
   let fenceMode = false;         // fences place repeatedly without a confirm
@@ -235,6 +287,14 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     if (!canAfford(kind)) { world.ui.showToast(`Need ${costLabel(kind)} to build ${SETTINGS.building[kind].label}`); return; }
     currentBuildKind = kind;
     fenceMode = (kind === 'woodFence' || kind === 'stoneFence');
+=======
+  world.ui.onBuildClick((kind) => {
+    if (ghostBuilding) return;
+    if (!canAfford(kind)) {
+      world.ui.showToast('Cannot afford: ' + kind);
+      return;
+    }
+>>>>>>> claude/relaxed-pascal-f2fqh5
     ghostBuilding = makeGhost(kind);
     ghostBuilding.setPosition(0, 0);
     awaitingConfirm = false; world.ui.hideConfirm();
@@ -243,6 +303,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
 
   // House / Town Center: confirm popup before committing.
   world.ui.onConfirmYes(() => {
+<<<<<<< HEAD
     if (!ghostBuilding || !currentBuildKind) return;
     const pos = ghostBuilding.group.position;
     const kind = currentBuildKind;
@@ -250,6 +311,22 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
       ghostBuilding = null; currentBuildKind = null; awaitingConfirm = false;
       world.ui.hideConfirm(); world.ui.showToast(`${SETTINGS.building[kind].label} under construction…`);
     }
+=======
+    if (!ghostBuilding) return;
+    const pos = ghostBuilding.group.position;
+    ghostBuilding.place();
+    world.buildings.push(ghostBuilding);
+    world.socket.emit('placeBuilding', {
+      type: ghostBuilding.buildingType || ghostBuilding.type,
+      fenceKind: ghostBuilding.fenceKind,
+      x: pos.x,
+      z: pos.z
+    });
+    const costStr = ghostBuilding.buildingType ? (Object.entries(buildCosts[ghostBuilding.buildingType]).map(([r, a]) => `${a} ${r}`).join(', ')) : '100 wood';
+    world.ui.showToast(`${ghostBuilding.buildingType || 'Building'} placed! (-${costStr})`);
+    ghostBuilding = null; awaitingConfirm = false;
+    world.ui.hideConfirm();
+>>>>>>> claude/relaxed-pascal-f2fqh5
   });
   world.ui.onConfirmMove(() => { awaitingConfirm = false; world.ui.hideConfirm(); });
   world.ui.onConfirmNo(() => { cancelBuild(); });
@@ -395,7 +472,15 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
 
   const onRightClick = (e) => {
     e.preventDefault();
+<<<<<<< HEAD
     if (ghostBuilding) { cancelBuild(); world.ui.showToast('Build cancelled.'); return; }
+=======
+    if (ghostBuilding) {
+      if (ghostBuilding) ghostBuilding.remove();
+      ghostBuilding = null; awaitingConfirm = false; world.ui.hideConfirm();
+      return;
+    }
+>>>>>>> claude/relaxed-pascal-f2fqh5
     commandAt(e.clientX, e.clientY);
   };
 
@@ -464,8 +549,17 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
 
   const keys = {};
   window.addEventListener('keydown', (e) => {
+<<<<<<< HEAD
     if (e.key === 'Escape' && ghostBuilding) { cancelBuild(); world.ui.showToast('Build cancelled.'); return; }
     keys[e.key.toLowerCase()] = true;
+=======
+    keys[e.key.toLowerCase()] = true;
+    // Cancel building with Escape
+    if (e.key === 'Escape' && ghostBuilding) {
+      if (ghostBuilding) ghostBuilding.remove();
+      ghostBuilding = null; awaitingConfirm = false; world.ui.hideConfirm();
+    }
+>>>>>>> claude/relaxed-pascal-f2fqh5
   });
   window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
   window.addEventListener('blur', () => Object.keys(keys).forEach(k => keys[k] = false));

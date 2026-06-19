@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { SETTINGS } from './Settings.js';
 
 // Create canvas texture for Town Center wooden sign
 function createSignTexture() {
@@ -121,16 +120,16 @@ export function createTownCenter(scene, ghost = true) {
     flag.position.set(0.5 * baseScale, 4.8 * baseScale, 0);
     group.add(flag);
 
-    // Wooden sign post — front-center, raised high so it's readable from camera angle
+    // Wooden sign post
     const signPost = new THREE.Mesh(
       new THREE.CylinderGeometry(0.15, 0.2, 2.5 * baseScale, 8),
       new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.8 })
     );
-    signPost.position.set(-3.6 * baseScale, 1.0 * baseScale, 4.0 * baseScale);
+    signPost.position.set(-2.5 * baseScale, 1.2 * baseScale, 1.5 * baseScale);
     signPost.castShadow = true;
     group.add(signPost);
 
-    // Wooden sign board — same front-center position, readable
+    // Wooden sign board
     const signMat = new THREE.MeshStandardMaterial({
       color: 0xa0826d,
       roughness: 0.7,
@@ -140,87 +139,54 @@ export function createTownCenter(scene, ghost = true) {
       new THREE.BoxGeometry(1.2 * baseScale, 0.8 * baseScale, 0.1 * baseScale),
       signMat
     );
-    signBoard.position.set(-3.6 * baseScale, 2.0 * baseScale, 4.0 * baseScale);
+    signBoard.position.set(-2.5 * baseScale, 2.0 * baseScale, 1.5 * baseScale);
     signBoard.castShadow = true;
-    signBoard.rotation.y = 0;
+    signBoard.rotation.y = 0.3;
     group.add(signBoard);
   }
 
-  // The wall faces sit at ±half-width. Everything below is placed ON those faces
-  // (scaled by baseScale) so the door/windows aren't buried inside the walls.
-  const front = 2.25 * baseScale;   // +z front wall face
-  const side = 2.25 * baseScale;    // +x / -x side wall faces
-
+  // Door frame
   const doorMat = new THREE.MeshStandardMaterial({
-    color: 0x3a2414, roughness: 0.8, transparent: ghost, opacity: ghost ? 0.5 : 1.0
+    color: 0x2a1810,
+    roughness: 0.8,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
   });
-  const trimMat = new THREE.MeshStandardMaterial({
-    color: 0xe8e2d0, roughness: 0.7, transparent: ghost, opacity: ghost ? 0.5 : 1.0
-  });
+  const door = new THREE.Mesh(
+    new THREE.BoxGeometry(1.0, 1.4, 0.2),
+    doorMat
+  );
+  door.position.set(0, 0.7, 2.3);
+  door.castShadow = true;
+  group.add(door);
+
+  // Windows (realistic detail)
   const windowMat = new THREE.MeshStandardMaterial({
-    color: 0x6fa8d4, roughness: 0.08, metalness: 0.35,
-    emissive: 0x244a66, emissiveIntensity: ghost ? 0 : 0.25,
-    transparent: ghost, opacity: ghost ? 0.5 : 1.0
+    color: 0x4a6fa5,
+    roughness: 0.1,
+    metalness: 0.3,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
   });
 
-  // --- Grand double-door entrance (courthouse style) ---
-  const doorW = 0.7 * baseScale, doorH = 1.7 * baseScale;
-  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(doorW * 2.4, doorH * 1.15, 0.18 * baseScale), trimMat);
-  doorFrame.position.set(0, doorH * 0.575, front + 0.02 * baseScale);
-  doorFrame.castShadow = true; group.add(doorFrame);
-  [-0.5, 0.5].forEach((sx) => {
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(doorW * 0.95, doorH, 0.16 * baseScale), doorMat);
-    leaf.position.set(sx * doorW, doorH * 0.5, front + 0.08 * baseScale);
-    leaf.castShadow = true; group.add(leaf);
-  });
+  // Window 1 (left)
+  const win1 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.15), windowMat);
+  win1.position.set(-1.0, 1.2, 2.3);
+  win1.castShadow = true;
+  group.add(win1);
 
-  // --- Stone steps up to the entrance ---
-  for (let s = 0; s < 3; s++) {
-    const step = new THREE.Mesh(
-      new THREE.BoxGeometry(doorW * 3.2 - s * 0.4 * baseScale, 0.18 * baseScale, (0.5 - s * 0.13) * baseScale),
-      trimMat
-    );
-    step.position.set(0, 0.09 * baseScale + s * 0.18 * baseScale, front + (0.55 - s * 0.13) * baseScale);
-    step.receiveShadow = true; group.add(step);
-  }
+  // Window 2 (right)
+  const win2 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.15), windowMat);
+  win2.position.set(1.0, 1.2, 2.3);
+  win2.castShadow = true;
+  group.add(win2);
 
-  // --- Two columns flanking the door (the courthouse signature) ---
-  if (!ghost) {
-    [-1, 1].forEach((sx) => {
-      const col = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.22 * baseScale, 0.26 * baseScale, 2.0 * baseScale, 12),
-        trimMat
-      );
-      col.position.set(sx * doorW * 1.9, 1.0 * baseScale, front + 0.25 * baseScale);
-      col.castShadow = true; group.add(col);
-      // simple capital + base
-      [0.05, 1.95].forEach((cy) => {
-        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.6 * baseScale, 0.15 * baseScale, 0.6 * baseScale), trimMat);
-        cap.position.set(sx * doorW * 1.9, cy * baseScale, front + 0.25 * baseScale);
-        cap.castShadow = true; group.add(cap);
-      });
-    });
-    // Triangular pediment over the entrance
-    const ped = new THREE.Mesh(new THREE.ConeGeometry(doorW * 2.4, 0.7 * baseScale, 3), trimMat);
-    ped.rotation.y = Math.PI / 2; ped.position.set(0, 2.25 * baseScale, front + 0.1 * baseScale);
-    ped.castShadow = true; group.add(ped);
-  }
-
-  // --- Rows of tall windows across the front and sides ---
-  function addWindow(x, y, z, ry) {
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.62 * baseScale, 1.0 * baseScale, 0.1 * baseScale), trimMat);
-    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.48 * baseScale, 0.82 * baseScale, 0.16 * baseScale), windowMat);
-    [frame, glass].forEach((m) => { m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; group.add(m); });
-  }
-  const winY = 1.25 * baseScale;
-  // front windows (flanking the door, outside the columns)
-  [-1.9, 1.9].forEach((mx) => addWindow(mx * doorW * 1.0 * 1.7, winY, front + 0.04 * baseScale, 0));
-  // upper-floor front windows
-  [-1, 0, 1].forEach((mx) => addWindow(mx * 1.3 * baseScale, winY + 1.15 * baseScale, front + 0.04 * baseScale, 0));
-  // side windows (both sides)
-  [side, -side].forEach((sxFace) => {
-    [-1, 1].forEach((mz) => addWindow(sxFace + (sxFace > 0 ? 0.04 : -0.04) * baseScale, winY, mz * 1.2 * baseScale, Math.PI / 2));
-  });
+  // Side window
+  const win3 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.15), windowMat);
+  win3.position.set(2.3, 1.2, 0);
+  win3.rotation.y = Math.PI / 2;
+  win3.castShadow = true;
+  group.add(win3);
 
   // Ground footprint ring (helps aim while placing)
   const ring = new THREE.Mesh(
@@ -234,7 +200,7 @@ export function createTownCenter(scene, ghost = true) {
 
   scene.add(group);
 
-  const allMats = [wallMat, roofMat, doorMat, windowMat, trimMat];
+  const allMats = [wallMat, roofMat, doorMat, windowMat];
 
   const building = {
     group,
@@ -264,153 +230,195 @@ export function createTownCenter(scene, ghost = true) {
   return building;
 }
 
-// ---------------------------------------------------------------------------
-// Construction progress bar (billboard) shown above a building while it builds.
-// ---------------------------------------------------------------------------
-function makeConstructionBar() {
-  const g = new THREE.Group();
-  const bg = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.2, 0.34),
-    new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.85, depthTest: false })
-  );
-  const fill = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.1, 0.24),
-    new THREE.MeshBasicMaterial({ color: 0x00d26a, depthTest: false })
-  );
-  fill.position.z = 0.001; g.add(bg); g.add(fill); g.renderOrder = 999;
-  return {
-    group: g,
-    set(frac) { frac = Math.max(0, Math.min(1, frac)); fill.scale.x = frac; fill.position.x = -(1 - frac) * 1.05; }
-  };
-}
-
-// Give any building object timed-construction behaviour. While building, the
-// structure is semi-transparent with a progress bar; when the timer elapses it
-// becomes solid and usable.
-function attachConstruction(building, group, allMats, scene, barHeight) {
-  const bar = makeConstructionBar();
-  bar.group.position.y = barHeight; bar.group.visible = false;
-  group.add(bar.group);
-  let t = 0, dur = 0;
-  building.constructing = false;
-  building.startConstruction = (seconds) => {
-    building.constructing = true; t = 0; dur = Math.max(0.1, seconds);
-    allMats.forEach((m) => { m.transparent = true; m.opacity = 0.4; });
-    bar.set(0); bar.group.visible = true;
-  };
-  building.tickConstruction = (dt, camera) => {
-    if (!building.constructing) return false;
-    t += dt; bar.set(t / dur);
-    if (camera) bar.group.quaternion.copy(camera.quaternion);
-    if (t >= dur) { building.completeConstruction(); return true; }
-    return false;
-  };
-  building.completeConstruction = () => {
-    building.constructing = false;
-    allMats.forEach((m) => { m.transparent = false; m.opacity = 1.0; });
-    bar.group.visible = false;
-    if (building.place) building.place();
-  };
-  building.buildProgress = () => (building.constructing ? t / dur : 1);
-}
-
-// ---------------------------------------------------------------------------
-// House — a personal home: smaller than the Town Center, tax-free storage.
-// ---------------------------------------------------------------------------
+// Create a House building for players to store resources
 export function createHouse(scene, ghost = true) {
   const group = new THREE.Group();
-  const s = 1.4; // house scale (smaller than town center)
+  const baseScale = ghost ? 1 : 1;
 
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xc9a877, roughness: 0.9, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
-  const roofMat = new THREE.MeshStandardMaterial({ color: 0x7a3b25, roughness: 0.85, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
-  const doorMat = new THREE.MeshStandardMaterial({ color: 0x3a2414, roughness: 0.8, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
-  const winMat = new THREE.MeshStandardMaterial({ color: 0x6fa8d4, roughness: 0.1, metalness: 0.3, emissive: 0x244a66, emissiveIntensity: ghost ? 0 : 0.25, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
-
-  const base = new THREE.Mesh(new THREE.BoxGeometry(3.0 * s, 2.0 * s, 3.0 * s), wallMat);
-  base.position.y = 1.0 * s; base.castShadow = true; base.receiveShadow = true; group.add(base);
-
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.5 * s, 1.5 * s, 4), roofMat);
-  roof.position.y = 2.75 * s; roof.rotation.y = Math.PI / 4; roof.castShadow = true; group.add(roof);
-
-  const front = 1.5 * s;
-  const door = new THREE.Mesh(new THREE.BoxGeometry(0.8 * s, 1.3 * s, 0.16 * s), doorMat);
-  door.position.set(0, 0.65 * s, front + 0.02 * s); door.castShadow = true; group.add(door);
-  [-0.85, 0.85].forEach((mx) => {
-    const w = new THREE.Mesh(new THREE.BoxGeometry(0.55 * s, 0.55 * s, 0.12 * s), winMat);
-    w.position.set(mx * s, 1.25 * s, front + 0.02 * s); w.castShadow = true; group.add(w);
+  const wallMat = new THREE.MeshStandardMaterial({
+    color: 0xa0826d,
+    roughness: 0.85,
+    metalness: 0.0,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
   });
 
+  const roofMat = new THREE.MeshStandardMaterial({
+    color: 0x8b5a2b,
+    roughness: 0.8,
+    metalness: 0.0,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
+  });
+
+  // Main structure - smaller than Town Center
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(2.1 * baseScale, 1.8 * baseScale, 2.1 * baseScale),
+    wallMat
+  );
+  base.position.y = 0.9 * baseScale;
+  base.castShadow = true;
+  base.receiveShadow = true;
+  group.add(base);
+
+  // Roof
+  const roofGeo = new THREE.ConeGeometry(2.0 * baseScale, 1.6 * baseScale, 4);
+  const roof = new THREE.Mesh(roofGeo, roofMat);
+  roof.position.y = 2.5 * baseScale;
+  roof.rotation.y = Math.PI / 4;
+  roof.castShadow = true;
+  group.add(roof);
+
+  // Door
+  const doorMat = new THREE.MeshStandardMaterial({
+    color: 0x2a1810,
+    roughness: 0.8,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
+  });
+  const door = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 1.1, 0.15),
+    doorMat
+  );
+  door.position.set(0, 0.55, 1.15);
+  door.castShadow = true;
+  group.add(door);
+
+  // Ground ring for aiming
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(1.8 * s, 2.1 * s, 28),
+    new THREE.RingGeometry(1.5 * baseScale, 1.8 * baseScale, 32),
     new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
   );
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; ring.visible = ghost; group.add(ring);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.02;
+  ring.visible = ghost;
+  group.add(ring);
 
   scene.add(group);
-  const allMats = [wallMat, roofMat, doorMat, winMat];
 
   const building = {
-    group, type: 'house', buildingType: 'house',
-    radius: 2.1 * s, storageMax: 10000,
+    group,
+    type: 'building',
+    buildingType: 'house',
+    radius: 2.1 * baseScale,
+    storageMax: 10000,
     storage: { wood: 0, stone: 0, gold: 0, food: 0, water: 0 },
     isGhost: ghost,
     position: () => group.position.clone(),
     setPosition(x, z) { group.position.set(x, 0, z); },
-    setValid(valid) { ring.material.color.setHex(valid ? 0x00ff88 : 0xff3333); },
-    place() { building.isGhost = false; allMats.forEach((m) => { m.transparent = false; m.opacity = 1.0; }); ring.visible = false; },
-    getStorageUsed() { return Object.values(building.storage).reduce((a, b) => a + b, 0); },
+    setValid(valid) {
+      ring.material.color.setHex(valid ? 0x00ff88 : 0xff3333);
+    },
+    place() {
+      building.isGhost = false;
+      [wallMat, roofMat, doorMat].forEach((m) => { m.transparent = false; m.opacity = 1.0; });
+      ring.visible = false;
+    },
+    getStorageUsed() {
+      return Object.values(building.storage).reduce((a,b)=>a+b,0);
+    },
     remove() { scene.remove(group); }
   };
-  attachConstruction(building, group, allMats, scene, 4.5 * s);
+
   return building;
 }
 
-// ---------------------------------------------------------------------------
-// Fence section — wood or stone. Small solid obstacle; chain them by clicking.
-// ---------------------------------------------------------------------------
-export function createFence(scene, kind = 'woodFence', ghost = true) {
+// Create a Fence section (wood or stone)
+export function createFence(scene, kind = 'wood', ghost = true) {
   const group = new THREE.Group();
-  const isStone = kind === 'stoneFence';
-  const matColor = isStone ? 0x9a958c : 0x8a5a2b;
-  const mat = new THREE.MeshStandardMaterial({ color: matColor, roughness: 0.9, transparent: ghost, opacity: ghost ? 0.5 : 1.0 });
+  const baseScale = ghost ? 1 : 1;
 
-  const width = 1.8, height = isStone ? 1.3 : 1.1, thick = isStone ? 0.35 : 0.2;
-  if (isStone) {
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(width, height, thick), mat);
-    wall.position.y = height / 2; wall.castShadow = true; wall.receiveShadow = true; group.add(wall);
+  let material, height;
+  if (kind === 'stone') {
+    material = new THREE.MeshStandardMaterial({
+      color: 0x808080,
+      roughness: 0.9,
+      metalness: 0.0,
+      transparent: ghost,
+      opacity: ghost ? 0.5 : 1.0
+    });
+    height = 2.0;
   } else {
-    // wood: two rails + posts
-    [-0.8, 0, 0.8].forEach((px) => {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, height, 0.16), mat);
-      post.position.set(px, height / 2, 0); post.castShadow = true; group.add(post);
+    material = new THREE.MeshStandardMaterial({
+      color: 0x8b7355,
+      roughness: 0.85,
+      metalness: 0.0,
+      transparent: ghost,
+      opacity: ghost ? 0.5 : 1.0
     });
-    [0.35, 0.8].forEach((ry) => {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(width, 0.14, 0.1), mat);
-      rail.position.set(0, ry, 0); rail.castShadow = true; group.add(rail);
-    });
+    height = 1.8;
   }
 
+  if (kind === 'stone') {
+    // Stone wall - solid
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(1.0 * baseScale, height * baseScale, 0.3 * baseScale),
+      material
+    );
+    wall.position.y = height * baseScale / 2;
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    group.add(wall);
+  } else {
+    // Wood fence - posts and rails
+    const post1 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1 * baseScale, 0.1 * baseScale, height * baseScale, 8),
+      material
+    );
+    post1.position.set(-0.4 * baseScale, height * baseScale / 2, 0);
+    post1.castShadow = true;
+    group.add(post1);
+
+    const post2 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1 * baseScale, 0.1 * baseScale, height * baseScale, 8),
+      material
+    );
+    post2.position.set(0.4 * baseScale, height * baseScale / 2, 0);
+    post2.castShadow = true;
+    group.add(post2);
+
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9 * baseScale, 0.2 * baseScale, 0.1 * baseScale),
+      material
+    );
+    rail.position.set(0, height * baseScale / 2, 0);
+    rail.castShadow = true;
+    group.add(rail);
+  }
+
+  // Ground ring
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.7, 0.9, 20),
+    new THREE.RingGeometry(0.6 * baseScale, 0.9 * baseScale, 16),
     new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
   );
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; ring.visible = ghost; group.add(ring);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.02;
+  ring.visible = ghost;
+  group.add(ring);
 
   scene.add(group);
-  const allMats = [mat];
-  const S = SETTINGS.building[kind] || {};
 
   const building = {
-    group, type: kind, buildingType: kind,
-    radius: 0.95, hitsToDestroy: S.hitsToDestroy || 25,
+    group,
+    type: 'building',
+    buildingType: 'fence',
+    fenceKind: kind,
+    radius: 0.9 * baseScale,
+    storageMax: 0,
+    storage: {},
     isGhost: ghost,
     position: () => group.position.clone(),
     setPosition(x, z) { group.position.set(x, 0, z); },
-    setRotation(ry) { group.rotation.y = ry; },
-    setValid(valid) { ring.material.color.setHex(valid ? 0x00ff88 : 0xff3333); },
-    place() { building.isGhost = false; allMats.forEach((m) => { m.transparent = false; m.opacity = 1.0; }); ring.visible = false; },
+    setValid(valid) {
+      ring.material.color.setHex(valid ? 0x00ff88 : 0xff3333);
+    },
+    place() {
+      building.isGhost = false;
+      [material].forEach((m) => { m.transparent = false; m.opacity = 1.0; });
+      ring.visible = false;
+    },
     remove() { scene.remove(group); }
   };
-  attachConstruction(building, group, allMats, scene, height + 0.6);
+
   return building;
 }

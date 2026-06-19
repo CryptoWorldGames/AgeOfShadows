@@ -76,6 +76,48 @@ export function showHouseModal(socket, userId) {
   document.getElementById('close-house').onclick = () => modal.remove();
 }
 
+export function showBuildMenu(onBuildSelect) {
+  const existingModal = document.getElementById('build-menu-modal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'build-menu-modal';
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
+
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const textSize = isMobile ? '14px' : '18px';
+  const labelSize = isMobile ? '12px' : '14px';
+  const costSize = isMobile ? '11px' : '13px';
+  const padding = isMobile ? '12px' : '16px';
+
+  modal.innerHTML = `
+    <div style="background:rgba(0,0,0,0.95);border:2px solid #c8a84b;border-radius:12px;padding:24px;width:90%;max-width:400px;color:#fff;font-family:'Segoe UI',sans-serif;">
+      <h2 style="margin:0 0 20px;color:#c8a84b;font-size:24px;text-align:center;font-weight:700;">BUILD</h2>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <button id="build-house" style="padding:${padding};background:rgba(100,200,100,0.2);border:2px solid rgba(100,200,100,0.5);border-radius:6px;color:#fff;font-size:${textSize};font-weight:600;cursor:pointer;transition:all 0.2s;">
+          <div style="font-size:${labelSize};margin-bottom:6px;text-align:left;">House</div>
+          <div style="font-size:${costSize};opacity:0.8;text-align:left;">100 Wood  -  3 min</div>
+        </button>
+        <button id="build-wood-fence" style="padding:${padding};background:rgba(139,100,50,0.2);border:2px solid rgba(139,100,50,0.5);border-radius:6px;color:#fff;font-size:${textSize};font-weight:600;cursor:pointer;transition:all 0.2s;">
+          <div style="font-size:${labelSize};margin-bottom:6px;text-align:left;">Wood Fence</div>
+          <div style="font-size:${costSize};opacity:0.8;text-align:left;">10 Wood  -  10 sec</div>
+        </button>
+        <button id="build-stone-fence" style="padding:${padding};background:rgba(150,150,150,0.2);border:2px solid rgba(150,150,150,0.5);border-radius:6px;color:#fff;font-size:${textSize};font-weight:600;cursor:pointer;transition:all 0.2s;">
+          <div style="font-size:${labelSize};margin-bottom:6px;text-align:left;">Stone Fence</div>
+          <div style="font-size:${costSize};opacity:0.8;text-align:left;">50 Stone  -  20 sec</div>
+        </button>
+      </div>
+      <button id="close-build-menu" style="width:100%;padding:10px;margin-top:16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;cursor:pointer;font-size:14px;font-weight:600;">Close</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('close-build-menu').onclick = () => modal.remove();
+  document.getElementById('build-house').onclick = () => { onBuildSelect('house'); modal.remove(); };
+  document.getElementById('build-wood-fence').onclick = () => { onBuildSelect('woodFence'); modal.remove(); };
+  document.getElementById('build-stone-fence').onclick = () => { onBuildSelect('stoneFence'); modal.remove(); };
+}
+
 export function showTownCenterModal(building) {
   const existingModal = document.getElementById('town-center-modal');
   if (existingModal) existingModal.remove();
@@ -162,7 +204,37 @@ export function showChatPanel(socket) {
     const input = document.getElementById('chat-input');
     const msg = input.value.trim();
     if (!msg) return;
-    socket.emit('chat', { message: msg, playerName: sessionStorage.getItem('playerName') || 'Player' });
+
+    // Handle admin commands
+    if (msg.startsWith('/admin')) {
+      const adminToken = sessionStorage.getItem('adminToken');
+      if (!adminToken) {
+        const msgEl = document.createElement('div');
+        msgEl.style.cssText = `margin-bottom:6px;padding:4px;background:rgba(255,0,0,0.2);border-radius:3px;color:#ff6b6b;`;
+        msgEl.textContent = '❌ Admin commands disabled. Not authenticated as admin.';
+        messagesDiv.appendChild(msgEl);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        input.value = '';
+        return;
+      }
+
+      const parts = msg.split(' ');
+      if (parts[1] === 'give' && parts[2]) {
+        const amount = parseInt(parts[2]) || 1000;
+        // Send admin command to server
+        socket.emit('adminCommand', { command: 'give', amount, token: adminToken });
+        const msgEl = document.createElement('div');
+        msgEl.style.cssText = `margin-bottom:6px;padding:4px;background:rgba(0,255,0,0.1);border-radius:3px;color:#00ff88;`;
+        msgEl.textContent = `📊 Admin: Requesting ${amount} of each resource...`;
+        messagesDiv.appendChild(msgEl);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+      input.value = '';
+      return;
+    }
+
+    const displayName = sessionStorage.getItem('playerName') || sessionStorage.getItem('displayName') || 'Player';
+    socket.emit('chat', { message: msg, playerName: displayName });
     input.value = '';
   };
 
@@ -260,13 +332,13 @@ function showSettingsPanel(displayName, email = '') {
       <h2 style="margin:0 0 20px;color:#c8a84b;font-size:20px;">Settings & Profile</h2>
 
       <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Nickname (shown to other players)</label>
-        <input type="text" id="settings-nickname" value="${displayName}" disabled style="width:100%;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#fff;font-size:13px;box-sizing:border-box;font-weight:600;"/>
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Display Name (shown to other players)</label>
+        <input type="text" id="settings-nickname" value="${displayName}" style="width:100%;padding:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(200,168,75,0.3);border-radius:4px;color:#fff;font-size:13px;box-sizing:border-box;font-weight:600;"/>
       </div>
 
       <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Email (account login)</label>
-        <input type="email" id="settings-email" value="${email}" disabled style="width:100%;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#ccc;font-size:13px;box-sizing:border-box;"/>
+        <label style="display:block;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">Email (account login - full address)</label>
+        <input type="email" id="settings-email" value="${email}" disabled style="width:100%;padding:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,168,75,0.2);border-radius:4px;color:#ccc;font-size:13px;box-sizing:border-box;word-break:break-all;"/>
       </div>
 
       <div style="margin-bottom:16px;">
@@ -389,7 +461,9 @@ export function createUI(playerId, gameState, displayName) {
   // --- Build system: hammer button (far left) opens a build menu ---
   const buildBar = document.createElement('div');
   buildBar.id = 'build-bar';
-  buildBar.style.cssText = `position:absolute;top:150px;left:14px;z-index:100;`;
+  buildBar.style.cssText = `position:absolute;top:150px;left:14px;z-index:100;display:flex;flex-direction:column;gap:10px;`;
+
+  // Hammer button
   const hammerBtn = document.createElement('button');
   hammerBtn.id = 'build-hammer';
   hammerBtn.title = 'Build';
@@ -398,6 +472,16 @@ export function createUI(playerId, gameState, displayName) {
   hammerBtn.onmouseenter = () => { hammerBtn.style.borderColor='#00ff88'; };
   hammerBtn.onmouseleave = () => { hammerBtn.style.borderColor='rgba(255,255,255,0.2)'; };
   buildBar.appendChild(hammerBtn);
+
+  // Character selection button
+  const charButton = document.createElement('button');
+  charButton.id = 'char-button';
+  charButton.innerHTML = '👤<div style="font-size:8px;margin-top:2px;font-weight:600;">UNIT</div>';
+  charButton.style.cssText = `width:64px;height:64px;background:rgba(0,0,0,0.6);color:#fff;border:2px solid rgba(255,255,255,0.2);border-radius:10px;font-size:22px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
+  charButton.onmouseenter = () => { charButton.style.borderColor='#00ff88'; };
+  charButton.onmouseleave = () => { charButton.style.borderColor='rgba(255,255,255,0.2)'; };
+  buildBar.appendChild(charButton);
+
   document.body.appendChild(buildBar);
 
   // Build menu listing what the player can build (cost + time)
@@ -405,39 +489,40 @@ export function createUI(playerId, gameState, displayName) {
   buildMenu.id = 'build-menu';
   buildMenu.style.cssText = `position:absolute;top:150px;left:88px;z-index:101;background:rgba(0,0,0,0.9);border:1px solid #c8a84b;border-radius:10px;padding:10px;width:210px;display:none;font-family:'Segoe UI',sans-serif;color:#fff;`;
   const buildables = [
-    { key: 'house', icon: '🏠' },
-    { key: 'woodFence', icon: '🪵' },
-    { key: 'stoneFence', icon: '🧱' }
+    { key: 'house' },
+    { key: 'woodFence' },
+    { key: 'stoneFence' }
   ];
   let buildSelectCb = () => {};
   const fmtTime = (s) => s >= 60 ? `${Math.round(s/60)} min` : `${s} sec`;
-  buildMenu.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:12px;margin-bottom:8px;letter-spacing:1px;">BUILD</div>`;
-  buildables.forEach(({ key, icon }) => {
+  buildMenu.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:14px;margin-bottom:8px;letter-spacing:1px;">BUILD</div>`;
+  buildables.forEach(({ key }) => {
     const b = SETTINGS.building[key];
     if (!b) return;
     const costs = [];
-    if (b.woodCost) costs.push(`${b.woodCost}🪵`);
-    if (b.stoneCost) costs.push(`${b.stoneCost}🪨`);
-    if (b.goldCost) costs.push(`${b.goldCost}💰`);
+    if (b.woodCost) costs.push(`${b.woodCost} Wood`);
+    if (b.stoneCost) costs.push(`${b.stoneCost} Stone`);
+    if (b.goldCost) costs.push(`${b.goldCost} Gold`);
     const card = document.createElement('button');
     card.className = 'build-option';
     card.dataset.key = key;
-    card.style.cssText = `width:100%;text-align:left;background:rgba(200,168,75,0.12);border:1px solid rgba(200,168,75,0.4);border-radius:6px;color:#fff;cursor:pointer;padding:8px;margin-bottom:6px;font-size:12px;`;
-    card.innerHTML = `<div style="font-weight:600;">${icon} ${b.label}</div>
-      <div style="font-size:10px;opacity:0.85;margin-top:2px;color:#e8c84a;">${costs.join(' ')} · ⏱ ${fmtTime(b.buildTime)}</div>`;
+    card.style.cssText = `width:100%;text-align:left;background:rgba(200,168,75,0.12);border:1px solid rgba(200,168,75,0.4);border-radius:6px;color:#fff;cursor:pointer;padding:8px;margin-bottom:6px;font-size:13px;`;
+    card.innerHTML = `<div style="font-weight:600;font-size:14px;">${b.label}</div>
+      <div style="font-size:11px;opacity:0.85;margin-top:2px;color:#e8c84a;">${costs.join('  ·  ')} · ⏱ ${fmtTime(b.buildTime)}</div>`;
     card.onclick = () => { buildMenu.style.display = 'none'; buildSelectCb(key); };
     buildMenu.appendChild(card);
   });
   // Fence hint
   const fenceHint = document.createElement('div');
   fenceHint.style.cssText = 'font-size:9px;opacity:0.55;margin-top:2px;';
-  fenceHint.textContent = 'Fences: click repeatedly to place a line. Right-click / Esc to stop.';
+  fenceHint.textContent = 'Fences: click repeatedly to place a line.';
   buildMenu.appendChild(fenceHint);
   document.body.appendChild(buildMenu);
 
   hammerBtn.onclick = () => {
     buildMenu.style.display = buildMenu.style.display === 'none' ? 'block' : 'none';
   };
+>>>>>>> claude/relaxed-pascal-f2fqh5
 
   const tracks = [
     { file:'kaazoom-the-ballad-of-my-sweet-fair-maiden-medieval-style-music-358306.mp3', label:'Ballad' },
@@ -702,6 +787,7 @@ export function createUI(playerId, gameState, displayName) {
       toastTimer = setTimeout(()=>{ toast.style.display='none'; }, duration);
     },
     onBuildSelect(cb) { buildSelectCb = cb; },
+    onCharacterClick(cb) { charButton.onclick = cb; },
     showConfirm(label) {
       const p = document.getElementById('place-prompt');
       if (p && label) p.textContent = label;
