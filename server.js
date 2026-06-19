@@ -177,10 +177,13 @@ setInterval(() => {
           unit.carryingWeight += amount * (resourceWeights[type] || 1);
         });
 
+        // Damage only taken while actively gathering (not while traveling)
         unit.health = Math.max(0, unit.health - 0.1);
 
         // Auto-deposit when weight capacity full (100 weight units)
         // Food: 100 food (1 weight each)
+        // Wood: 50 wood (2 weight each)
+        // Stone: 10 stone (10 weight each)
         // Gold: 4 gold (25 weight each)
         if (unit.carryingWeight >= 100) {
           const house = world.buildings.find(b => b.ownerId === player.id && b.type === 'house');
@@ -190,6 +193,7 @@ setInterval(() => {
             Object.entries(deposit).forEach(([type, amount]) => {
               house.storage[type] = (house.storage[type] || 0) + amount;
             });
+            console.log(`[DEPOSIT] Unit deposited to house:`, deposit);
           } else {
             const tc = world.townCenterLedger = world.townCenterLedger || { ledger: {} };
             tc.ledger[player.id] = tc.ledger[player.id] || { name: player.name };
@@ -197,6 +201,7 @@ setInterval(() => {
               const stored = Math.floor(amount * 0.5); // 50% tax
               tc.ledger[player.id][type] = (tc.ledger[player.id][type] || 0) + stored;
             });
+            console.log(`[DEPOSIT] Unit deposited to town center with 50% tax:`, deposit);
           }
           unit.carrying = {};
           unit.carryingWeight = 0;
