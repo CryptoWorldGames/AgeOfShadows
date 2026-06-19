@@ -108,6 +108,179 @@ setInterval(() => {
   if (changed) io.emit('worldUpdate', { trees: world.trees });
 }, 500);
 
+// Work damage - units take 0.1 damage per work swing/action
+// This represents exertion and combat while working
+setInterval(() => {
+  Object.values(world.players).forEach((player) => {
+    if (!player.units) return;
+    player.units.forEach((unit) => {
+      if (!unit.isWorking || unit.health <= 0 || !unit.taskType) return;
+
+      // Each work tick = ~1 swing action
+      // Take 0.1 damage per swing regardless of task
+      const oldHealth = unit.health;
+      unit.health = Math.max(0, unit.health - 0.1);
+
+      // Track hits for visual feedback (every 3 hits = blood splat)
+      if (!unit.hitCount) unit.hitCount = 0;
+      unit.hitCount++;
+
+      // Trigger effects every 3 hits
+      if (unit.hitCount % 3 === 0) {
+        // Emit to client: damage taken, show blood splat and play sound
+        const socketId = Object.keys(socketUserMap).find(sid =>
+          world.players[sid]?.units?.includes(unit)
+        );
+        if (socketId) {
+          io.to(socketId).emit('unitDamage', {
+            unitIndex: world.players[socketId].units.indexOf(unit),
+            health: unit.health,
+            splat: true // show blood splat every 3 hits
+          });
+        }
+      }
+    });
+  });
+}, 5000); // Every 5 seconds (each tick = 1 swing)
+
+// Unit AI simulation - men work, hunt, defend, and regenerate
+setInterval(() => {
+  Object.values(world.players).forEach((player) => {
+    if (!player.units) return;
+    player.units.forEach((unit) => {
+      if (!unit.health) unit.health = 100;
+      if (!unit.carrying) unit.carrying = { food: 0 };
+
+      // Check if past 24-hour work limit
+      const now = Date.now();
+      const workStartTime = unit.workStartTime || now;
+      const elapsedSeconds = (now - workStartTime) / 1000;
+      const pastWorkLimit = elapsedSeconds >= 86400; // 24 hours
+
+      // If currently working
+      if (unit.isWorking && !pastWorkLimit) {
+        // Gather resources based on task type with weight-based carrying
+        if (!unit.carrying) unit.carrying = {};
+        if (!unit.carryingWeight) unit.carryingWeight = 0;
+
+        const resourceWeights = { food: 1, wood: 2, stone: 10, gold: 25 };
+        const gatherRates = { hunt: 'food', wood: 'wood', stone: 'stone', gold: 'gold' };
+        const resourceType = gatherRates[unit.taskType] || 'food';
+
+        // Auto-find target resource if none exists or current is depleted
+        if (!unit.targetResourceId || !unit.targetResourceType) {
+          // Search for available resource using spiral pattern
+          let foundResource = null;
+          const searchRadius = 100;
+
+          if (resourceType === 'food') {
+            // For hunting, look for animals (limit by distance from unit)
+            foundResource = world.animals && world.animals.length > 0
+              ? world.animals[Math.floor(Math.random() * world.animals.length)]
+              : null;
+          } else if (resourceType === 'wood') {
+            foundResource = world.trees.find(t => t.state === 'standing' && t.wood > 0);
+          } else if (resourceType === 'stone') {
+            foundResource = world.stones && world.stones.length > 0
+              ? world.stones.find(s => s && s.hp && s.hp > 0)
+              : null;
+          } else if (resourceType === 'gold') {
+            foundResource = world.golds && world.golds.length > 0
+              ? world.golds.find(g => g && g.hp && g.hp > 0)
+              : null;
+          }
+
+          if (foundResource) {
+            unit.targetResourceId = foundResource.id;
+            unit.targetResourceType = resourceType;
+          }
+        }
+
+        // Gather amounts: food/wood/stone = 1/tick, gold = 0.2/tick (rare, slow)
+        const gatherAmount = (resourceType === 'gold') ? 0.2 : 1;
+        unit.carrying[resourceType] = (unit.carrying[resourceType] || 0) + gatherAmount;
+
+        // Calculate total weight being carried
+        unit.carryingWeight = 0;
+        Object.entries(unit.carrying).forEach(([type, amount]) => {
+          unit.carryingWeight += amount * (resourceWeights[type] || 1);
+        });
+
+        // Damage only taken while actively gathering (not while traveling)
+        unit.health = Math.max(0, unit.health - 0.1);
+
+        // Auto-deposit when weight capacity full (100 weight units)
+        // Food: 100 food (1 weight each)
+        // Wood: 50 wood (2 weight each)
+        // Stone: 10 stone (10 weight each)
+        // Gold: 4 gold (25 weight each)
+        if (unit.carryingWeight >= 100) {
+          const house = world.buildings.find(b => b.ownerId === player.id && b.type === 'house');
+          const deposit = unit.carrying;
+          if (house) {
+            house.storage = house.storage || {};
+            Object.entries(deposit).forEach(([type, amount]) => {
+              house.storage[type] = (house.storage[type] || 0) + amount;
+            });
+            console.log(`[DEPOSIT] Unit deposited to house:`, deposit);
+          } else {
+            const tc = world.townCenterLedger = world.townCenterLedger || { ledger: {} };
+            tc.ledger[player.id] = tc.ledger[player.id] || { name: player.name };
+            Object.entries(deposit).forEach(([type, amount]) => {
+              const stored = Math.floor(amount * 0.5); // 50% tax
+              tc.ledger[player.id][type] = (tc.ledger[player.id][type] || 0) + stored;
+            });
+            console.log(`[DEPOSIT] Unit deposited to town center with 50% tax:`, deposit);
+          }
+          unit.carrying = {};
+          unit.carryingWeight = 0;
+        }
+
+        // Critical health: retreat to house
+        if (unit.health <= 5) {
+          unit.isWorking = false;
+          unit.isRegenerating = true;
+          unit.regenStartTime = now;
+          console.log(`[RETREAT] Unit retreated to house (${unit.health}% HP)`);
+        }
+      } else if (unit.isWorking && pastWorkLimit) {
+        // Work time expired - stop working
+        unit.isWorking = false;
+        console.log(`[WORK-END] Unit work ended after 24 hours`);
+      }
+
+      // If idle (not working, not regenerating): lose 1 HP per hour (0.0028 per 5-sec tick)
+      if (!unit.isWorking && !unit.isRegenerating) {
+        unit.health = Math.max(0, unit.health - 0.0139); // 1 HP per hour ≈ 0.0139 per 5 seconds
+      }
+
+      // Regenerating in house: scales by missing HP (1 hour at 1% HP, 30 min at 50% HP)
+      if (unit.isRegenerating) {
+        const regenElapsed = (now - (unit.regenStartTime || now)) / 1000;
+        const missingHP = 100 - unit.health;
+        const regenTime = (missingHP / 100) * 3600; // 1 hour at 100 damage, scales down
+
+        if (regenElapsed >= regenTime) {
+          unit.health = 100;
+          unit.isRegenerating = false;
+          // Auto-resume work if still within 24 hours
+          const newElapsed = (now - workStartTime) / 1000;
+          if (newElapsed < 86400 && unit.taskType) {
+            unit.isWorking = true;
+            console.log(`[RESUME] Unit resumed ${unit.taskType} after regeneration`);
+          } else {
+            console.log(`[REGEN-DONE] Unit fully healed but work time expired`);
+          }
+        } else {
+          // Heal proportionally: at 1% health takes 1 hour, at 50% takes 30 min, etc.
+          const healRate = missingHP / regenTime; // HP per second
+          unit.health = Math.min(100, unit.health + (healRate * 5));
+        }
+      }
+    });
+  });
+}, 5000); // Every 5 seconds
+
 setInterval(() => {
   io.emit('worldUpdate', {
     trees: world.trees,
@@ -265,6 +438,62 @@ io.on('connection', (socket) => {
       player.resources = data.resources;
       console.log(`[SYNC] ${player.name} resources:`, data.resources);
     }
+  });
+
+  socket.on('buildUnit', (data) => {
+    const player = world.players[socket.id];
+    if (!player) return;
+
+    const cost = 100; // food cost to build one man
+    if (player.resources.food < cost) {
+      socket.emit('toast', `Need ${cost} food to build a man (you have ${player.resources.food})`);
+      return;
+    }
+
+    // Deduct cost
+    player.resources.food -= cost;
+
+    // Create new unit at player's first unit location (or center)
+    const spawnX = player.units[0]?.x || 0;
+    const spawnZ = player.units[0]?.z || 18;
+    const newUnit = {
+      id: `${socket.id}_u${player.units.length}_${Date.now()}`,
+      x: spawnX,
+      z: spawnZ,
+      team: 'red',
+      ownerId: socket.id,
+      health: 100,
+      carrying: { food: 0 },
+      isWorking: false,
+      isRegenerating: false,
+      taskType: null,
+      workStartTime: null,
+      regenStartTime: null
+    };
+    player.units.push(newUnit);
+
+    socket.emit('resourceUpdate', player.resources);
+    socket.emit('toast', `Built a new man for ${cost} food!`);
+    console.log(`[BUILD] ${player.name} built a new unit. Total: ${player.units.length}`);
+  });
+
+  socket.on('setUnitTask', (data) => {
+    const player = world.players[socket.id];
+    if (!player || data.unitIndex === undefined || !data.task) return;
+
+    const unit = player.units[data.unitIndex];
+    if (!unit) return;
+
+    unit.isWorking = true;
+    unit.taskType = data.task; // 'hunt', 'wood', 'stone', 'gold', etc.
+    unit.workStartTime = Date.now();
+    unit.health = 100;
+    unit.carrying = {};
+    unit.carryingWeight = 0;
+    unit.isRegenerating = false;
+
+    socket.emit('toast', `Unit started ${data.task} (24 hour shift)`);
+    console.log(`[TASK] Unit ${data.unitIndex} set to ${data.task} for 24 hours`);
   });
 
   socket.on('disconnect', async () => {

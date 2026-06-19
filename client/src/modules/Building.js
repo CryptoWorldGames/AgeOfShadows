@@ -65,72 +65,102 @@ function createSignTexture() {
   return texture;
 }
 
-// Town Center building.
+// Town Center building - Age of Empires style fortress
 // Ghost mode: transparent, follows cursor on the ground, not collidable.
 // Placed mode: solid, permanent, collidable.
 export function createTownCenter(scene, ghost = true) {
   const group = new THREE.Group();
 
-  // Improved materials with better detail
-  const wallMat = new THREE.MeshStandardMaterial({
-    color: 0xb8936a,
-    roughness: 0.9,
-    metalness: 0.0,
+  // Stone fortress materials
+  const stoneMat = new THREE.MeshStandardMaterial({
+    color: 0xa89968,
+    roughness: 0.85,
+    metalness: 0.05,
     transparent: ghost,
     opacity: ghost ? 0.5 : 1.0,
     side: THREE.FrontSide
   });
 
   const roofMat = new THREE.MeshStandardMaterial({
-    color: 0x6b2f20,
-    roughness: 0.85,
+    color: 0x5a3a1a,
+    roughness: 0.9,
     metalness: 0.0,
     transparent: ghost,
     opacity: ghost ? 0.5 : 1.0
   });
 
-  // Main wooden structure (Town Center is 2x bigger than house)
+  const trimMat = new THREE.MeshStandardMaterial({
+    color: 0xd4b896,
+    roughness: 0.8,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
+  });
+
+  // Main fortress structure - solid, imposing stone walls
   const baseScale = ghost ? 1 : 2.0;
-  const base = new THREE.Mesh(new THREE.BoxGeometry(4.5 * baseScale, 2.2 * baseScale, 4.5 * baseScale), wallMat);
-  base.position.y = 1.1 * baseScale;
+  const base = new THREE.Mesh(new THREE.BoxGeometry(5.0 * baseScale, 3.0 * baseScale, 5.0 * baseScale), stoneMat);
+  base.position.y = 1.5 * baseScale;
   base.castShadow = true;
   base.receiveShadow = true;
   group.add(base);
 
-  // Pitched roof (more realistic)
-  const roofGeo = new THREE.ConeGeometry(3.4 * baseScale, 2.0 * baseScale, 4);
+  // Steep pitched roof for Age of Empires appearance
+  const roofGeo = new THREE.ConeGeometry(3.8 * baseScale, 2.4 * baseScale, 4);
   const roof = new THREE.Mesh(roofGeo, roofMat);
-  roof.position.y = 3.2 * baseScale;
+  roof.position.y = 3.6 * baseScale;
   roof.rotation.y = Math.PI / 4;
   roof.castShadow = true;
   group.add(roof);
 
-  // Add flag on top for Town Center (distinctive marker)
+  // Add tower turrets on corners for fortress look
   if (!ghost) {
+    [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5]].forEach(([x, z]) => {
+      const turret = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.6 * baseScale, 0.7 * baseScale, 3.2 * baseScale, 8),
+        stoneMat
+      );
+      turret.position.set(x, 1.6 * baseScale, z);
+      turret.castShadow = true;
+      group.add(turret);
+
+      // Turret roof
+      const turretRoof = new THREE.Mesh(
+        new THREE.ConeGeometry(0.8 * baseScale, 0.8 * baseScale, 8),
+        roofMat
+      );
+      turretRoof.position.set(x, 3.4 * baseScale, z);
+      turretRoof.castShadow = true;
+      group.add(turretRoof);
+    });
+
+    // Tall flag pole on top (Age of Empires style)
     const flagpole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.1, 3 * baseScale, 8),
-      new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+      new THREE.CylinderGeometry(0.08 * baseScale, 0.08 * baseScale, 2.5 * baseScale, 8),
+      new THREE.MeshStandardMaterial({ color: 0x3a3a3a })
     );
-    flagpole.position.set(0, 3.5 * baseScale, 0);
+    flagpole.position.set(0, 4.3 * baseScale, 0);
+    flagpole.castShadow = true;
     group.add(flagpole);
 
+    // Flag banner
     const flag = new THREE.Mesh(
       new THREE.BoxGeometry(0.8 * baseScale, 0.5 * baseScale, 0.05),
-      new THREE.MeshStandardMaterial({ color: 0xffff00 })
+      new THREE.MeshStandardMaterial({ color: 0xffcc00 })
     );
-    flag.position.set(0.5 * baseScale, 4.8 * baseScale, 0);
+    flag.position.set(0.5 * baseScale, 5.0 * baseScale, 0);
+    flag.castShadow = true;
     group.add(flag);
 
-    // Wooden sign post — front-center, raised high so it's readable from camera angle
+    // Wooden sign post — front-center, readable
     const signPost = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.15, 0.2, 2.5 * baseScale, 8),
+      new THREE.CylinderGeometry(0.12 * baseScale, 0.18 * baseScale, 2.2 * baseScale, 8),
       new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.8 })
     );
-    signPost.position.set(-3.6 * baseScale, 1.0 * baseScale, 4.0 * baseScale);
+    signPost.position.set(0, 1.1 * baseScale, 3.0 * baseScale);
     signPost.castShadow = true;
     group.add(signPost);
 
-    // Wooden sign board — same front-center position, readable
+    // Wooden sign board
     const signMat = new THREE.MeshStandardMaterial({
       color: 0xa0826d,
       roughness: 0.7,
@@ -140,86 +170,119 @@ export function createTownCenter(scene, ghost = true) {
       new THREE.BoxGeometry(1.2 * baseScale, 0.8 * baseScale, 0.1 * baseScale),
       signMat
     );
-    signBoard.position.set(-3.6 * baseScale, 2.0 * baseScale, 4.0 * baseScale);
+    signBoard.position.set(0, 1.8 * baseScale, 3.1 * baseScale);
     signBoard.castShadow = true;
-    signBoard.rotation.y = 0;
     group.add(signBoard);
   }
 
-  // The wall faces sit at ±half-width. Everything below is placed ON those faces
-  // (scaled by baseScale) so the door/windows aren't buried inside the walls.
-  const front = 2.25 * baseScale;   // +z front wall face
-  const side = 2.25 * baseScale;    // +x / -x side wall faces
+  // Fortress entrance configuration
+  const front = 2.5 * baseScale;   // +z front wall face
+  const side = 2.5 * baseScale;    // +x / -x side wall faces
 
   const doorMat = new THREE.MeshStandardMaterial({
-    color: 0x3a2414, roughness: 0.8, transparent: ghost, opacity: ghost ? 0.5 : 1.0
-  });
-  const trimMat = new THREE.MeshStandardMaterial({
-    color: 0xe8e2d0, roughness: 0.7, transparent: ghost, opacity: ghost ? 0.5 : 1.0
+    color: 0x2a1810, roughness: 0.9, transparent: ghost, opacity: ghost ? 0.5 : 1.0
   });
   const windowMat = new THREE.MeshStandardMaterial({
-    color: 0x6fa8d4, roughness: 0.08, metalness: 0.35,
-    emissive: 0x244a66, emissiveIntensity: ghost ? 0 : 0.25,
+    color: 0x5a8aaa, roughness: 0.1, metalness: 0.2,
+    emissive: 0x1a3a4a, emissiveIntensity: ghost ? 0 : 0.2,
     transparent: ghost, opacity: ghost ? 0.5 : 1.0
   });
 
-  // --- Grand double-door entrance (courthouse style) ---
-  const doorW = 0.7 * baseScale, doorH = 1.7 * baseScale;
-  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(doorW * 2.4, doorH * 1.15, 0.18 * baseScale), trimMat);
-  doorFrame.position.set(0, doorH * 0.575, front + 0.02 * baseScale);
-  doorFrame.castShadow = true; group.add(doorFrame);
-  [-0.5, 0.5].forEach((sx) => {
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(doorW * 0.95, doorH, 0.16 * baseScale), doorMat);
-    leaf.position.set(sx * doorW, doorH * 0.5, front + 0.08 * baseScale);
-    leaf.castShadow = true; group.add(leaf);
+  // --- Grand fortress entrance with double doors ---
+  const doorW = 0.6 * baseScale, doorH = 1.8 * baseScale;
+
+  // Door frame/archway
+  const doorFrameGroup = new THREE.Group();
+
+  // Arched doorway frame (stone)
+  const archFrame = new THREE.Mesh(
+    new THREE.BoxGeometry(doorW * 2.2, doorH * 1.2, 0.2 * baseScale),
+    trimMat
+  );
+  archFrame.position.z = 0.02 * baseScale;
+  doorFrameGroup.add(archFrame);
+
+  // Double doors
+  [-doorW * 0.5, doorW * 0.5].forEach((sx) => {
+    const door = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, 0.15 * baseScale), doorMat);
+    door.position.set(sx, doorH * 0.5, 0.08 * baseScale);
+    door.castShadow = true;
+    doorFrameGroup.add(door);
   });
 
-  // --- Stone steps up to the entrance ---
+  doorFrameGroup.position.set(0, 1.2 * baseScale, front);
+  doorFrameGroup.castShadow = true;
+  group.add(doorFrameGroup);
+
+  // Stone steps up to entrance (3 steps)
   for (let s = 0; s < 3; s++) {
     const step = new THREE.Mesh(
-      new THREE.BoxGeometry(doorW * 3.2 - s * 0.4 * baseScale, 0.18 * baseScale, (0.5 - s * 0.13) * baseScale),
+      new THREE.BoxGeometry(2.2 * baseScale - s * 0.3 * baseScale, 0.2 * baseScale, 0.5 * baseScale),
       trimMat
     );
-    step.position.set(0, 0.09 * baseScale + s * 0.18 * baseScale, front + (0.55 - s * 0.13) * baseScale);
-    step.receiveShadow = true; group.add(step);
+    step.position.set(0, 0.1 * baseScale + s * 0.2 * baseScale, front + 0.4 * baseScale - s * 0.5 * baseScale);
+    step.receiveShadow = true;
+    group.add(step);
   }
 
-  // --- Two columns flanking the door (the courthouse signature) ---
+  // Crenellations (fortress battlements) on top of walls if placed
   if (!ghost) {
-    [-1, 1].forEach((sx) => {
-      const col = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.22 * baseScale, 0.26 * baseScale, 2.0 * baseScale, 12),
-        trimMat
+    // Front crenellations
+    for (let i = -2; i <= 2; i++) {
+      const cren = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3 * baseScale, 0.6 * baseScale, 0.3 * baseScale),
+        stoneMat
       );
-      col.position.set(sx * doorW * 1.9, 1.0 * baseScale, front + 0.25 * baseScale);
-      col.castShadow = true; group.add(col);
-      // simple capital + base
-      [0.05, 1.95].forEach((cy) => {
-        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.6 * baseScale, 0.15 * baseScale, 0.6 * baseScale), trimMat);
-        cap.position.set(sx * doorW * 1.9, cy * baseScale, front + 0.25 * baseScale);
-        cap.castShadow = true; group.add(cap);
-      });
+      cren.position.set(i * 0.9 * baseScale, 3.0 * baseScale, front);
+      cren.castShadow = true;
+      group.add(cren);
+    }
+    // Side crenellations
+    [side, -side].forEach((sxFace) => {
+      for (let i = -2; i <= 2; i++) {
+        const cren = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3 * baseScale, 0.6 * baseScale, 0.3 * baseScale),
+          stoneMat
+        );
+        cren.position.set(sxFace, 3.0 * baseScale, i * 0.9 * baseScale);
+        cren.castShadow = true;
+        group.add(cren);
+      }
     });
-    // Triangular pediment over the entrance
-    const ped = new THREE.Mesh(new THREE.ConeGeometry(doorW * 2.4, 0.7 * baseScale, 3), trimMat);
-    ped.rotation.y = Math.PI / 2; ped.position.set(0, 2.25 * baseScale, front + 0.1 * baseScale);
-    ped.castShadow = true; group.add(ped);
   }
 
-  // --- Rows of tall windows across the front and sides ---
+  // --- Windows: properly embedded in walls, not floating ---
   function addWindow(x, y, z, ry) {
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.62 * baseScale, 1.0 * baseScale, 0.1 * baseScale), trimMat);
-    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.48 * baseScale, 0.82 * baseScale, 0.16 * baseScale), windowMat);
-    [frame, glass].forEach((m) => { m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; group.add(m); });
+    const frameSize = 0.6 * baseScale;
+    const glassSize = 0.45 * baseScale;
+
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(frameSize, frameSize, 0.12 * baseScale),
+      trimMat
+    );
+    const glass = new THREE.Mesh(
+      new THREE.BoxGeometry(glassSize, glassSize, 0.16 * baseScale),
+      windowMat
+    );
+
+    frame.position.set(x, y, z);
+    glass.position.set(x, y, z + 0.02 * baseScale);
+    frame.rotation.y = ry;
+    glass.rotation.y = ry;
+    frame.castShadow = true;
+    glass.castShadow = true;
+
+    group.add(frame);
+    group.add(glass);
   }
-  const winY = 1.25 * baseScale;
-  // front windows (flanking the door, outside the columns)
-  [-1.9, 1.9].forEach((mx) => addWindow(mx * doorW * 1.0 * 1.7, winY, front + 0.04 * baseScale, 0));
-  // upper-floor front windows
-  [-1, 0, 1].forEach((mx) => addWindow(mx * 1.3 * baseScale, winY + 1.15 * baseScale, front + 0.04 * baseScale, 0));
-  // side windows (both sides)
+
+  const winY = 1.8 * baseScale;
+  // Front windows (flanking the doors)
+  [-1.5, 1.5].forEach((mx) => addWindow(mx * baseScale, winY, front, 0));
+
+  // Side windows
   [side, -side].forEach((sxFace) => {
-    [-1, 1].forEach((mz) => addWindow(sxFace + (sxFace > 0 ? 0.04 : -0.04) * baseScale, winY, mz * 1.2 * baseScale, Math.PI / 2));
+    [-1.2, 1.2].forEach((mz) => addWindow(sxFace, winY, mz * baseScale, Math.PI / 2));
   });
 
   // Ground footprint ring (helps aim while placing)
@@ -234,7 +297,7 @@ export function createTownCenter(scene, ghost = true) {
 
   scene.add(group);
 
-  const allMats = [wallMat, roofMat, doorMat, windowMat, trimMat];
+  const allMats = [stoneMat, roofMat, doorMat, windowMat, trimMat];
 
   const building = {
     group,
@@ -291,17 +354,43 @@ function attachConstruction(building, group, allMats, scene, barHeight) {
   const bar = makeConstructionBar();
   bar.group.position.y = barHeight; bar.group.visible = false;
   group.add(bar.group);
+
+  // Create hammers that animate during construction
+  const hammers = [];
+  for (let i = 0; i < 4; i++) {
+    const hammerGroup = new THREE.Group();
+    const hammerHead = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.08), new THREE.MeshStandardMaterial({ color: 0x888888 }));
+    hammerHead.position.y = 0.05;
+    const hammerHandle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), new THREE.MeshStandardMaterial({ color: 0x654321 }));
+    hammerHandle.position.y = 0.25;
+    hammerGroup.add(hammerHead);
+    hammerGroup.add(hammerHandle);
+    hammerGroup.position.set((i - 1.5) * 0.8, 0, 1.2);
+    group.add(hammerGroup);
+    hammers.push({ group: hammerGroup, startY: hammerGroup.position.y, phase: i * 0.5 });
+  }
+
   let t = 0, dur = 0;
   building.constructing = false;
   building.startConstruction = (seconds) => {
     building.constructing = true; t = 0; dur = Math.max(0.1, seconds);
     allMats.forEach((m) => { m.transparent = true; m.opacity = 0.4; });
     bar.set(0); bar.group.visible = true;
+    hammers.forEach(h => h.group.visible = true);
   };
   building.tickConstruction = (dt, camera) => {
     if (!building.constructing) return false;
     t += dt; bar.set(t / dur);
     if (camera) bar.group.quaternion.copy(camera.quaternion);
+
+    // Animate hammers: bounce up and down
+    hammers.forEach((h, i) => {
+      const hammerTime = t + h.phase;
+      const bounce = Math.sin(hammerTime * 8) * 0.3;
+      h.group.position.y = h.startY + Math.max(0, bounce);
+      h.group.rotation.z = Math.sin(hammerTime * 8) * 0.3;
+    });
+
     if (t >= dur) { building.completeConstruction(); return true; }
     return false;
   };
@@ -309,6 +398,7 @@ function attachConstruction(building, group, allMats, scene, barHeight) {
     building.constructing = false;
     allMats.forEach((m) => { m.transparent = false; m.opacity = 1.0; });
     bar.group.visible = false;
+    hammers.forEach(h => h.group.visible = false);
     if (building.place) building.place();
   };
   building.buildProgress = () => (building.constructing ? t / dur : 1);
