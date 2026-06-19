@@ -120,16 +120,16 @@ export function createTownCenter(scene, ghost = true) {
     flag.position.set(0.5 * baseScale, 4.8 * baseScale, 0);
     group.add(flag);
 
-    // Wooden sign post
+    // Wooden sign post — front-center, raised high so it's readable from camera angle
     const signPost = new THREE.Mesh(
       new THREE.CylinderGeometry(0.15, 0.2, 2.5 * baseScale, 8),
       new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.8 })
     );
-    signPost.position.set(-2.5 * baseScale, 1.2 * baseScale, 1.5 * baseScale);
+    signPost.position.set(0, 2.5 * baseScale, 4.5 * baseScale + 0.4);
     signPost.castShadow = true;
     group.add(signPost);
 
-    // Wooden sign board
+    // Wooden sign board — same front-center position, readable
     const signMat = new THREE.MeshStandardMaterial({
       color: 0xa0826d,
       roughness: 0.7,
@@ -139,9 +139,9 @@ export function createTownCenter(scene, ghost = true) {
       new THREE.BoxGeometry(1.2 * baseScale, 0.8 * baseScale, 0.1 * baseScale),
       signMat
     );
-    signBoard.position.set(-2.5 * baseScale, 2.0 * baseScale, 1.5 * baseScale);
+    signBoard.position.set(0, 3.2 * baseScale, 4.5 * baseScale + 0.5);
     signBoard.castShadow = true;
-    signBoard.rotation.y = 0.3;
+    signBoard.rotation.y = 0;
     group.add(signBoard);
   }
 

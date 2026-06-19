@@ -149,8 +149,8 @@ export default function GameScene({ auth }) {
           world.units.push(createHuman(scene, { x: u.x, y: 0, z: u.z }, { team: u.team || 'red' }));
         });
       } else {
-        // Spawn clearly OUTSIDE the Town Center footprint (wall radius ~4.5 at 2x scale).
-        world.units.push(createHuman(scene, { x: 0, y: 0, z: 12 }, { team: 'red' }));
+        // Spawn clearly in front of Town Center, visible to camera looking from +Z at (0,20,28)
+        world.units.push(createHuman(scene, { x: 0, y: 0, z: 18 }, { team: 'red' }));
       }
 
       const usedSpots = [];
