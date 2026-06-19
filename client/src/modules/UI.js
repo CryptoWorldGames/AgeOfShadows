@@ -57,6 +57,48 @@ export function showHouseModal(socket, userId) {
   document.getElementById('close-house').onclick = () => modal.remove();
 }
 
+export function showBuildMenu(onBuildSelect) {
+  const existingModal = document.getElementById('build-menu-modal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'build-menu-modal';
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
+
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const textSize = isMobile ? '14px' : '18px';
+  const labelSize = isMobile ? '12px' : '14px';
+  const costSize = isMobile ? '11px' : '13px';
+  const padding = isMobile ? '12px' : '16px';
+
+  modal.innerHTML = `
+    <div style="background:rgba(0,0,0,0.95);border:2px solid #c8a84b;border-radius:12px;padding:24px;width:90%;max-width:400px;color:#fff;font-family:'Segoe UI',sans-serif;">
+      <h2 style="margin:0 0 20px;color:#c8a84b;font-size:24px;text-align:center;font-weight:700;">BUILD</h2>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <button id="build-house" style="padding:${padding};background:rgba(100,200,100,0.2);border:2px solid rgba(100,200,100,0.5);border-radius:6px;color:#fff;font-size:${textSize};font-weight:600;cursor:pointer;transition:all 0.2s;">
+          <div style="font-size:${labelSize};margin-bottom:6px;text-align:left;">House</div>
+          <div style="font-size:${costSize};opacity:0.8;text-align:left;">100 Wood  -  3 min</div>
+        </button>
+        <button id="build-wood-fence" style="padding:${padding};background:rgba(139,100,50,0.2);border:2px solid rgba(139,100,50,0.5);border-radius:6px;color:#fff;font-size:${textSize};font-weight:600;cursor:pointer;transition:all 0.2s;">
+          <div style="font-size:${labelSize};margin-bottom:6px;text-align:left;">Wood Fence</div>
+          <div style="font-size:${costSize};opacity:0.8;text-align:left;">10 Wood  -  10 sec</div>
+        </button>
+        <button id="build-stone-fence" style="padding:${padding};background:rgba(150,150,150,0.2);border:2px solid rgba(150,150,150,0.5);border-radius:6px;color:#fff;font-size:${textSize};font-weight:600;cursor:pointer;transition:all 0.2s;">
+          <div style="font-size:${labelSize};margin-bottom:6px;text-align:left;">Stone Fence</div>
+          <div style="font-size:${costSize};opacity:0.8;text-align:left;">50 Stone  -  20 sec</div>
+        </button>
+      </div>
+      <button id="close-build-menu" style="width:100%;padding:10px;margin-top:16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;cursor:pointer;font-size:14px;font-weight:600;">Close</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('close-build-menu').onclick = () => modal.remove();
+  document.getElementById('build-house').onclick = () => { onBuildSelect('house'); modal.remove(); };
+  document.getElementById('build-wood-fence').onclick = () => { onBuildSelect('woodFence'); modal.remove(); };
+  document.getElementById('build-stone-fence').onclick = () => { onBuildSelect('stoneFence'); modal.remove(); };
+}
+
 export function showTownCenterModal(building) {
   const existingModal = document.getElementById('town-center-modal');
   if (existingModal) existingModal.remove();
@@ -367,15 +409,31 @@ export function createUI(playerId, gameState, displayName) {
 
   const buildBar = document.createElement('div');
   buildBar.id = 'build-bar';
-  buildBar.style.cssText = `position:absolute;top:150px;left:14px;z-index:100;`;
-  const tcButton = document.createElement('button');
-  tcButton.id = 'tc-button';
-  tcButton.innerHTML = '🏛️<div style="font-size:9px;margin-top:2px;">Town Center<br><span style="color:#e8c84a;">100 🪵</span></div>';
-  tcButton.style.cssText = `width:72px;height:72px;background:rgba(0,0,0,0.6);color:#fff;border:2px solid rgba(255,255,255,0.2);border-radius:10px;font-size:22px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
-  tcButton.onmouseenter = () => { tcButton.style.borderColor='#00ff88'; };
-  tcButton.onmouseleave = () => { tcButton.style.borderColor='rgba(255,255,255,0.2)'; };
-  buildBar.appendChild(tcButton);
+  buildBar.style.cssText = `position:absolute;top:150px;left:14px;z-index:100;display:flex;flex-direction:column;gap:10px;`;
+
+  // Build button (hammer)
+  const buildButton = document.createElement('button');
+  buildButton.id = 'build-button';
+  buildButton.innerHTML = '🔨<div style="font-size:8px;margin-top:2px;font-weight:600;">BUILD</div>';
+  buildButton.style.cssText = `width:72px;height:72px;background:rgba(0,0,0,0.6);color:#fff;border:2px solid rgba(255,255,255,0.2);border-radius:10px;font-size:22px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
+  buildButton.onmouseenter = () => { buildButton.style.borderColor='#00ff88'; };
+  buildButton.onmouseleave = () => { buildButton.style.borderColor='rgba(255,255,255,0.2)'; };
+  buildButton.onclick = () => showBuildMenu((kind) => {});
+  buildBar.appendChild(buildButton);
+
+  // Character selection button
+  const charButton = document.createElement('button');
+  charButton.id = 'char-button';
+  charButton.innerHTML = '👤<div style="font-size:8px;margin-top:2px;font-weight:600;">UNIT</div>';
+  charButton.style.cssText = `width:72px;height:72px;background:rgba(0,0,0,0.6);color:#fff;border:2px solid rgba(255,255,255,0.2);border-radius:10px;font-size:22px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
+  charButton.onmouseenter = () => { charButton.style.borderColor='#00ff88'; };
+  charButton.onmouseleave = () => { charButton.style.borderColor='rgba(255,255,255,0.2)'; };
+  buildBar.appendChild(charButton);
+
   document.body.appendChild(buildBar);
+
+  // Store charButton for later reference
+  const buttons = { buildButton, charButton };
 
   const tracks = [
     { file:'kaazoom-the-ballad-of-my-sweet-fair-maiden-medieval-style-music-358306.mp3', label:'Ballad' },
@@ -630,7 +688,8 @@ export function createUI(playerId, gameState, displayName) {
       if (toastTimer) clearTimeout(toastTimer);
       toastTimer = setTimeout(()=>{ toast.style.display='none'; }, duration);
     },
-    onTownCenterClick(cb) { tcButton.onclick = cb; },
+    onBuildClick(cb) { buildButton.onclick = () => { showBuildMenu(cb); }; },
+    onCharacterClick(cb) { charButton.onclick = cb; },
     showConfirm() { popup.style.display='block'; },
     hideConfirm() { popup.style.display='none'; },
     onConfirmYes(cb) { document.getElementById('place-yes').onclick = cb; },

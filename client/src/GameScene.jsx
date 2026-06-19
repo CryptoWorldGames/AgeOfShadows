@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import { createEnvironment } from './modules/Environment';
 import { createHuman } from './modules/Human';
 import { createTree } from './modules/Tree';
-import { createUI, showChatPanel, showInventoryModal, showHouseModal } from './modules/UI';
+import { createUI, showChatPanel, showInventoryModal, showHouseModal, showBuildMenu } from './modules/UI';
 import { createControls } from './modules/Controls';
 import { createTownCenter } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
@@ -143,6 +143,12 @@ export default function GameScene({ auth }) {
           }, 4000);
         }
       };
+
+      // Build button handler
+      ui.onBuildClick((buildKind) => {
+        // This will be wired up by the Controls module
+        console.log('Build selected:', buildKind);
+      });
 
       if (joinData.player.units && joinData.player.units.length > 0) {
         joinData.player.units.forEach(u => {
@@ -293,6 +299,22 @@ export default function GameScene({ auth }) {
       try {
         const ctrl = createControls(camera, renderer, scene, world);
         update = ctrl.update; dispose = ctrl.dispose;
+
+        // Character selection button handler
+        ui.onCharacterClick(() => {
+          if (world.units && world.units.length > 0) {
+            const firstUnit = world.units[0];
+            // Focus camera on unit and select it
+            camera.position.set(
+              firstUnit.group.position.x + 3,
+              firstUnit.group.position.y + 4,
+              firstUnit.group.position.z + 3
+            );
+            // Select the unit
+            ui.setSelectedCount(1);
+            world.ui.showToast('Selected: ' + (auth.displayName || 'Unit'));
+          }
+        });
       } catch (e) {
         console.error('createControls failed:', e);
         const box = document.createElement('div');
