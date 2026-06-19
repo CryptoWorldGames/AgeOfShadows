@@ -108,6 +108,42 @@ setInterval(() => {
   if (changed) io.emit('worldUpdate', { trees: world.trees });
 }, 500);
 
+// Unit work simulation - men gather resources even when players are offline
+setInterval(() => {
+  Object.values(world.players).forEach((player) => {
+    if (!player.units) return;
+    player.units.forEach((unit) => {
+      // Each unit gathers 1 food per tick (adjust rate as needed)
+      if (!unit.carrying) unit.carrying = { food: 0 };
+
+      // Simulate gathering: find nearby food/animals
+      // For now, just give free food (simplified - real version would check nearby resources)
+      unit.carrying.food += 1;
+
+      // Auto-deposit when full (100 capacity)
+      if (unit.carrying.food >= 100) {
+        const deposit = unit.carrying.food;
+
+        // Try to deposit to player's house first (no tax)
+        const house = world.buildings.find(b => b.ownerId === player.id && b.type === 'house');
+        if (house) {
+          house.storage = house.storage || {};
+          house.storage.food = (house.storage.food || 0) + deposit;
+          console.log(`[AUTO-DEPOSIT] Unit deposited ${deposit} food to house (no tax)`);
+        } else {
+          // Deposit to town center with 50% tax
+          const tc = world.townCenterLedger = world.townCenterLedger || { ledger: {} };
+          tc.ledger[player.id] = tc.ledger[player.id] || { name: player.name };
+          const stored = Math.floor(deposit * 0.5);
+          tc.ledger[player.id].food = (tc.ledger[player.id].food || 0) + stored;
+          console.log(`[AUTO-DEPOSIT] Unit deposited ${stored} food to town center (50% tax from ${deposit})`);
+        }
+        unit.carrying.food = 0;
+      }
+    });
+  });
+}, 5000); // Every 5 seconds
+
 setInterval(() => {
   io.emit('worldUpdate', {
     trees: world.trees,
@@ -265,6 +301,37 @@ io.on('connection', (socket) => {
       player.resources = data.resources;
       console.log(`[SYNC] ${player.name} resources:`, data.resources);
     }
+  });
+
+  socket.on('buildUnit', (data) => {
+    const player = world.players[socket.id];
+    if (!player) return;
+
+    const cost = 10; // food cost to build one man
+    if (player.resources.food < cost) {
+      socket.emit('toast', `Need ${cost} food to build a man (you have ${player.resources.food})`);
+      return;
+    }
+
+    // Deduct cost
+    player.resources.food -= cost;
+
+    // Create new unit at player's first unit location (or center)
+    const spawnX = player.units[0]?.x || 0;
+    const spawnZ = player.units[0]?.z || 18;
+    const newUnit = {
+      id: `${socket.id}_u${player.units.length}_${Date.now()}`,
+      x: spawnX,
+      z: spawnZ,
+      team: 'red',
+      ownerId: socket.id,
+      carrying: { food: 0 }
+    };
+    player.units.push(newUnit);
+
+    socket.emit('resourceUpdate', player.resources);
+    socket.emit('toast', `Built a new man for ${cost} food!`);
+    console.log(`[BUILD] ${player.name} built a new unit. Total: ${player.units.length}`);
   });
 
   socket.on('disconnect', async () => {

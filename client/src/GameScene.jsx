@@ -132,6 +132,7 @@ export default function GameScene({ auth }) {
         <div style="color:#c8a84b;font-weight:700;font-size:13px;margin-bottom:2px;letter-spacing:1px;">AGE OF SHADOWS</div>
         <div style="opacity:0.7;font-size:10px;margin-bottom:8px;">v2.14</div>
         <button id="inv-btn-inline" style="width:100%;padding:5px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">📦 Inventory</button>
+        <button id="build-unit-btn" style="width:100%;padding:5px;background:rgba(100,200,75,0.15);border:1px solid rgba(100,200,75,0.5);border-radius:4px;color:#64c84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">👤 Build Man (10F)</button>
         <button id="game-logout-btn" style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">Logout</button>
       `;
       document.body.appendChild(gameInfo);
@@ -145,6 +146,10 @@ export default function GameScene({ auth }) {
       };
 
       document.getElementById('inv-btn-inline').onclick = () => showInventoryModal(world.resources);
+
+      document.getElementById('build-unit-btn').onclick = () => {
+        socket.emit('buildUnit', {});
+      };
 
       document.getElementById('game-logout-btn').onclick = () => {
         if (confirm('Logout?')) {
@@ -270,6 +275,10 @@ export default function GameScene({ auth }) {
 
       socket.on('resourceUpdate', (res) => {
         world.resources = res;
+      });
+
+      socket.on('toast', (msg) => {
+        world.ui.showToast(msg);
       });
 
       socket.on('treeUpdate', (tree) => {
