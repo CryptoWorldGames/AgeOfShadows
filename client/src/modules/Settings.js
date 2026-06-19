@@ -48,10 +48,10 @@ export const SETTINGS = {
   // Stone: 3 weight → 33 stone per trip (slow)
   // Gold: 25 weight → 4 gold per trip (very slow, rare)
   resourceWeights: {
-    food: 1,      // Light, abundant
-    wood: 2,      // Medium
-    stone: 3,     // Heavy
-    gold: 25      // Very heavy, rare (100 capacity / 25 weight = 4 pieces max)
+    food: 1,      // Light, abundant (100 per haul)
+    wood: 2,      // Medium (50 per haul)
+    stone: 10,    // Heavy (10 per haul)
+    gold: 25      // Very heavy, rare (4 per haul)
   },
   building: {
     townCenter: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 30, label: 'Town Center', storageMax: 100000 },

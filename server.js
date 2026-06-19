@@ -163,7 +163,7 @@ setInterval(() => {
         if (!unit.carrying) unit.carrying = {};
         if (!unit.carryingWeight) unit.carryingWeight = 0;
 
-        const resourceWeights = { food: 1, wood: 2, stone: 3, gold: 25 };
+        const resourceWeights = { food: 1, wood: 2, stone: 10, gold: 25 };
         const gatherRates = { hunt: 'food', wood: 'wood', stone: 'stone', gold: 'gold' };
         const resourceType = gatherRates[unit.taskType] || 'food';
 
