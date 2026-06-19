@@ -207,22 +207,34 @@ export default function GameScene({ auth }) {
       }
       world.golds.push(createGold(scene, { x: 5, y:0, z: 5 }));
 
-      // Spread 30 chickens and 20 deer evenly across the whole map,
+      // Spread animals evenly across the whole map using a grid-based approach,
       // avoiding the town center and the pond.
-      function scatterAnimal(makeFn, count, minCenter) {
-        let placed = 0, tries = 0;
-        while (placed < count && tries < count * 60) {
-          tries++;
-          const x = (Math.random()-0.5)*150;
-          const z = (Math.random()-0.5)*150;
-          if (Math.sqrt(x*x+z*z) < minCenter) continue; // off town center
-          if (inPond(x, z)) continue;                    // not in the pond
-          world.animals.push(makeFn(scene, { x, y:0, z }));
-          placed++;
+      function scatterAnimalEvenly(makeFn, count, minCenter) {
+        const mapSize = 150;
+        const mapRadius = mapSize / 2;
+
+        // Calculate grid dimensions to distribute animals evenly
+        const gridCols = Math.ceil(Math.sqrt(count * (mapSize / mapSize)));
+        const gridRows = Math.ceil(count / gridCols);
+        const cellWidth = mapSize / gridCols;
+        const cellHeight = mapSize / gridRows;
+
+        let placed = 0;
+        for (let row = 0; row < gridRows && placed < count; row++) {
+          for (let col = 0; col < gridCols && placed < count; col++) {
+            // Random position within this cell
+            const x = (col - gridCols / 2 + Math.random()) * cellWidth;
+            const z = (row - gridRows / 2 + Math.random()) * cellHeight;
+
+            if (Math.sqrt(x*x+z*z) < minCenter) continue; // off town center
+            if (inPond(x, z)) continue;                    // not in the pond
+            world.animals.push(makeFn(scene, { x, y:0, z }));
+            placed++;
+          }
         }
       }
-      scatterAnimal(createChicken, 30, 9);
-      scatterAnimal(createDeer, 20, 12);
+      scatterAnimalEvenly(createChicken, 30, 9);
+      scatterAnimalEvenly(createDeer, 20, 12);
 
       // Create default Town Center at center of map
       const defaultTownCenter = createTownCenter(scene, false);
@@ -323,6 +335,21 @@ export default function GameScene({ auth }) {
         console.log('[AUTOSAVE] Syncing resources:', world.resources);
       }, 5000);
 
+      // View culling: only render/update objects near the player's units
+      const RENDER_DISTANCE = 80;  // render distance for full updates
+      const WORK_DISTANCE = 200;   // units can still gather from far away
+      let getRenderCenter = () => {
+        if (world.units.length === 0) return new THREE.Vector3(0, 0, 0);
+        const c = new THREE.Vector3();
+        world.units.forEach(u => c.add(u.group.position));
+        c.divideScalar(world.units.length);
+        return c;
+      };
+      let isInRenderRange = (pos) => {
+        const center = getRenderCenter();
+        return pos.distanceTo(center) < RENDER_DISTANCE;
+      };
+
       let update = () => {}, dispose = () => {};
       try {
         // Focus the camera on the player's first man so he's centered and zoomed in.
@@ -381,11 +408,63 @@ export default function GameScene({ auth }) {
         }
 
         safe('water', () => { if (env.waterUpdate) env.waterUpdate(dt); });
-        safe('trees', () => world.trees.forEach((t) => t.update(dt)));
-        safe('stones', () => world.stones.forEach((s) => s.update(dt)));
-        safe('golds', () => world.golds.forEach((g) => g.update(dt)));
-        safe('animals', () => world.animals.forEach((a) => a.update(dt, world)));
+
+        // Always update player's own units (they work even AFK)
         safe('units', () => world.units.forEach((u) => { u.update(dt, world); u.animate(dt); }));
+
+        // View culling: only detailed updates for nearby objects
+        safe('trees', () => {
+          world.trees.forEach((t) => {
+            if (t.group && isInRenderRange(t.group.position)) {
+              t.update(dt);
+              t.group.visible = true;
+            } else if (t.group) {
+              t.group.visible = false;
+            }
+          });
+        });
+        safe('stones', () => {
+          world.stones.forEach((s) => {
+            if (s.group && isInRenderRange(s.group.position)) {
+              s.update(dt);
+              s.group.visible = true;
+            } else if (s.group) {
+              s.group.visible = false;
+            }
+          });
+        });
+        safe('golds', () => {
+          world.golds.forEach((g) => {
+            if (g.group && isInRenderRange(g.group.position)) {
+              g.update(dt);
+              g.group.visible = true;
+            } else if (g.group) {
+              g.group.visible = false;
+            }
+          });
+        });
+        safe('animals', () => {
+          world.animals.forEach((a) => {
+            if (a.group && isInRenderRange(a.group.position)) {
+              a.update(dt, world);
+              a.group.visible = true;
+            } else if (a.group) {
+              a.group.visible = false;
+            }
+          });
+        });
+
+        // Cull buildings too (but skip own buildings which must always render)
+        safe('buildings', () => {
+          world.buildings.forEach((b) => {
+            if (b.group && isInRenderRange(b.group.position)) {
+              b.group.visible = true;
+            } else if (b.group && b.ownerId !== world.playerId) {
+              b.group.visible = false;
+            }
+          });
+        });
+
         safe('others', () => Object.values(otherPlayers).forEach(units => units.forEach(u => u.animate(dt))));
         safe('hud', () => ui.setResources(world.resources));
 
