@@ -248,6 +248,16 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   const commandAt = (cx, cy) => {
     if (ghostBuilding || selected.size === 0) return false;
 
+    // Building (Town Center / house) — send selected units to deposit their load.
+    const depotBuilding = raycastBuilding(cx, cy);
+    if (depotBuilding && depotBuilding.storage) {
+      Array.from(selected).forEach((u) => { if (u.depositAt) u.depositAt(depotBuilding); });
+      const bp = (typeof depotBuilding.position === 'function') ? depotBuilding.position() : null;
+      if (bp) showResourceHighlight(bp);
+      okSound.currentTime = 0; okSound.play();
+      return true;
+    }
+
     // Chicken
     const chicken = raycastGroup(cx, cy, (world.animals || []).filter(a => a.type === 'chicken' || a.type === 'deer'));
     if (chicken) {
@@ -329,6 +339,14 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     }
     const building = raycastBuilding(cx, cy);
     if (building) {
+      // If units are selected, tapping a storage building sends them to deposit.
+      if (selected.size > 0 && building.storage) {
+        Array.from(selected).forEach((u) => { if (u.depositAt) u.depositAt(building); });
+        const bp = (typeof building.position === 'function') ? building.position() : null;
+        if (bp) showResourceHighlight(bp);
+        okSound.currentTime = 0; okSound.play();
+        return;
+      }
       if (building.type === 'townCenter' || building.isTownCenter) showTownCenterModal(building);
       return;
     }

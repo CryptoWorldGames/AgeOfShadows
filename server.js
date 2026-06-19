@@ -208,21 +208,34 @@ io.on('connection', (socket) => {
 
   socket.on('depositBuilding', (data) => {
     const player = world.players[socket.id];
-    if (!player) return;
-    const building = world.buildings.find(b => b.id === data.buildingId);
-    if (!building || building.ownerId !== socket.id) return;
+    if (!player || !data || !data.resources) return;
 
     const isTownCenter = data.buildingType === 'townCenter';
+    // Houses are private (owner only); the Town Center is public to all players.
+    let building = world.buildings.find(b => b.id === data.buildingId);
+    if (building && !isTownCenter && building.ownerId !== socket.id) return;
+
     const taxRate = isTownCenter ? 0.5 : 0;
+
+    // Keep a per-player ledger on the building so it knows who deposited what.
+    // (The Town Center may live only on clients, so we track its ledger here.)
+    if (!building) building = (isTownCenter
+      ? (world.townCenterLedger = world.townCenterLedger || { id: data.buildingId, ledger: {} })
+      : null);
+    if (!building) return;
+    building.ledger = building.ledger || {};
+    const led = building.ledger[socket.id] = building.ledger[socket.id] || { name: player.name };
 
     Object.keys(data.resources).forEach(key => {
       const amount = data.resources[key] || 0;
-      const taxedAmount = Math.floor(amount * (1 - taxRate));
-      building.storage[key] = (building.storage[key] || 0) + taxedAmount;
-      player.resources[key] = (player.resources[key] || 0) - amount;
+      const kept = Math.floor(amount * (1 - taxRate));
+      if (building.storage) building.storage[key] = (building.storage[key] || 0) + kept;
+      led[key] = (led[key] || 0) + kept;
     });
+    // player.resources is kept authoritative by the 5s resourceSync, so we do
+    // not mutate it here (avoids double-counting against the client total).
 
-    console.log(`[DEPOSIT] ${player.name} deposited into ${isTownCenter ? 'Town Center' : 'Building'}, tax: ${taxRate * 100}%`);
+    console.log(`[DEPOSIT] ${player.name} -> ${isTownCenter ? 'Town Center' : 'house'} (tax ${taxRate * 100}%)`);
   });
 
   socket.on('chat', (data) => {

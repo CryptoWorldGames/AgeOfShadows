@@ -314,21 +314,33 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
   }
 
   function depositInventory(building, world) {
-    const toDeposit = {};
+    // Town Center charges a 50% tax; your own house stores everything tax-free.
+    const isTownCenter = building.type === 'townCenter' || building.isTownCenter;
+    const taxRate = isTownCenter ? 0.5 : 0;
+    const depositorId = world.playerId || 'me';
+    // Per-depositor ledger so the building knows who put in what.
+    if (!building.ledger) building.ledger = {};
+    if (!building.ledger[depositorId]) building.ledger[depositorId] = {wood:0,stone:0,gold:0,food:0,water:0};
+
+    const carried = {};   // full amount taken off the unit
+    let anything = false;
     Object.keys(inventory).forEach((key) => {
-      if (inventory[key] > 0) {
-        const space = (building.storageMax || 10000) - (building.storage[key] || 0);
-        const dep = Math.min(inventory[key], Math.max(0, space));
-        toDeposit[key] = dep;
-        building.storage[key] = (building.storage[key] || 0) + dep;
-        inventory[key] -= dep;
+      const have = inventory[key];
+      if (have > 0) {
+        const kept = Math.floor(have * (1 - taxRate)); // after tax
+        building.storage[key] = (building.storage[key] || 0) + kept;
+        building.ledger[depositorId][key] += kept;
+        carried[key] = have;
+        inventory[key] = 0; // unit drops its entire load
+        anything = true;
       }
     });
-    if (Object.values(toDeposit).some(v => v > 0)) {
+    if (anything) {
       world.socket.emit('depositBuilding', {
         buildingId: building.id,
         buildingType: building.type,
-        resources: toDeposit
+        resources: carried,
+        taxRate
       });
     }
     updateWorldResources(world);
@@ -703,6 +715,8 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     mineStone(stone,slot){stoneTarget=stone;stoneSlot=slot||null;chopTarget=null;animalTarget=null;goldTarget=null;target=null;chopPhase=0;stoneHitCount=0;autoTask='stone';returning=false;},
     mineGold(gold,slot){goldTarget=gold;goldSlot=slot||null;chopTarget=null;animalTarget=null;stoneTarget=null;target=null;chopPhase=0;goldHitCount=0;autoTask='gold';returning=false;},
     stop(){target=null;chopTarget=null;animalTarget=null;stoneTarget=null;goldTarget=null;autoTask=null;returning=false;depositTarget=null;lastKillPos=null;},
+    // Player-commanded deposit: drop everything off at this building, then idle.
+    depositAt(building){chopTarget=null;animalTarget=null;stoneTarget=null;goldTarget=null;target=null;autoTask=null;depositTarget=building;returning=true;lastKillPos=null;},
     update, animate(){}
   };
 
