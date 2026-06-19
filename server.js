@@ -146,6 +146,16 @@ io.on('connection', (socket) => {
         buildings
       };
 
+      // Remove any stale session for the SAME user (e.g. a reconnect under a new
+      // socket id) so a single account never shows up as two avatars on the map.
+      Object.keys(world.players).forEach((sid) => {
+        if (sid !== socket.id && world.players[sid].userId === data.userId) {
+          delete world.players[sid];
+          delete socketUserMap[sid];
+          io.emit('playerLeft', { playerId: sid });
+        }
+      });
+
       world.players[socket.id] = player;
       socketUserMap[socket.id] = data.userId;
 

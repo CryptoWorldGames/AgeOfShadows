@@ -54,6 +54,10 @@ export default function GameScene({ auth }) {
 
     const socket = io('/', { reconnection: true });
 
+    let initialized = false;
+    let worldRef = null;
+    let gameCleanup = null;
+
     socket.on('connect', () => {
       console.log('Connected:', socket.id);
       socket.emit('join', { userId: auth.userId, email: auth.email });
@@ -61,7 +65,15 @@ export default function GameScene({ auth }) {
 
     socket.on('joined', (data) => {
       console.log('Joined:', data);
-      initializeGame(data);
+      // Guard against reconnects: build the game ONCE. A reconnect gives us a new
+      // socket id, so just refresh our identity (so we keep skipping our own
+      // avatar in worldUpdate) instead of spawning a whole second game + units.
+      if (initialized) {
+        if (worldRef) worldRef.playerId = data.playerId;
+        return;
+      }
+      initialized = true;
+      worldRef = initializeGame(data);
     });
 
     socket.on('joinError', (err) => {
@@ -368,7 +380,7 @@ export default function GameScene({ auth }) {
       };
       window.addEventListener('resize', handleResize);
 
-      return () => {
+      gameCleanup = () => {
         clearInterval(syncInterval);
         Object.keys(otherPlayers).forEach(removeOtherPlayer);
         window.removeEventListener('resize', handleResize);
@@ -377,9 +389,11 @@ export default function GameScene({ auth }) {
           containerRef.current.removeChild(renderer.domElement);
         }
       };
+      return world;
     }
 
     return () => {
+      if (gameCleanup) gameCleanup();
       socket.disconnect();
     };
   }, [auth, checkingOrientation]);
