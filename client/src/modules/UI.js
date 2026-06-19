@@ -485,7 +485,7 @@ export function createUI(playerId, gameState, displayName) {
   volRow.style.cssText = 'display:flex;align-items:center;gap:6px;';
   volRow.innerHTML = `<span style="font-size:12px;">🔊</span>`;
   const volSlider = document.createElement('input');
-  volSlider.type='range'; volSlider.min=0; volSlider.max=100; volSlider.value=60;
+  volSlider.type='range'; volSlider.min=0; volSlider.max=100; volSlider.value=25;
   volSlider.style.cssText = 'flex:1;accent-color:#00ff88;cursor:pointer;';
   volRow.appendChild(volSlider);
   musicPanel.appendChild(volRow);
@@ -500,7 +500,7 @@ export function createUI(playerId, gameState, displayName) {
   });
 
   const audio = new Audio();
-  audio.volume = 0.6;
+  audio.volume = 0.25; // start at 25%
   activeMusicAudio = audio; // track so a later createUI() can stop this one
   let currentTrack = DEFAULT_TRACK;
   let musicOn = true;

@@ -315,7 +315,10 @@ export default function GameScene({ auth }) {
 
       let update = () => {}, dispose = () => {};
       try {
-        const ctrl = createControls(camera, renderer, scene, world);
+        // Focus the camera on the player's first man so he's centered and zoomed in.
+        const firstUnit = world.units[0];
+        const startPos = firstUnit ? firstUnit.group.position.clone() : new THREE.Vector3(0, 0, 18);
+        const ctrl = createControls(camera, renderer, scene, world, startPos);
         update = ctrl.update; dispose = ctrl.dispose;
       } catch (e) {
         console.error('createControls failed:', e);

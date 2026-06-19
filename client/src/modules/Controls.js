@@ -17,16 +17,19 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     // A one-finger TAP (no drag) is handled separately for select/command.
     controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
   }
-  if (isMobile && playerStartPos) {
-    controls.target.copy(playerStartPos);
-    camera.position.set(playerStartPos.x + 2, playerStartPos.y + 3, playerStartPos.z + 3);
-  }
   controls.minPolarAngle = Math.PI / 6;
   controls.maxPolarAngle = Math.PI / 3;
   controls.zoomToCursor = false;
   controls.mouseButtons = { MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   controls.enableRotate = false;
-  controls.target.set(0, 0, 0);
+  // Start the camera zoomed in on the player's man so he's easy to see.
+  if (playerStartPos) {
+    controls.target.set(playerStartPos.x, 1, playerStartPos.z);
+    const dist = isMobile ? 9 : 12;
+    camera.position.set(playerStartPos.x, playerStartPos.y + dist * 0.7, playerStartPos.z + dist);
+  } else {
+    controls.target.set(0, 0, 0);
+  }
   controls.update();
 
   const okSound = new Audio('/sounds/pensieri_profondi_scuba-ok-274157.mp3');

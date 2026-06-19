@@ -125,7 +125,7 @@ export function createTownCenter(scene, ghost = true) {
       new THREE.CylinderGeometry(0.15, 0.2, 2.5 * baseScale, 8),
       new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.8 })
     );
-    signPost.position.set(0, 2.5 * baseScale, 4.5 * baseScale + 0.4);
+    signPost.position.set(-3.6 * baseScale, 1.0 * baseScale, 4.0 * baseScale);
     signPost.castShadow = true;
     group.add(signPost);
 
@@ -139,7 +139,7 @@ export function createTownCenter(scene, ghost = true) {
       new THREE.BoxGeometry(1.2 * baseScale, 0.8 * baseScale, 0.1 * baseScale),
       signMat
     );
-    signBoard.position.set(0, 3.2 * baseScale, 4.5 * baseScale + 0.5);
+    signBoard.position.set(-3.6 * baseScale, 2.0 * baseScale, 4.0 * baseScale);
     signBoard.castShadow = true;
     signBoard.rotation.y = 0;
     group.add(signBoard);
