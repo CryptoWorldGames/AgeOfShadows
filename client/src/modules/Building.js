@@ -229,3 +229,196 @@ export function createTownCenter(scene, ghost = true) {
 
   return building;
 }
+
+// Create a House building for players to store resources
+export function createHouse(scene, ghost = true) {
+  const group = new THREE.Group();
+  const baseScale = ghost ? 1 : 1;
+
+  const wallMat = new THREE.MeshStandardMaterial({
+    color: 0xa0826d,
+    roughness: 0.85,
+    metalness: 0.0,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
+  });
+
+  const roofMat = new THREE.MeshStandardMaterial({
+    color: 0x8b5a2b,
+    roughness: 0.8,
+    metalness: 0.0,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
+  });
+
+  // Main structure - smaller than Town Center
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(2.1 * baseScale, 1.8 * baseScale, 2.1 * baseScale),
+    wallMat
+  );
+  base.position.y = 0.9 * baseScale;
+  base.castShadow = true;
+  base.receiveShadow = true;
+  group.add(base);
+
+  // Roof
+  const roofGeo = new THREE.ConeGeometry(2.0 * baseScale, 1.6 * baseScale, 4);
+  const roof = new THREE.Mesh(roofGeo, roofMat);
+  roof.position.y = 2.5 * baseScale;
+  roof.rotation.y = Math.PI / 4;
+  roof.castShadow = true;
+  group.add(roof);
+
+  // Door
+  const doorMat = new THREE.MeshStandardMaterial({
+    color: 0x2a1810,
+    roughness: 0.8,
+    transparent: ghost,
+    opacity: ghost ? 0.5 : 1.0
+  });
+  const door = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 1.1, 0.15),
+    doorMat
+  );
+  door.position.set(0, 0.55, 1.15);
+  door.castShadow = true;
+  group.add(door);
+
+  // Ground ring for aiming
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.5 * baseScale, 1.8 * baseScale, 32),
+    new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.02;
+  ring.visible = ghost;
+  group.add(ring);
+
+  scene.add(group);
+
+  const building = {
+    group,
+    type: 'building',
+    buildingType: 'house',
+    radius: 2.1 * baseScale,
+    storageMax: 10000,
+    storage: { wood: 0, stone: 0, gold: 0, food: 0, water: 0 },
+    isGhost: ghost,
+    position: () => group.position.clone(),
+    setPosition(x, z) { group.position.set(x, 0, z); },
+    setValid(valid) {
+      ring.material.color.setHex(valid ? 0x00ff88 : 0xff3333);
+    },
+    place() {
+      building.isGhost = false;
+      [wallMat, roofMat, doorMat].forEach((m) => { m.transparent = false; m.opacity = 1.0; });
+      ring.visible = false;
+    },
+    getStorageUsed() {
+      return Object.values(building.storage).reduce((a,b)=>a+b,0);
+    },
+    remove() { scene.remove(group); }
+  };
+
+  return building;
+}
+
+// Create a Fence section (wood or stone)
+export function createFence(scene, kind = 'wood', ghost = true) {
+  const group = new THREE.Group();
+  const baseScale = ghost ? 1 : 1;
+
+  let material, height;
+  if (kind === 'stone') {
+    material = new THREE.MeshStandardMaterial({
+      color: 0x808080,
+      roughness: 0.9,
+      metalness: 0.0,
+      transparent: ghost,
+      opacity: ghost ? 0.5 : 1.0
+    });
+    height = 2.0;
+  } else {
+    material = new THREE.MeshStandardMaterial({
+      color: 0x8b7355,
+      roughness: 0.85,
+      metalness: 0.0,
+      transparent: ghost,
+      opacity: ghost ? 0.5 : 1.0
+    });
+    height = 1.8;
+  }
+
+  if (kind === 'stone') {
+    // Stone wall - solid
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(1.0 * baseScale, height * baseScale, 0.3 * baseScale),
+      material
+    );
+    wall.position.y = height * baseScale / 2;
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    group.add(wall);
+  } else {
+    // Wood fence - posts and rails
+    const post1 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1 * baseScale, 0.1 * baseScale, height * baseScale, 8),
+      material
+    );
+    post1.position.set(-0.4 * baseScale, height * baseScale / 2, 0);
+    post1.castShadow = true;
+    group.add(post1);
+
+    const post2 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1 * baseScale, 0.1 * baseScale, height * baseScale, 8),
+      material
+    );
+    post2.position.set(0.4 * baseScale, height * baseScale / 2, 0);
+    post2.castShadow = true;
+    group.add(post2);
+
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9 * baseScale, 0.2 * baseScale, 0.1 * baseScale),
+      material
+    );
+    rail.position.set(0, height * baseScale / 2, 0);
+    rail.castShadow = true;
+    group.add(rail);
+  }
+
+  // Ground ring
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.6 * baseScale, 0.9 * baseScale, 16),
+    new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.6 })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.02;
+  ring.visible = ghost;
+  group.add(ring);
+
+  scene.add(group);
+
+  const building = {
+    group,
+    type: 'building',
+    buildingType: 'fence',
+    fenceKind: kind,
+    radius: 0.9 * baseScale,
+    storageMax: 0,
+    storage: {},
+    isGhost: ghost,
+    position: () => group.position.clone(),
+    setPosition(x, z) { group.position.set(x, 0, z); },
+    setValid(valid) {
+      ring.material.color.setHex(valid ? 0x00ff88 : 0xff3333);
+    },
+    place() {
+      building.isGhost = false;
+      [material].forEach((m) => { m.transparent = false; m.opacity = 1.0; });
+      ring.visible = false;
+    },
+    remove() { scene.remove(group); }
+  };
+
+  return building;
+}

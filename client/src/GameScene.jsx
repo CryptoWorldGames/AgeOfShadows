@@ -6,7 +6,7 @@ import { createHuman } from './modules/Human';
 import { createTree } from './modules/Tree';
 import { createUI, showChatPanel, showInventoryModal, showHouseModal, showBuildMenu } from './modules/UI';
 import { createControls } from './modules/Controls';
-import { createTownCenter } from './modules/Building';
+import { createTownCenter, createHouse, createFence } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
 import { createStone } from './modules/Stone';
 import { createGold } from './modules/Gold';
