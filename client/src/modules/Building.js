@@ -202,7 +202,7 @@ export function createTownCenter(scene, ghost = true) {
     });
     // Triangular pediment over the entrance
     const ped = new THREE.Mesh(new THREE.ConeGeometry(doorW * 2.4, 0.7 * baseScale, 3), trimMat);
-    ped.rotation.y = Math.PI / 2; ped.position.set(0, 2.25 * baseScale, front + 0.1 * baseScale);
+    ped.rotation.y = Math.PI / 2; ped.position.set(0, 2.9 * baseScale, front + 0.1 * baseScale);
     ped.castShadow = true; group.add(ped);
   }
 
