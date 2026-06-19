@@ -236,20 +236,22 @@ export default function GameScene({ auth }) {
       world.buildings.push(defaultTownCenter);
 
       // Safety: shove any unit that spawned inside the Town Center footprint out
-      // to the edge so it's visible and tap-selectable (not buried in the wall).
+      // to the FRONT (south, +z) so the man stands clearly in front of the Town
+      // Center — where the starting camera looks from — and never buried in a wall
+      // or behind the building (which made the camera clip into the roof).
       (() => {
         const tcPos = defaultTownCenter.position();
         const wall = (defaultTownCenter.radius || 6) * 0.75; // collision wall
-        const clearDist = wall + 1.5; // stand this far from center
-        world.units.forEach((u) => {
+        const clearDist = wall + 3.0; // stand this far in front of center
+        world.units.forEach((u, i) => {
           const p = u.group.position;
-          let dx = p.x - tcPos.x, dz = p.z - tcPos.z;
-          const d = Math.sqrt(dx * dx + dz * dz);
-          if (d < clearDist) {
-            if (d < 1e-4) { dx = 0; dz = 1; }
-            else { dx /= d; dz /= d; }
-            p.x = tcPos.x + dx * clearDist;
-            p.z = tcPos.z + dz * clearDist;
+          const dz = p.z - tcPos.z;
+          // If the unit is inside the footprint OR on the far (north) side, move
+          // it to the front of the Town Center so it's always visible.
+          if (dz < clearDist) {
+            const spread = (i - (world.units.length - 1) / 2) * 2.0; // line them up
+            p.x = tcPos.x + spread;
+            p.z = tcPos.z + clearDist;
           }
         });
       })();
@@ -329,19 +331,12 @@ export default function GameScene({ auth }) {
         const ctrl = createControls(camera, renderer, scene, world, startPos);
         update = ctrl.update; dispose = ctrl.dispose;
 
-        // Character selection button handler
+        // Character selection button handler: jump the camera to the player's
+        // man at a comfortable distance and select him.
         ui.onCharacterClick(() => {
-          if (world.units && world.units.length > 0) {
-            const firstUnit = world.units[0];
-            // Focus camera on unit and select it
-            camera.position.set(
-              firstUnit.group.position.x + 3,
-              firstUnit.group.position.y + 4,
-              firstUnit.group.position.z + 3
-            );
-            // Select the unit
-            ui.setSelectedCount(1);
-            world.ui.showToast('Selected: ' + (auth.displayName || 'Unit'));
+          if (world.units && world.units.length > 0 && ctrl.focusUnit) {
+            ctrl.focusUnit(world.units[0]);
+            world.ui.showToast('Selected your unit');
           }
         });
       } catch (e) {

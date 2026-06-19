@@ -23,13 +23,17 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   controls.zoomToCursor = false;
   controls.mouseButtons = { MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
   controls.enableRotate = false;
-  // Start the camera zoomed in on the player's man so he's easy to see.
+  // Start the camera south of (in front of) the player's man, looking north past
+  // him toward the Town Center, so you see "the man standing in front of the
+  // Town Center". We aim at a point just in front of the man and keep enough
+  // distance that the camera never starts jammed inside the Town Center.
   if (playerStartPos) {
-    controls.target.set(playerStartPos.x, 1, playerStartPos.z);
-    const dist = isMobile ? 9 : 12;
-    camera.position.set(playerStartPos.x, playerStartPos.y + dist * 0.7, playerStartPos.z + dist);
+    const dist = isMobile ? 16 : 20;
+    controls.target.set(playerStartPos.x, 1.2, playerStartPos.z - 2);
+    camera.position.set(playerStartPos.x, dist * 0.65, playerStartPos.z + dist);
   } else {
-    controls.target.set(0, 0, 0);
+    controls.target.set(0, 1.2, 0);
+    camera.position.set(0, 14, 24);
   }
   controls.update();
 
@@ -519,5 +523,17 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     controls.dispose();
   };
 
-  return { update, dispose };
+  // Center the camera on a unit at a comfortable distance and select it.
+  const focusUnit = (unit) => {
+    if (!unit) return;
+    clearSelection();
+    addToSelection(unit);
+    const p = unit.group.position;
+    const dist = isMobile ? 12 : 14;
+    controls.target.set(p.x, 1.2, p.z);
+    camera.position.set(p.x, dist * 0.7, p.z + dist);
+    controls.update();
+  };
+
+  return { update, dispose, focusUnit };
 }
