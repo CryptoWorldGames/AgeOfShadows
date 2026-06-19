@@ -22,6 +22,7 @@ function getAudioCtx() {
   return audioCtx;
 }
 function playSound(type, listenerPos, soundPos) {
+  if (typeof window !== 'undefined' && window.__AOS_MUTED) return; // master mute
   try {
     const ctx = getAudioCtx();
     const dx = soundPos.x - listenerPos.x;

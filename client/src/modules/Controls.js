@@ -30,6 +30,10 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   controls.update();
 
   const okSound = new Audio('/sounds/pensieri_profondi_scuba-ok-274157.mp3');
+  function playOk() {
+    if (typeof window !== 'undefined' && window.__AOS_MUTED) return; // master mute
+    try { okSound.currentTime = 0; okSound.play().catch(() => {}); } catch (e) {}
+  }
 
   const markerGroup = new THREE.Group();
   const cone = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 8), new THREE.MeshPhongMaterial({ color: 0xff6600 }));
@@ -254,7 +258,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
       Array.from(selected).forEach((u) => { if (u.depositAt) u.depositAt(depotBuilding); });
       const bp = (typeof depotBuilding.position === 'function') ? depotBuilding.position() : null;
       if (bp) showResourceHighlight(bp);
-      okSound.currentTime = 0; okSound.play();
+      playOk();
       return true;
     }
 
@@ -267,7 +271,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         const ang = (i / arr.length) * Math.PI * 2;
         u.killAnimal(chicken, { x: cp.x + Math.cos(ang) * 0.8, z: cp.z + Math.sin(ang) * 0.8 });
       });
-      showResourceHighlight(cp); okSound.currentTime = 0; okSound.play(); return true;
+      showResourceHighlight(cp); playOk(); return true;
     }
 
     // Stone
@@ -279,7 +283,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         const ang = (i / arr.length) * Math.PI * 2;
         u.mineStone(stone, { x: sp.x + Math.cos(ang) * 1.5, z: sp.z + Math.sin(ang) * 1.5 });
       });
-      showResourceHighlight(sp); okSound.currentTime = 0; okSound.play(); return true;
+      showResourceHighlight(sp); playOk(); return true;
     }
 
     // Gold
@@ -291,7 +295,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         const ang = (i / arr.length) * Math.PI * 2;
         u.mineGold(gold, { x: gp2.x + Math.cos(ang) * 1.5, z: gp2.z + Math.sin(ang) * 1.5 });
       });
-      showResourceHighlight(gp2); okSound.currentTime = 0; okSound.play(); return true;
+      showResourceHighlight(gp2); playOk(); return true;
     }
 
     // Tree
@@ -303,7 +307,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         const ang = (i / arr.length) * Math.PI * 2;
         u.chopTree(tree, { x: tp.x + Math.cos(ang) * 1.3, z: tp.z + Math.sin(ang) * 1.3 });
       });
-      showResourceHighlight(tp); okSound.currentTime = 0; okSound.play(); return true;
+      showResourceHighlight(tp); playOk(); return true;
     }
 
     // Move
@@ -319,7 +323,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     });
     markerGroup.position.set(gp.x, 0, gp.z);
     markerGroup.visible = true; markerTimer = 2.0;
-    okSound.currentTime = 0; okSound.play();
+    playOk();
     return true;
   };
 
@@ -344,14 +348,14 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
         Array.from(selected).forEach((u) => { if (u.depositAt) u.depositAt(building); });
         const bp = (typeof building.position === 'function') ? building.position() : null;
         if (bp) showResourceHighlight(bp);
-        okSound.currentTime = 0; okSound.play();
+        playOk();
         return;
       }
       if (building.type === 'townCenter' || building.isTownCenter) showTownCenterModal(building);
       return;
     }
     const tappedUnit = raycastUnit(cx, cy) || nearestUnit(cx, cy, 40);
-    if (tappedUnit) { clearSelection(); addToSelection(tappedUnit); okSound.currentTime = 0; okSound.play(); return; }
+    if (tappedUnit) { clearSelection(); addToSelection(tappedUnit); playOk(); return; }
     // No unit/building tapped: if we have units selected, command them here.
     if (selected.size > 0) { commandAt(cx, cy); return; }
     clearSelection();

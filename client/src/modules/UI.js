@@ -550,11 +550,19 @@ export function createUI(playerId, gameState, displayName) {
     element.addEventListener('touchend', (e) => { e.preventDefault(); callback(); });
   }
 
-  // On/Off Switch (WORKS: Desktop, iOS, Android)
+  // On/Off Switch = MASTER audio toggle. Turns off music AND all game sound
+  // effects (chopping, mining, click sounds) on desktop and mobile.
   addClickHandler(onoffSwitch, () => {
     musicOn = !musicOn;
-    if (musicOn) { audio.play().catch(()=>{}); onoffSwitch.style.background='#16a34a'; onoffBall.style.left='22px'; }
-    else { audio.pause(); onoffSwitch.style.background='#555'; onoffBall.style.left='2px'; }
+    window.__AOS_MUTED = !musicOn; // silence Web Audio SFX + click sounds everywhere
+    if (musicOn) {
+      audio.muted = false;
+      audio.play().catch(()=>{});
+      onoffSwitch.style.background='#16a34a'; onoffBall.style.left='22px';
+    } else {
+      audio.pause(); audio.muted = true; // pause + hard-mute so nothing leaks through
+      onoffSwitch.style.background='#555'; onoffBall.style.left='2px';
+    }
   });
 
   // Shuffle Button (WORKS: Desktop, iOS, Android)

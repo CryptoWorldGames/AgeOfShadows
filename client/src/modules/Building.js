@@ -145,48 +145,81 @@ export function createTownCenter(scene, ghost = true) {
     group.add(signBoard);
   }
 
-  // Door frame
+  // The wall faces sit at ±half-width. Everything below is placed ON those faces
+  // (scaled by baseScale) so the door/windows aren't buried inside the walls.
+  const front = 2.25 * baseScale;   // +z front wall face
+  const side = 2.25 * baseScale;    // +x / -x side wall faces
+
   const doorMat = new THREE.MeshStandardMaterial({
-    color: 0x2a1810,
-    roughness: 0.8,
-    transparent: ghost,
-    opacity: ghost ? 0.5 : 1.0
+    color: 0x3a2414, roughness: 0.8, transparent: ghost, opacity: ghost ? 0.5 : 1.0
   });
-  const door = new THREE.Mesh(
-    new THREE.BoxGeometry(1.0, 1.4, 0.2),
-    doorMat
-  );
-  door.position.set(0, 0.7, 2.3);
-  door.castShadow = true;
-  group.add(door);
-
-  // Windows (realistic detail)
+  const trimMat = new THREE.MeshStandardMaterial({
+    color: 0xe8e2d0, roughness: 0.7, transparent: ghost, opacity: ghost ? 0.5 : 1.0
+  });
   const windowMat = new THREE.MeshStandardMaterial({
-    color: 0x4a6fa5,
-    roughness: 0.1,
-    metalness: 0.3,
-    transparent: ghost,
-    opacity: ghost ? 0.5 : 1.0
+    color: 0x6fa8d4, roughness: 0.08, metalness: 0.35,
+    emissive: 0x244a66, emissiveIntensity: ghost ? 0 : 0.25,
+    transparent: ghost, opacity: ghost ? 0.5 : 1.0
   });
 
-  // Window 1 (left)
-  const win1 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.15), windowMat);
-  win1.position.set(-1.0, 1.2, 2.3);
-  win1.castShadow = true;
-  group.add(win1);
+  // --- Grand double-door entrance (courthouse style) ---
+  const doorW = 0.7 * baseScale, doorH = 1.7 * baseScale;
+  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(doorW * 2.4, doorH * 1.15, 0.18 * baseScale), trimMat);
+  doorFrame.position.set(0, doorH * 0.575, front + 0.02 * baseScale);
+  doorFrame.castShadow = true; group.add(doorFrame);
+  [-0.5, 0.5].forEach((sx) => {
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(doorW * 0.95, doorH, 0.16 * baseScale), doorMat);
+    leaf.position.set(sx * doorW, doorH * 0.5, front + 0.08 * baseScale);
+    leaf.castShadow = true; group.add(leaf);
+  });
 
-  // Window 2 (right)
-  const win2 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.15), windowMat);
-  win2.position.set(1.0, 1.2, 2.3);
-  win2.castShadow = true;
-  group.add(win2);
+  // --- Stone steps up to the entrance ---
+  for (let s = 0; s < 3; s++) {
+    const step = new THREE.Mesh(
+      new THREE.BoxGeometry(doorW * 3.2 - s * 0.4 * baseScale, 0.18 * baseScale, (0.5 - s * 0.13) * baseScale),
+      trimMat
+    );
+    step.position.set(0, 0.09 * baseScale + s * 0.18 * baseScale, front + (0.55 - s * 0.13) * baseScale);
+    step.receiveShadow = true; group.add(step);
+  }
 
-  // Side window
-  const win3 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.15), windowMat);
-  win3.position.set(2.3, 1.2, 0);
-  win3.rotation.y = Math.PI / 2;
-  win3.castShadow = true;
-  group.add(win3);
+  // --- Two columns flanking the door (the courthouse signature) ---
+  if (!ghost) {
+    [-1, 1].forEach((sx) => {
+      const col = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22 * baseScale, 0.26 * baseScale, 2.0 * baseScale, 12),
+        trimMat
+      );
+      col.position.set(sx * doorW * 1.9, 1.0 * baseScale, front + 0.25 * baseScale);
+      col.castShadow = true; group.add(col);
+      // simple capital + base
+      [0.05, 1.95].forEach((cy) => {
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.6 * baseScale, 0.15 * baseScale, 0.6 * baseScale), trimMat);
+        cap.position.set(sx * doorW * 1.9, cy * baseScale, front + 0.25 * baseScale);
+        cap.castShadow = true; group.add(cap);
+      });
+    });
+    // Triangular pediment over the entrance
+    const ped = new THREE.Mesh(new THREE.ConeGeometry(doorW * 2.4, 0.7 * baseScale, 3), trimMat);
+    ped.rotation.y = Math.PI / 2; ped.position.set(0, 2.25 * baseScale, front + 0.1 * baseScale);
+    ped.castShadow = true; group.add(ped);
+  }
+
+  // --- Rows of tall windows across the front and sides ---
+  function addWindow(x, y, z, ry) {
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.62 * baseScale, 1.0 * baseScale, 0.1 * baseScale), trimMat);
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.48 * baseScale, 0.82 * baseScale, 0.16 * baseScale), windowMat);
+    [frame, glass].forEach((m) => { m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; group.add(m); });
+  }
+  const winY = 1.25 * baseScale;
+  // front windows (flanking the door, outside the columns)
+  [-1.9, 1.9].forEach((mx) => addWindow(mx * doorW * 1.0 * 1.7, winY, front + 0.04 * baseScale, 0));
+  // upper-floor front windows
+  [-1, 0, 1].forEach((mx) => addWindow(mx * 1.3 * baseScale, winY + 1.15 * baseScale, front + 0.04 * baseScale, 0));
+  // side windows (both sides)
+  [side, -side].forEach((sxFace) => {
+    [-1, 1].forEach((mz) => addWindow(sxFace + (sxFace > 0 ? 0.04 : -0.04) * baseScale, winY, mz * 1.2 * baseScale, Math.PI / 2));
+  });
 
   // Ground footprint ring (helps aim while placing)
   const ring = new THREE.Mesh(
@@ -200,7 +233,7 @@ export function createTownCenter(scene, ghost = true) {
 
   scene.add(group);
 
-  const allMats = [wallMat, roofMat, doorMat, windowMat];
+  const allMats = [wallMat, roofMat, doorMat, windowMat, trimMat];
 
   const building = {
     group,
