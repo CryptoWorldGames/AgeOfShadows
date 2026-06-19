@@ -1,4 +1,21 @@
 let globalSocket = null;
+// Track the active music player so a second createUI() can't leave a duplicate
+// audio element playing on top of the first.
+let activeMusicAudio = null;
+
+// Remove any previously-created HUD panels so building the UI again can never
+// stack a second copy (duplicate Town Center button, music player, etc.).
+function clearExistingHUD() {
+  ['login-panel','hud','resource-bar','selected-panel','build-bar',
+   'music-tab','music-panel','chat-panel'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
+  if (activeMusicAudio) {
+    try { activeMusicAudio.pause(); activeMusicAudio.src = ''; } catch (e) {}
+    activeMusicAudio = null;
+  }
+}
 
 export function showInventoryModal(resources) {
   const existingModal = document.getElementById('inventory-modal');
@@ -306,6 +323,8 @@ function showSettingsPanel(displayName, email = '') {
 }
 
 export function createUI(playerId, gameState, displayName) {
+  // Wipe any leftover HUD from a prior init so nothing is ever duplicated.
+  clearExistingHUD();
 
   // Login info panel (top right)
   if (displayName) {
@@ -482,6 +501,7 @@ export function createUI(playerId, gameState, displayName) {
 
   const audio = new Audio();
   audio.volume = 0.6;
+  activeMusicAudio = audio; // track so a later createUI() can stop this one
   let currentTrack = DEFAULT_TRACK;
   let musicOn = true;
   let shuffleMode = false;

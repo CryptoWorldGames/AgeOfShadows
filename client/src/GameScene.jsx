@@ -112,6 +112,8 @@ export default function GameScene({ auth }) {
       // MOBILE: Use simpler shadow algorithm on iPhone
       renderer.shadowMap.type = isMobile ? THREE.BasicShadowMap : THREE.PCFShadowMap;
       console.log('📍 Canvas appending to container...');
+      // Remove any leftover canvas so we never stack two game views.
+      while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild);
       containerRef.current.appendChild(renderer.domElement);
 
       const env = createEnvironment(scene);
