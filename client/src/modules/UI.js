@@ -522,7 +522,6 @@ export function createUI(playerId, gameState, displayName) {
   hammerBtn.onclick = () => {
     buildMenu.style.display = buildMenu.style.display === 'none' ? 'block' : 'none';
   };
->>>>>>> claude/relaxed-pascal-f2fqh5
 
   const tracks = [
     { file:'kaazoom-the-ballad-of-my-sweet-fair-maiden-medieval-style-music-358306.mp3', label:'Ballad' },

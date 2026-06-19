@@ -160,11 +160,8 @@ export default function GameScene({ auth }) {
         }
       };
 
-      // Build button handler
-      ui.onBuildClick((buildKind) => {
-        // This will be wired up by the Controls module
-        console.log('Build selected:', buildKind);
-      });
+      // Note: the build menu (hammer button) and its selection callback are
+      // wired up inside createControls via world.ui.onBuildSelect().
 
       if (joinData.player.units && joinData.player.units.length > 0) {
         joinData.player.units.forEach(u => {
