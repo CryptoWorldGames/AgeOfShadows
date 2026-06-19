@@ -156,12 +156,15 @@ export default function GameScene({ auth }) {
       const usedSpots = [];
       function isTooClose(x, z, minDist) { return usedSpots.some((s) => Math.sqrt((x-s.x)**2+(z-s.z)**2) < minDist); }
       function addSpot(x, z) { usedSpots.push({ x, z }); }
+      const pondX = -35, pondZ = -30; // keep things out of the pond
+      const inPond = (x, z) => Math.sqrt((x-pondX)**2 + (z-pondZ)**2) < 11;
       let attempts = 0;
-      while (world.trees.length < 20 && attempts < 300) {
+      while (world.trees.length < 100 && attempts < 4000) {
         attempts++;
-        const x = (Math.random()-0.5)*120; const z = (Math.random()-0.5)*120;
+        const x = (Math.random()-0.5)*150; const z = (Math.random()-0.5)*150;
         if (Math.sqrt(x*x+z*z) < 12) continue;
-        if (isTooClose(x, z, 5)) continue;
+        if (inPond(x, z)) continue;
+        if (isTooClose(x, z, 4)) continue;
         addSpot(x, z); world.trees.push(createTree(scene, { x, y:0, z }));
       }
 
@@ -185,15 +188,22 @@ export default function GameScene({ auth }) {
       }
       world.golds.push(createGold(scene, { x: 5, y:0, z: 5 }));
 
-      world.animals.push(createChicken(scene, { x:6, y:0, z:6 }));
-      world.animals.push(createChicken(scene, { x:-6, y:0, z:6 }));
-      world.animals.push(createChicken(scene, { x:6, y:0, z:-6 }));
-      world.animals.push(createChicken(scene, { x:-6, y:0, z:-6 }));
-      world.animals.push(createChicken(scene, { x:0, y:0, z:8 }));
-      world.animals.push(createDeer(scene, { x:5, y:0, z:-8 }));
-      world.animals.push(createDeer(scene, { x:-5, y:0, z:-8 }));
-      world.animals.push(createDeer(scene, { x:10, y:0, z:5 }));
-      world.animals.push(createDeer(scene, { x:-10, y:0, z:5 }));
+      // Spread 30 chickens and 20 deer evenly across the whole map,
+      // avoiding the town center and the pond.
+      function scatterAnimal(makeFn, count, minCenter) {
+        let placed = 0, tries = 0;
+        while (placed < count && tries < count * 60) {
+          tries++;
+          const x = (Math.random()-0.5)*150;
+          const z = (Math.random()-0.5)*150;
+          if (Math.sqrt(x*x+z*z) < minCenter) continue; // off town center
+          if (inPond(x, z)) continue;                    // not in the pond
+          world.animals.push(makeFn(scene, { x, y:0, z }));
+          placed++;
+        }
+      }
+      scatterAnimal(createChicken, 30, 9);
+      scatterAnimal(createDeer, 20, 12);
 
       // Create default Town Center at center of map
       const defaultTownCenter = createTownCenter(scene, false);

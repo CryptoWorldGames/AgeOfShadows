@@ -1,5 +1,5 @@
 export const SETTINGS = {
-  tree: { hitsToKill: 10, hitsPerResource: 10, yield: 10, pickupInterval: 1.0, respawnTime: 3600 },
+  tree: { hitsToKill: 10, hitsPerResource: 10, yield: 10, pickupInterval: 1.0, respawnTime: 900 },
   stone: { hitsToKill: 50, hitsPerResource: 20, yield: 10, pickupInterval: 1.0, respawnTime: 7200 },
   gold: { hitsToKill: 100, hitsPerResource: 40, yield: 10, pickupInterval: 1.0, respawnTime: 10800 },
   chicken: { hitsToKill: 3, pickupInterval: 1.0, yield: 10, respawnTime: 3600, minOnMap: 5 },

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SETTINGS } from './Settings.js';
 
 export function createTree(scene, position = { x: 0, y: 0, z: 0 }) {
   const group = new THREE.Group();
@@ -152,7 +153,7 @@ export function createTree(scene, position = { x: 0, y: 0, z: 0 }) {
       }
     } else if (state === 'respawning') {
       respawnTimer += dt;
-      if (respawnTimer >= 60) reset();
+      if (respawnTimer >= (SETTINGS.tree.respawnTime || 900)) reset();
     }
   }
 

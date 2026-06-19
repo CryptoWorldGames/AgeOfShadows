@@ -119,8 +119,27 @@ function makeCollapsible(el, shortLabel, startCollapsed = false) {
   btn.onclick = (e) => {
     e.stopPropagation();
     setState(!el.classList.contains('ui-collapsed'));
+    // Re-flow the left column so collapsing/expanding never leaves a gap or overlap.
+    if (!window.matchMedia('(orientation: portrait)').matches) stackLeftColumn();
   };
   setState(startCollapsed);
+}
+
+// Force the left-edge panels to stack vertically so they can NEVER overlap,
+// no matter how tall each one grows. Runs on desktop + landscape (portrait
+// uses fixed CSS positions). Uses real on-screen height (post-transform).
+function stackLeftColumn() {
+  const ids = ['game-info-panel', 'build-bar', 'admin-panel'];
+  let y = 14;
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el || getComputedStyle(el).display === 'none') return;
+    el.style.top = y + 'px';
+    el.style.left = '14px';
+    el.style.bottom = 'auto';
+    const h = el.getBoundingClientRect().height || el.offsetHeight || 0;
+    y += h + 12;
+  });
 }
 
 // Apply collapsible toggles to the known panels. Safe to call repeatedly and
@@ -130,6 +149,10 @@ export function applyResponsiveUI() {
 
   const portrait = window.matchMedia('(orientation: portrait)').matches;
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  // WASD / keyboard hint is useless on touch — hide it on ALL mobile.
+  const hud = document.getElementById('hud');
+  if (hud && isMobile) hud.style.display = 'none';
 
   const panels = [
     ['game-info-panel', 'INFO', true],
@@ -164,6 +187,10 @@ export function applyResponsiveUI() {
       }
     }
   }
+
+  // Portrait uses the fixed CSS layout; everywhere else, auto-stack the left
+  // column so INFO / BUILD / ADMIN can never sit on top of each other.
+  if (!portrait) stackLeftColumn();
 }
 
 // Watch for late-mounting panels (e.g. the React admin panel) and wire them up.
@@ -174,5 +201,7 @@ export function startResponsiveUI() {
   obs.observe(document.body, { childList: true });
   window.addEventListener('orientationchange', () => setTimeout(applyResponsiveUI, 150));
   window.addEventListener('resize', () => applyResponsiveUI());
+  // Re-stack a few times after load once panels have their real heights/content.
+  [200, 600, 1200].forEach((ms) => setTimeout(applyResponsiveUI, ms));
   return obs;
 }

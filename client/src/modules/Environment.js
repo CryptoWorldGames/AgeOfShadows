@@ -137,16 +137,30 @@ export function createEnvironment(scene) {
     }
   });
 
-  // Pond
-  const pondBed = new THREE.Mesh(new THREE.CircleGeometry(8, 32), new THREE.MeshStandardMaterial({ color: 0x2a4a1a, roughness: 1.0 }));
+  // Pond — irregular, natural-looking blob shape (not a perfect circle).
+  // A few sine harmonics make the shoreline wobble like a real pond edge.
+  const pondShore = (a, base) =>
+    base * (1 + 0.16*Math.sin(a*3 + 0.6) + 0.09*Math.sin(a*5 + 1.3) + 0.06*Math.cos(a*2 + 0.2));
+  function makePondGeometry(base) {
+    const shape = new THREE.Shape();
+    const n = 64;
+    for (let i = 0; i <= n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const r = pondShore(a, base);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+      if (i === 0) shape.moveTo(x, y); else shape.lineTo(x, y);
+    }
+    return new THREE.ShapeGeometry(shape, 24);
+  }
+  const pondBed = new THREE.Mesh(makePondGeometry(8), new THREE.MeshStandardMaterial({ color: 0x2a4a1a, roughness: 1.0 }));
   pondBed.rotation.x = -Math.PI / 2; pondBed.position.set(-35, -0.05, -30); scene.add(pondBed);
   const waterMat = new THREE.MeshStandardMaterial({ color: 0x2277aa, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.82 });
-  const water = new THREE.Mesh(new THREE.CircleGeometry(7.5, 32), waterMat);
+  const water = new THREE.Mesh(makePondGeometry(7.4), waterMat);
   water.rotation.x = -Math.PI / 2; water.position.set(-35, 0.02, -30); scene.add(water);
   const pondRockMat = new THREE.MeshStandardMaterial({ color: 0x777770, roughness: 0.95 });
-  for (let i = 0; i < 14; i++) {
-    const ang = (i / 14) * Math.PI * 2;
-    const r = 7.8 + Math.random() * 0.6;
+  for (let i = 0; i < 18; i++) {
+    const ang = (i / 18) * Math.PI * 2;
+    const r = pondShore(ang, 8) + 0.3 + Math.random() * 0.4; // hug the wobbly shore
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.2 + Math.random() * 0.35, 0), pondRockMat);
     rock.position.set(-35 + Math.cos(ang) * r, 0.1, -30 + Math.sin(ang) * r);
     rock.rotation.set(Math.random(), Math.random(), Math.random());
