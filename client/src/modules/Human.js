@@ -117,11 +117,12 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       if (o.name==='hand_r_49') handR=o;
     });
     // The model ships in a T-pose (arms straight out). Rotate the upper arms DOWN
-    // so they hang at the sides — this becomes the rest pose for idle AND walking,
-    // and walkPose still swings them forward/back on top of this.
-    const ARM_DOWN = 1.15;
-    if (rest.armUL) rest.armUL.z += ARM_DOWN;
-    if (rest.armUR) rest.armUR.z -= ARM_DOWN;
+    // so they hang at the sides. The model's arms extend along Z, so the "down"
+    // rotation is about the X axis; this becomes the rest pose for idle AND walk.
+    const ARM_DOWN = 1.25;
+    if (B.armUL) { rest.armUL.x += ARM_DOWN; rest.armUL.z += 0.15; }
+    if (B.armUR) { rest.armUR.x += ARM_DOWN; rest.armUR.z -= 0.15; }
+    console.log('[rig] bones found:', Object.keys(B).join(',') || 'NONE', '| handR:', !!handR);
   }, undefined, (err)=>console.error('Failed to load character:',err));
 
   const inventory = {wood:0,stone:0,gold:0,food:0,water:0};

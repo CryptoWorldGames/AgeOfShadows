@@ -321,76 +321,40 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   // and tap (mobile). Returns true if a command was issued.
   const commandAt = (cx, cy) => {
     if (ghostBuilding || selected.size === 0) return false;
+    // Units are simulated on the SERVER now, so commands go to the server.
+    const ids = Array.from(selected).map((u) => u.serverId).filter(Boolean);
 
     // Building (Town Center / house) — send selected units to deposit their load.
     const depotBuilding = raycastBuilding(cx, cy);
     if (depotBuilding && depotBuilding.storage) {
-      Array.from(selected).forEach((u) => { if (u.depositAt) u.depositAt(depotBuilding); });
+      world.socket.emit('commandDeposit', { unitIds: ids });
       const bp = (typeof depotBuilding.position === 'function') ? depotBuilding.position() : null;
       if (bp) showResourceHighlight(bp);
       playOk();
       return true;
     }
 
-    // Chicken
-    const chicken = raycastGroup(cx, cy, (world.animals || []).filter(a => a.type === 'chicken' || a.type === 'deer'));
-    if (chicken) {
-      const arr = Array.from(selected);
-      const cp = chicken.position();
-      arr.forEach((u, i) => {
-        const ang = (i / arr.length) * Math.PI * 2;
-        u.killAnimal(chicken, { x: cp.x + Math.cos(ang) * 0.8, z: cp.z + Math.sin(ang) * 0.8 });
-      });
-      showResourceHighlight(cp); playOk(); return true;
-    }
-
-    // Stone
-    const stone = raycastGroup(cx, cy, world.stones || []);
-    if (stone) {
-      const arr = Array.from(selected);
-      const sp = stone.position();
-      arr.forEach((u, i) => {
-        const ang = (i / arr.length) * Math.PI * 2;
-        u.mineStone(stone, { x: sp.x + Math.cos(ang) * 1.5, z: sp.z + Math.sin(ang) * 1.5 });
-      });
-      showResourceHighlight(sp); playOk(); return true;
-    }
-
-    // Gold
-    const gold = raycastGroup(cx, cy, world.golds || []);
-    if (gold) {
-      const arr = Array.from(selected);
-      const gp2 = gold.position();
-      arr.forEach((u, i) => {
-        const ang = (i / arr.length) * Math.PI * 2;
-        u.mineGold(gold, { x: gp2.x + Math.cos(ang) * 1.5, z: gp2.z + Math.sin(ang) * 1.5 });
-      });
-      showResourceHighlight(gp2); playOk(); return true;
-    }
-
-    // Tree
+    // Tree — chop this specific tree (server gather command).
     const tree = raycastGroup(cx, cy, world.trees || []);
     if (tree) {
-      const arr = Array.from(selected);
-      const tp = tree.position();
-      arr.forEach((u, i) => {
-        const ang = (i / arr.length) * Math.PI * 2;
-        u.chopTree(tree, { x: tp.x + Math.cos(ang) * 1.3, z: tp.z + Math.sin(ang) * 1.3 });
-      });
-      showResourceHighlight(tp); playOk(); return true;
+      world.socket.emit('commandGather', { unitIds: ids, treeId: tree.id });
+      showResourceHighlight(tree.position()); playOk(); return true;
     }
 
-    // Move
+    // Stone / Gold / Animals aren't server-side yet — for now just walk the unit
+    // there so your click still does something (gathering them is the next step).
+    const res = raycastGroup(cx, cy, world.stones || [])
+             || raycastGroup(cx, cy, world.golds || [])
+             || raycastGroup(cx, cy, (world.animals || []).filter(a => a.type === 'chicken' || a.type === 'deer'));
+    if (res) {
+      const p = res.position();
+      world.socket.emit('commandMove', { unitIds: ids, x: p.x, z: p.z });
+      showResourceHighlight(p); playOk(); return true;
+    }
+
+    // Move — walk to the clicked ground point, then resume working from there.
     const gp = groundPoint(cx, cy);
-    Array.from(selected).forEach((u, i) => {
-      let ox = 0, oz = 0;
-      if (selected.size > 1) {
-        const ring = 1 + Math.floor(i / 8);
-        const ang = (i % 8) / 8 * Math.PI * 2;
-        ox = Math.cos(ang) * ring * 1.1; oz = Math.sin(ang) * ring * 1.1;
-      }
-      u.moveTo(new THREE.Vector3(gp.x + ox, 0, gp.z + oz));
-    });
+    world.socket.emit('commandMove', { unitIds: ids, x: gp.x, z: gp.z });
     markerGroup.position.set(gp.x, 0, gp.z);
     markerGroup.visible = true; markerTimer = 2.0;
     playOk();
@@ -419,7 +383,8 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     if (building) {
       // If units are selected, tapping a storage building sends them to deposit.
       if (selected.size > 0 && building.storage) {
-        Array.from(selected).forEach((u) => { if (u.depositAt) u.depositAt(building); });
+        const ids = Array.from(selected).map((u) => u.serverId).filter(Boolean);
+        world.socket.emit('commandDeposit', { unitIds: ids });
         const bp = (typeof building.position === 'function') ? building.position() : null;
         if (bp) showResourceHighlight(bp);
         playOk();

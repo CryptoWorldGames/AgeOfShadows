@@ -161,6 +161,13 @@ function stepUnit(unit, trees, stockpile, player, dt, tNow = nowMs()) {
   if (unit.phase == null) unit.phase = 'toResource';
   const step = UNIT_SPEED * dt;
 
+  // --- MANUAL MOVE COMMAND (player clicked the ground): go there, then resume work ---
+  if (unit.cmd && unit.cmd.type === 'move') {
+    if (moveToward(unit, unit.cmd.x, unit.cmd.z, step)) { unit.cmd = null; unit.moving = false; }
+    else unit.moving = true;
+    return;
+  }
+
   // Returning to the town centre to deposit.
   if (unit.phase === 'returning') {
     if (moveToward(unit, TOWN_CENTER.x, TOWN_CENTER.z, step)) {
@@ -175,21 +182,32 @@ function stepUnit(unit, trees, stockpile, player, dt, tNow = nowMs()) {
     return;
   }
 
-  // Make sure we have a valid target tree.
+  // Keep our current target while it's standing, mid-fall, OR a pile we can still
+  // gather — only pick a NEW tree when the current one is truly done. (This is the
+  // fix: don't abandon the tree we just felled while it's falling.)
   let tree = unit.targetTreeId && trees.find(t => t.id === unit.targetTreeId);
-  const valid = tree && (tree.state === 'standing' || (tree.state === 'woodpile' && tree.wood > 0 && canGather(tree, player.id, tNow)));
-  if (!valid) {
+  let keep = false;
+  if (tree) {
+    if (tree.state === 'standing' || tree.state === 'falling') keep = true;
+    else if (tree.state === 'woodpile' && tree.wood > 0 && canGather(tree, player.id, tNow)) keep = true;
+  }
+  if (!keep) {
     tree = nearestWorkTree(trees, unit, player.id, tNow);
     unit.targetTreeId = tree ? tree.id : null;
     unit._t = 0;
   }
-  if (!tree) { unit.moving = false; return; }   // nothing to do right now
+  if (!tree) {
+    // nothing to chop right now; if we're carrying anything, go bank it
+    if (unit.carry > 0) { unit.phase = 'returning'; return; }
+    unit.moving = false; return;
+  }
 
   const dist = Math.hypot(tree.x - unit.x, tree.z - unit.z);
   if (dist > REACH) { moveToward(unit, tree.x, tree.z, step); unit.moving = true; return; }
 
-  // In range: chop a standing tree, or gather from a pile.
+  // In range — stand still and work.
   unit.moving = false;
+  if (tree.state === 'falling') return;                 // wait for it to hit the ground
   unit._t = (unit._t || 0) + dt;
   if (tree.state === 'standing') {
     if (unit._t >= CHOP_EVERY) { unit._t = 0; chopTree(tree, player, tNow); }

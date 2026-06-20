@@ -199,6 +199,38 @@ io.on('connection', (socket) => {
     if (unit) { unit.x = data.x; unit.z = data.z; }
   });
 
+  // ----- Manual unit commands (your clicks). The server-sim obeys these. -----
+  // Right-click ground: walk there, then resume auto-working from that spot.
+  socket.on('commandMove', (data) => {
+    const player = world.players[socket.id];
+    if (!player || !data) return;
+    const ids = data.unitId ? [data.unitId] : (data.unitIds || []);
+    ids.forEach(id => {
+      const u = player.units.find(x => x.id === id);
+      if (u) { u.cmd = { type: 'move', x: data.x, z: data.z }; u.targetTreeId = null; u.phase = 'toResource'; }
+    });
+  });
+  // Click a tree: send the unit(s) to chop that specific tree.
+  socket.on('commandGather', (data) => {
+    const player = world.players[socket.id];
+    if (!player || !data) return;
+    const ids = data.unitId ? [data.unitId] : (data.unitIds || []);
+    ids.forEach(id => {
+      const u = player.units.find(x => x.id === id);
+      if (u) { u.cmd = null; u.targetTreeId = data.treeId; u.phase = 'toResource'; }
+    });
+  });
+  // Click the town center with carrying units: dump their load now.
+  socket.on('commandDeposit', (data) => {
+    const player = world.players[socket.id];
+    if (!player) return;
+    const ids = (data && data.unitIds) || (player.units || []).map(u => u.id);
+    ids.forEach(id => {
+      const u = player.units.find(x => x.id === id);
+      if (u) { u.cmd = null; u.phase = 'returning'; }
+    });
+  });
+
   // A swing at a tree. Server is authoritative: it decrements hp, assigns
   // ownership to the feller, and broadcasts so EVERY player sees it fall.
   socket.on('chopTree', (data) => {
