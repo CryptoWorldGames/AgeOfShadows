@@ -103,9 +103,11 @@ const DEFAULTS = {
   // weapon (procedural, attached to the hand)
   weapon: 'none',
   attachBone: '',                          // '' = auto-detected right hand
-  weaponX: 0, weaponY: 0, weaponZ: 0,     // cm offset in the hand
+  weaponX: 0, weaponY: 0, weaponZ: 0,     // cm offset in the hand (LIVE editing values)
   weaponSpin: 0, weaponTilt: 0, weaponRoll: 0,
   weaponScale: 100,                        // %
+  weaponPlacements: {},                    // PER-WEAPON saved placement {sword:{...}, pistol:{...}}
+  swingDir: 'overhead',                    // overhead | horizontal | diagonal
   // scene
   autoSpin:false, showGrid:true, bgColor:'#1b2330',
   // per-part colors keyed by material name (so recolors persist across reloads)
@@ -340,6 +342,19 @@ function currentAttachBone(){
   if (S.attachBone){ const b = boneList.find(x=>x.name===S.attachBone); if (b) return b; }
   return handBone;
 }
+
+// ---- per-weapon placement memory ----
+const PLACE_KEYS = ['weaponX','weaponY','weaponZ','weaponSpin','weaponTilt','weaponRoll','weaponScale'];
+const PLACE_DEFAULTS = { weaponX:0, weaponY:0, weaponZ:0, weaponSpin:0, weaponTilt:0, weaponRoll:0, weaponScale:100 };
+function loadPlacement(w){
+  const p = (S.weaponPlacements && S.weaponPlacements[w]) || null;
+  PLACE_KEYS.forEach(k => { S[k] = (p && (k in p)) ? p[k] : PLACE_DEFAULTS[k]; });
+}
+function savePlacement(){
+  if (S.weapon === 'none') return;
+  const p = {}; PLACE_KEYS.forEach(k => p[k] = S[k]);
+  S.weaponPlacements[S.weapon] = p; saveState();
+}
 function applyWeapon(){
   if (weaponHolder && weaponHolder.parent) weaponHolder.parent.remove(weaponHolder);
   weaponHolder = null;
@@ -372,7 +387,47 @@ function updateWeaponTransform(){
   // Upright in the fist by default; the sliders aim it. (We deliberately do NOT
   // inherit the bone's rotation — that's what drove the blade through his body.)
   weaponHolder.rotation.set(d(S.weaponTilt), d(S.weaponSpin), d(S.weaponRoll));
+  // live swing preview on top of the aimed pose
+  if (swing.active){
+    const e = swing.t, a = (-1.2 + 2.4*(e*e*(3-2*e)));   // smooth -1.2 -> +1.2 rad
+    if (S.swingDir==='horizontal') weaponHolder.rotateY(a);
+    else if (S.swingDir==='diagonal'){ weaponHolder.rotateX(a*0.7); weaponHolder.rotateZ(a*0.7); }
+    else weaponHolder.rotateX(a);
+  }
   weaponHolder.position.x += S.weaponX/100*u; weaponHolder.position.y += S.weaponY/100*u; weaponHolder.position.z += S.weaponZ/100*u;
+}
+
+/* ---------------- action preview: swing (melee) + fire (guns) ---------------- */
+let swing = { active:false, t:0 };
+const tracers = [];
+function playAction(){
+  if (S.weapon === 'none'){ toast('Equip a weapon first'); return; }
+  if (S.weapon === 'pistol' || S.weapon === 'rifle'){ fireGun(); toast('Fire!'); }
+  else { swing.active = true; swing.t = 0; toast('Swing — use Speed slider for slow-mo'); }
+}
+function fireGun(){
+  if (!weaponHolder) return;
+  const u = modelH/1.8;
+  const wq = weaponHolder.getWorldQuaternion(new THREE.Quaternion());
+  const dir = new THREE.Vector3(0,0,1).applyQuaternion(wq).normalize();   // gun points +Z
+  const origin = weaponHolder.getWorldPosition(new THREE.Vector3()).add(dir.clone().multiplyScalar(0.45*u));
+  const end = origin.clone().add(dir.clone().multiplyScalar(12*u));
+  const lmat = new THREE.LineBasicMaterial({ color:0xfff070, transparent:true, opacity:0.95 });
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([origin, end]), lmat); scene.add(line);
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.05*u,8,6), new THREE.MeshBasicMaterial({color:0xffe080})); flash.position.copy(origin); scene.add(flash);
+  const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.02*u,8,6), new THREE.MeshBasicMaterial({color:0xffffff})); bullet.position.copy(origin); scene.add(bullet);
+  tracers.push({ line, lmat, flash, bullet, origin:origin.clone(), end:end.clone(), t:0 });
+}
+function updateActions(dt){
+  if (swing.active){ swing.t += dt * S.speed; if (swing.t >= 1) swing.active = false; }   // Speed = slow-mo
+  for (let i=tracers.length-1; i>=0; i--){
+    const tr = tracers[i]; tr.t += dt;
+    tr.lmat.opacity = Math.max(0, 0.95*(1 - tr.t/1.0));        // line lingers ~1s then fades
+    tr.flash.visible = tr.t < 0.06;
+    const travel = Math.min(1, tr.t / (0.6 / Math.max(0.1,S.speed)));  // bullet flies (slow-mo via Speed)
+    tr.bullet.position.copy(tr.origin).lerp(tr.end, travel); tr.bullet.visible = travel < 1;
+    if (tr.t >= 1){ scene.remove(tr.line); scene.remove(tr.flash); scene.remove(tr.bullet); tr.line.geometry.dispose(); tracers.splice(i,1); }
+  }
 }
 
 /* ---------------- AI prompt (plain-English commands) ---------------- */
@@ -467,6 +522,7 @@ function tick(){
   try {
     if (mixer) mixer.update(dt);
     updateWeaponTransform();              // keep the weapon glued to the hand each frame
+    updateActions(dt);                    // swing / fire preview
     if (S.autoSpin) avatar.rotation.y += dt*0.5;
     controls.update();
   } catch (e) {
@@ -568,15 +624,32 @@ function buildUI(){
   });
 
   g = addGroup('Weapon (in hand)');
-  addButtons(g,'weapon','Weapon',[['none','None'],['sword','Sword'],['axe','Axe'],['pick','Pick'],['mace','Mace'],['spear','Spear'],['dagger','Dagger'],['bow','Bow'],['staff','Staff'],['torch','Torch'],['pistol','Pistol'],['rifle','Rifle']], applyWeapon);
-  const noop = ()=>{};   // transform sliders auto-apply every frame via updateWeaponTransform
-  addSlider(g,'weaponSpin','Spin',0,360,1,v=>Math.round(v)+'°', noop);
-  addSlider(g,'weaponTilt','Tilt',-180,180,1,v=>Math.round(v)+'°', noop);
-  addSlider(g,'weaponRoll','Roll',-180,180,1,v=>Math.round(v)+'°', noop);
-  addSlider(g,'weaponScale','Size',20,300,1,v=>Math.round(v)+'%', noop);
-  addSlider(g,'weaponX','Move X',-40,40,0.5,v=>v+' cm', noop);
-  addSlider(g,'weaponY','Move Y',-40,40,0.5,v=>v+' cm', noop);
-  addSlider(g,'weaponZ','Move Z',-40,40,0.5,v=>v+' cm', noop);
+  // selecting a weapon loads ITS OWN saved placement (each tool remembers its spot)
+  addButtons(g,'weapon','Weapon',[['none','None'],['sword','Sword'],['axe','Axe'],['pick','Pick'],['mace','Mace'],['spear','Spear'],['dagger','Dagger'],['bow','Bow'],['staff','Staff'],['torch','Torch'],['pistol','Pistol'],['rifle','Rifle']], ()=>{ loadPlacement(S.weapon); applyWeapon(); buildUI(); });
+  const onPlace = ()=>{ savePlacement(); };   // each nudge saves THIS weapon's placement
+  addSlider(g,'weaponSpin','Spin',0,360,1,v=>Math.round(v)+'°', onPlace);
+  addSlider(g,'weaponTilt','Tilt',-180,180,1,v=>Math.round(v)+'°', onPlace);
+  addSlider(g,'weaponRoll','Roll',-180,180,1,v=>Math.round(v)+'°', onPlace);
+  addSlider(g,'weaponScale','Size',20,300,1,v=>Math.round(v)+'%', onPlace);
+  addSlider(g,'weaponX','Move X',-40,40,0.5,v=>v+' cm', onPlace);
+  addSlider(g,'weaponY','Move Y',-40,40,0.5,v=>v+' cm', onPlace);
+  addSlider(g,'weaponZ','Move Z',-40,40,0.5,v=>v+' cm', onPlace);
+  if (S.weapon !== 'none'){
+    const sv = el('button',null,'💾 Save '+S.weapon+' placement');
+    sv.style.cssText = 'width:100%;margin-top:4px;padding:9px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#15171c;font-weight:700;cursor:pointer;font-size:12px;';
+    sv.onclick = ()=>{ savePlacement(); toast('Saved '+S.weapon+' placement'); };
+    g.appendChild(sv);
+  }
+
+  // ---- Action preview: swing (melee) or fire (guns), Speed slider = slow-mo ----
+  g = addGroup('Action Preview');
+  const isGun = (S.weapon==='pistol'||S.weapon==='rifle');
+  const play = el('button',null, S.weapon==='none' ? '▶ Play (equip a weapon)' : (isGun ? '🔫 Fire (tracer)' : '⚔ Swing'));
+  play.style.cssText = 'width:100%;padding:10px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-weight:600;cursor:pointer;font-size:12px;';
+  play.onclick = playAction;
+  g.appendChild(play);
+  if (!isGun) addButtons(g,'swingDir','Swing direction',[['overhead','Overhead'],['horizontal','Horizontal'],['diagonal','Diagonal']], ()=>{});
+  g.appendChild(el('div',null,'<div style="font-size:10px;color:var(--muted);margin-top:4px">Lower the <b>Speed</b> slider for slow-motion. Guns show a 1-second bullet tracer line.</div>'));
 
   // ---- Rig Wizard: choose which bone the held object attaches to ----
   g = addGroup('Rig Wizard');
