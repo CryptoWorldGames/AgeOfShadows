@@ -102,6 +102,7 @@ const DEFAULTS = {
   skin:'', tunic:'', trousers:'', boots:'', hair:'', eyes:'', belt:'',
   // weapon (procedural, attached to the hand)
   weapon: 'none',
+  attachBone: '',                          // '' = auto-detected right hand
   weaponX: 0, weaponY: 0, weaponZ: 0,     // cm offset in the hand
   weaponSpin: 0, weaponTilt: 0, weaponRoll: 0,
   weaponScale: 100,                        // %
@@ -153,7 +154,7 @@ const fbxLoader = new FBXLoader();
 function loaderFor(url){ return url.toLowerCase().endsWith('.fbx') ? fbxLoader : gltfLoader; }
 const avatar = new THREE.Group();      // height scaling applies here
 scene.add(avatar);
-let model = null, mixer = null, clips = [], actions = [], materials = {}, matGroups = [], handBone = null, weaponHolder = null;
+let model = null, mixer = null, clips = [], actions = [], materials = {}, matGroups = [], boneList = [], handBone = null, weaponHolder = null;
 const clock = new THREE.Clock();
 
 // Friendly label for a material swatch (uses its category, else humanizes the name).
@@ -181,7 +182,7 @@ function classifyMat(name){
 function loadModel(){
   setStatus('Loading model…');
   if (model){ avatar.remove(model); model = null; }
-  materials = {}; matGroups = []; handBone = null; weaponHolder = null; mixer = null; clips = []; actions = [];
+  materials = {}; matGroups = []; boneList = []; handBone = null; weaponHolder = null; mixer = null; clips = []; actions = [];
   const def = MODELS[S.model];
   tryLoad(def.urls || [def.url], 0);
 }
@@ -207,9 +208,10 @@ function onModelLoaded(root, animations){
   model = root;
   model.traverse(o => {
     if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; }
-    if (o.isBone && !handBone){
+    if (o.isBone){
+      boneList.push(o);
       const bn = o.name.toLowerCase();
-      if (/(right|_r\b|\.r\b|rhand|hand_r|righthand)/.test(bn) && /hand|wrist/.test(bn)) handBone = o;
+      if (!handBone && /(right|_r\b|\.r\b|rhand|hand_r|righthand)/.test(bn) && /hand|wrist/.test(bn)) handBone = o;
     }
   });
   if (!handBone) model.traverse(o => { if (o.isBone && !handBone && /hand|wrist/.test(o.name.toLowerCase())) handBone = o; });
@@ -306,23 +308,51 @@ function buildWeapon(kind){
   else if (kind==='staff'){ C(0,.2,0,.025,.03,1.4,wood); const orb=new THREE.Mesh(new THREE.SphereGeometry(.09,16,14),new THREE.MeshStandardMaterial({color:0x7ec8e3,emissive:0x2a6e8a,emissiveIntensity:.6})); orb.position.y=1.0; g.add(orb); }
   else if (kind==='dagger'){ B(0,0,0,.03,.12,.03,wood); B(0,.07,0,.10,.02,.03,gold); B(0,.24,0,.04,.30,.015,steel); }
   else if (kind==='torch'){ C(0,.18,0,.018,.022,.5,wood); const fl=new THREE.Mesh(new THREE.ConeGeometry(.07,.22,10),new THREE.MeshStandardMaterial({color:0xffae33,emissive:0xff7a00,emissiveIntensity:1.4})); fl.position.y=.52; g.add(fl); const lp=new THREE.PointLight(0xff8a33,1.2,5); lp.position.y=.52; g.add(lp); }
-  g.position.set(0,-0.08,0.04); g.rotation.x = -Math.PI*0.5;   // base grip orientation
+  else if (kind==='pistol'){ const dk=new THREE.MeshStandardMaterial({color:0x2a2d33,roughness:0.5,metalness:0.4});
+    B(0,-.02,0,.035,.12,.05,dk); B(0,.06,.03,.04,.05,.16,steel); B(0,.05,.11,.018,.028,.08,steel); B(0,-.01,.03,.02,.03,.02,dk); }
+  else if (kind==='rifle'){ const dk=new THREE.MeshStandardMaterial({color:0x2a2d33,roughness:0.5,metalness:0.4});
+    B(0,0,0,.04,.10,.05,dk); B(0,.04,.26,.05,.07,.5,dk); B(0,.05,.56,.018,.026,.42,steel);
+    B(0,-.06,.30,.03,.17,.06,dk); B(0,.11,.16,.03,.05,.22,dk); B(0,-.02,-.16,.035,.10,.05,dk); }
+  // base grip orientation: melee/tools held vertically; firearms/bow held forward
+  if (kind==='pistol' || kind==='rifle'){ g.position.set(0,0,0); g.rotation.set(0,0,0); }
+  else { g.position.set(0,-0.08,0.04); g.rotation.x = -Math.PI*0.5; }
   return g;
 }
 
+function currentAttachBone(){
+  if (S.attachBone){ const b = boneList.find(x=>x.name===S.attachBone); if (b) return b; }
+  return handBone;
+}
 function applyWeapon(){
-  // remove old
   if (weaponHolder && weaponHolder.parent) weaponHolder.parent.remove(weaponHolder);
   weaponHolder = null;
   if (S.weapon === 'none' || !model) return;
-  const d = THREE.MathUtils.degToRad;
+  // Holder lives under the avatar (consistent scale); each frame we snap it to the
+  // chosen bone's world position — same trick the game uses to avoid bone-scale issues.
   weaponHolder = new THREE.Group();
-  weaponHolder.position.set(S.weaponX/100, S.weaponY/100, S.weaponZ/100);
-  weaponHolder.rotation.set(d(S.weaponTilt), d(S.weaponSpin), d(S.weaponRoll));
-  weaponHolder.scale.setScalar(S.weaponScale/100);
   weaponHolder.add(buildWeapon(S.weapon));
-  if (handBone) handBone.add(weaponHolder);
-  else { weaponHolder.position.add(new THREE.Vector3(0.35,1.0,0.15)); avatar.add(weaponHolder); } // fallback if no hand bone
+  avatar.add(weaponHolder);
+  updateWeaponTransform();
+}
+const _wpos = new THREE.Vector3(), _wquat = new THREE.Quaternion();
+function updateWeaponTransform(){
+  if (!weaponHolder) return;
+  const d = THREE.MathUtils.degToRad;
+  weaponHolder.scale.setScalar(S.weaponScale/100);
+  const bone = currentAttachBone();
+  if (bone){
+    bone.getWorldPosition(_wpos);
+    avatar.worldToLocal(_wpos);
+    weaponHolder.position.copy(_wpos);
+    // align to the hand's facing, then apply the user's spin/tilt/roll on top
+    bone.getWorldQuaternion(_wquat);
+    weaponHolder.quaternion.copy(_wquat);
+    weaponHolder.rotateX(d(S.weaponTilt)); weaponHolder.rotateY(d(S.weaponSpin)); weaponHolder.rotateZ(d(S.weaponRoll));
+  } else {
+    weaponHolder.position.set(0.2, 1.0, 0.15);
+    weaponHolder.rotation.set(d(S.weaponTilt), d(S.weaponSpin), d(S.weaponRoll));
+  }
+  weaponHolder.position.x += S.weaponX/100; weaponHolder.position.y += S.weaponY/100; weaponHolder.position.z += S.weaponZ/100;
 }
 
 /* ---------------- AI prompt (plain-English commands) ---------------- */
@@ -343,7 +373,7 @@ const PART_WORDS = [
   ['boots', /\bboots?|shoes?|feet\b/],
   ['belt', /\bbelt\b/],
 ];
-const WEAPONS = ['sword','axe','pick','mace','spear','bow','staff','dagger','torch'];
+const WEAPONS = ['sword','axe','pick','mace','spear','bow','staff','dagger','torch','pistol','rifle'];
 
 function applyPrompt(text){
   const t = (text||'').toLowerCase();
@@ -377,9 +407,14 @@ function applyPrompt(text){
   else if (/\b(taller|tall|big|huge|giant|large)\b/.test(t)){ S.height=clamp(S.height+0.15,1.4,2.1); applyHeight(); done.push('taller'); }
   else if (/\b(shorter|short|small|tiny|dwarf|little)\b/.test(t)){ S.height=clamp(S.height-0.15,1.4,2.1); applyHeight(); done.push('shorter'); }
 
-  // weapon
+  // weapon (with a few aliases)
   if (/\b(no weapon|unarmed|empty hand|nothing|drop)\b/.test(t)){ S.weapon='none'; applyWeapon(); done.push('unarmed'); }
-  else for (const w of WEAPONS){ if (new RegExp('\\b'+w+'\\b').test(t)){ S.weapon=w; applyWeapon(); done.push('holding '+w); break; } }
+  else {
+    let w = WEAPONS.find(x => new RegExp('\\b'+x+'\\b').test(t));
+    if (!w && /\b(gun|handgun|glock)\b/.test(t)) w='pistol';
+    if (!w && /\b(ak|m4|assault|carbine|smg)\b/.test(t)) w='rifle';
+    if (w){ S.weapon=w; applyWeapon(); done.push('holding '+w); }
+  }
 
   // animation
   if (clips.length){
@@ -409,6 +444,7 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function tick(){
   const dt = Math.min(clock.getDelta(), 0.05);
   if (mixer) mixer.update(dt);
+  updateWeaponTransform();          // keep the weapon glued to the hand each frame
   if (S.autoSpin) avatar.rotation.y += dt*0.5;
   controls.update();
   renderer.render(scene,camera);
@@ -503,15 +539,31 @@ function buildUI(){
   });
 
   g = addGroup('Weapon (in hand)');
-  addButtons(g,'weapon','Weapon',[['none','None'],['sword','Sword'],['axe','Axe'],['pick','Pick'],['mace','Mace'],['spear','Spear'],['bow','Bow'],['staff','Staff'],['dagger','Dagger'],['torch','Torch']], applyWeapon);
-  addSlider(g,'weaponSpin','Spin',0,360,1,v=>Math.round(v)+'°', applyWeapon);
-  addSlider(g,'weaponTilt','Tilt',-180,180,1,v=>Math.round(v)+'°', applyWeapon);
-  addSlider(g,'weaponRoll','Roll',-180,180,1,v=>Math.round(v)+'°', applyWeapon);
-  addSlider(g,'weaponScale','Size',30,200,1,v=>Math.round(v)+'%', applyWeapon);
-  addSlider(g,'weaponX','Move X',-30,30,0.5,v=>v+' cm', applyWeapon);
-  addSlider(g,'weaponY','Move Y',-30,30,0.5,v=>v+' cm', applyWeapon);
-  addSlider(g,'weaponZ','Move Z',-30,30,0.5,v=>v+' cm', applyWeapon);
-  if (!handBone) g.appendChild(el('div',null,'<div style="font-size:10.5px;color:#c98">No hand bone detected — use Move/Spin to place it.</div>'));
+  addButtons(g,'weapon','Weapon',[['none','None'],['sword','Sword'],['axe','Axe'],['pick','Pick'],['mace','Mace'],['spear','Spear'],['dagger','Dagger'],['bow','Bow'],['staff','Staff'],['torch','Torch'],['pistol','Pistol'],['rifle','Rifle']], applyWeapon);
+  const noop = ()=>{};   // transform sliders auto-apply every frame via updateWeaponTransform
+  addSlider(g,'weaponSpin','Spin',0,360,1,v=>Math.round(v)+'°', noop);
+  addSlider(g,'weaponTilt','Tilt',-180,180,1,v=>Math.round(v)+'°', noop);
+  addSlider(g,'weaponRoll','Roll',-180,180,1,v=>Math.round(v)+'°', noop);
+  addSlider(g,'weaponScale','Size',20,300,1,v=>Math.round(v)+'%', noop);
+  addSlider(g,'weaponX','Move X',-40,40,0.5,v=>v+' cm', noop);
+  addSlider(g,'weaponY','Move Y',-40,40,0.5,v=>v+' cm', noop);
+  addSlider(g,'weaponZ','Move Z',-40,40,0.5,v=>v+' cm', noop);
+
+  // ---- Rig Wizard: choose which bone the held object attaches to ----
+  g = addGroup('Rig Wizard');
+  const brow = el('div','row'); brow.appendChild(el('label',null,'<span>Attach object to bone</span>'));
+  const sel = document.createElement('select');
+  sel.style.cssText = 'width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px;font-size:12px;';
+  const autoLabel = handBone ? ('Auto: right hand ('+handBone.name+')') : 'Auto: no hand bone found';
+  sel.innerHTML = `<option value="">${autoLabel}</option>` + boneList.map(b=>`<option value="${b.name}">${b.name}</option>`).join('');
+  sel.value = S.attachBone;
+  sel.onchange = ()=>{ S.attachBone = sel.value; };
+  brow.appendChild(sel); g.appendChild(brow);
+  g.appendChild(el('div',null,`<div style="font-size:10.5px;color:var(--muted);margin:2px 0 8px">${boneList.length} bones in this rig. Pick the hand bone if the weapon sits wrong, then nudge with Move/Spin.</div>`));
+  const seat = el('button',null,'✦ Auto-seat in hand');
+  seat.style.cssText = 'width:100%;padding:9px;border-radius:7px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-weight:700;cursor:pointer;font-size:12px;';
+  seat.onclick = ()=>{ S.attachBone=''; S.weaponX=0; S.weaponY=0; S.weaponZ=0; S.weaponSpin=0; S.weaponTilt=0; S.weaponRoll=0; S.weaponScale=100; buildUI(); toast(handBone?'Seated on right hand':'No hand bone — pick one in the dropdown'); };
+  g.appendChild(seat);
 
   g = addGroup('Scene');
   addToggle(g,'autoSpin','Auto-rotate', ()=>{});
