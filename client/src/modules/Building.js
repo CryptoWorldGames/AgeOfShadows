@@ -215,11 +215,13 @@ export function createTownCenter(scene, ghost = true) {
   const winY = 1.25 * baseScale;
   // front windows (flanking the door, outside the columns)
   [-1.9, 1.9].forEach((mx) => addWindow(mx * doorW * 1.0 * 1.7, winY, front + 0.04 * baseScale, 0));
-  // upper-floor front windows
-  [-1, 0, 1].forEach((mx) => addWindow(mx * 1.3 * baseScale, winY + 1.15 * baseScale, front + 0.04 * baseScale, 0));
-  // side windows (both sides)
+  // upper-floor front windows (positioned lower to fit within building)
+  [-1, 0, 1].forEach((mx) => addWindow(mx * 1.3 * baseScale, winY + 0.65 * baseScale, front + 0.04 * baseScale, 0));
+  // side windows (both sides) - two per side
   [side, -side].forEach((sxFace) => {
     [-1, 1].forEach((mz) => addWindow(sxFace + (sxFace > 0 ? 0.04 : -0.04) * baseScale, winY, mz * 1.2 * baseScale, Math.PI / 2));
+    // upper side windows
+    addWindow(sxFace + (sxFace > 0 ? 0.04 : -0.04) * baseScale, winY + 0.65 * baseScale, 0, Math.PI / 2);
   });
 
   // Ground footprint ring (helps aim while placing)
