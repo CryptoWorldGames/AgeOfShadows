@@ -9,7 +9,7 @@ gamescene_content = (
     "import { createHuman } from './modules/Human';\n"
     "import { createTree } from './modules/Tree';\n"
     "import { createUI } from './modules/UI';\n"
-    "import { createControls } from './modules/Controls';\n"
+    "import { createControls } from './modules/Controls.jsx';\n"
     "import { createTownCenter } from './modules/Building';\n"
     "import { createChicken, createDeer } from './modules/Animal';\n"
     "import { createStone } from './modules/Stone';\n"
