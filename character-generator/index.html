@@ -153,9 +153,18 @@ const fbxLoader = new FBXLoader();
 function loaderFor(url){ return url.toLowerCase().endsWith('.fbx') ? fbxLoader : gltfLoader; }
 const avatar = new THREE.Group();      // height scaling applies here
 scene.add(avatar);
-let model = null, mixer = null, clips = [], actions = [], materials = {}, handBone = null, weaponHolder = null;
+let model = null, mixer = null, clips = [], actions = [], materials = {}, matGroups = [], handBone = null, weaponHolder = null;
 const clock = new THREE.Clock();
 
+// Friendly label for a material swatch (uses its category, else humanizes the name).
+function matLabel(name){
+  const cat = classifyMat(name);
+  if (cat) return cat.charAt(0).toUpperCase()+cat.slice(1);
+  let s = (name||'Part').replace(/[._]+/g,' ')
+    .replace(/\b(tm|sm|v\d|mat|material|varianta?|lambert\d*|phong\d*|\d{2,3})\b/gi,'')
+    .replace(/\s+/g,' ').trim();
+  return (s || 'Part').replace(/\b\w/g, c=>c.toUpperCase()).slice(0,18);
+}
 function classifyMat(name){
   const n = (name||'').toLowerCase();
   // order matters: eyes/teeth/hair before skin so they aren't swallowed by /body/
@@ -172,7 +181,7 @@ function classifyMat(name){
 function loadModel(){
   setStatus('Loading model…');
   if (model){ avatar.remove(model); model = null; }
-  materials = {}; handBone = null; weaponHolder = null; mixer = null; clips = []; actions = [];
+  materials = {}; matGroups = []; handBone = null; weaponHolder = null; mixer = null; clips = []; actions = [];
   const def = MODELS[S.model];
   tryLoad(def.urls || [def.url], 0);
 }
@@ -205,7 +214,8 @@ function onModelLoaded(root, animations){
   });
   if (!handBone) model.traverse(o => { if (o.isBone && !handBone && /hand|wrist/.test(o.name.toLowerCase())) handBone = o; });
 
-  // gather recolor-able materials by category (works for GLTF Standard + FBX Phong)
+  // gather EVERY material so the user can recolor any part, plus a category map
+  // (skin/hair/...) that the AI prompt uses.
   const seen = new Set();
   model.traverse(o => {
     if (!o.isMesh) return;
@@ -213,6 +223,8 @@ function onModelLoaded(root, animations){
     arr.forEach((m) => {
       if (!m || seen.has(m.uuid)) return;
       seen.add(m.uuid);
+      if (!m.color) m.color = new THREE.Color(0xffffff);
+      matGroups.push({ label: matLabel(m.name), mats: [m] });
       const cat = classifyMat(m.name);
       if (cat){ (materials[cat] = materials[cat] || []).push(m); }
     });
@@ -478,9 +490,17 @@ function buildUI(){
   g = addGroup('Body');
   addSlider(g,'height','Height',1.4,2.1,0.01,v=>v.toFixed(2)+' m', applyHeight);
 
-  g = addGroup('Colors');
-  const colorParts = [['skin','Skin'],['hair','Hair'],['eyes','Eyes'],['tunic','Tunic / top'],['trousers','Trousers'],['boots','Boots'],['belt','Belt']];
-  colorParts.forEach(([k,l])=>{ if (materials[k]) addColor(g,k,l, applyColors); });
+  g = addGroup('Colors — recolor any part');
+  if (!matGroups.length){
+    g.appendChild(el('div',null,'<div style="font-size:11px;color:var(--muted)">This model exposes no recolorable materials.</div>'));
+  }
+  matGroups.forEach((grp)=>{
+    const row=el('div','row'); row.appendChild(el('label',null,`<span>${grp.label}</span>`));
+    const inp=el('input'); inp.type='color';
+    inp.value = '#'+grp.mats[0].color.getHexString();
+    inp.oninput=()=>{ grp.mats.forEach(m=>{ m.color.set(inp.value); m.needsUpdate=true; }); };
+    row.appendChild(inp); g.appendChild(row);
+  });
 
   g = addGroup('Weapon (in hand)');
   addButtons(g,'weapon','Weapon',[['none','None'],['sword','Sword'],['axe','Axe'],['pick','Pick'],['mace','Mace'],['spear','Spear'],['bow','Bow'],['staff','Staff'],['dagger','Dagger'],['torch','Torch']], applyWeapon);
