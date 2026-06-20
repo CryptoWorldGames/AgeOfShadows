@@ -87,13 +87,14 @@ function setStatus(msg){ if(!msg){ statusEl.style.display='none'; } else { statu
 function fail(msg){ statusEl.style.display='block'; statusEl.style.background='rgba(120,0,0,.85)'; statusEl.innerHTML = msg; }
 
 const MODELS = {
+  agent:     { urls:['https://pub-9e79279ca165496da153d64ecb88f99c.r2.dev/balkan__cs2_agent_model_dragomir_no1.glb','./models/peasant_realistic.glb'], label:'Operator' },
   custom:    { urls:['./models/custom.glb','./models/custom.fbx'], label:'Custom' },
   realistic: { url:'./models/peasant_realistic.glb', label:'Peasant' },
   modular:   { url:'./models/peasant_modular.glb',   label:'Modular' },
 };
 
 const DEFAULTS = {
-  model: 'realistic',
+  model: 'agent',
   anim: 0,            // clip index, or -1 for T-pose
   speed: 1.0,
   height: 1.80,
@@ -343,7 +344,7 @@ function addToggle(g,key,label,onChange){
 function buildUI(){
   scroll.innerHTML='';
   let g = addGroup('Model');
-  addButtons(g,'model','Base model',[['custom','Custom'],['realistic','Peasant'],['modular','Modular']], ()=>loadModel());
+  addButtons(g,'model','Base model',[['agent','Operator'],['custom','Custom'],['realistic','Peasant'],['modular','Modular']], ()=>loadModel());
 
   g = addGroup('Animation');
   const animOpts = [['-1','T-pose']].concat(clips.map((c,i)=>[String(i), c.name.replace(/_/g,' ').slice(0,14)]));
