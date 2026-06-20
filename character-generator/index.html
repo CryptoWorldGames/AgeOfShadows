@@ -80,13 +80,15 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
 import { GLTFLoader } from './vendor/GLTFLoader.js';
+import { FBXLoader } from './vendor/FBXLoader.js';
 
 const statusEl = document.getElementById('status');
 function setStatus(msg){ if(!msg){ statusEl.style.display='none'; } else { statusEl.style.display='block'; statusEl.textContent=msg; } }
 function fail(msg){ statusEl.style.display='block'; statusEl.style.background='rgba(120,0,0,.85)'; statusEl.innerHTML = msg; }
 
 const MODELS = {
-  realistic: { url:'./models/peasant_realistic.glb', label:'Realistic' },
+  custom:    { urls:['./models/custom.glb','./models/custom.fbx'], label:'Custom' },
+  realistic: { url:'./models/peasant_realistic.glb', label:'Peasant' },
   modular:   { url:'./models/peasant_modular.glb',   label:'Modular' },
 };
 
@@ -145,7 +147,9 @@ const grid = new THREE.GridHelper(40,40,0x4a5568,0x39414f);
 grid.material.opacity=0.35; grid.material.transparent=true; scene.add(grid);
 
 /* ---------------- model loading ---------------- */
-const loader = new GLTFLoader();
+const gltfLoader = new GLTFLoader();
+const fbxLoader = new FBXLoader();
+function loaderFor(url){ return url.toLowerCase().endsWith('.fbx') ? fbxLoader : gltfLoader; }
 const avatar = new THREE.Group();      // height scaling applies here
 scene.add(avatar);
 let model = null, mixer = null, clips = [], actions = [], materials = {}, handBone = null, weaponHolder = null;
@@ -153,73 +157,82 @@ const clock = new THREE.Clock();
 
 function classifyMat(name){
   const n = (name||'').toLowerCase();
+  // order matters: eyes/teeth/hair before skin so they aren't swallowed by /body/
+  if (/eye|cornea|teeth|tooth|tongue/.test(n)) return 'eyes';
+  if (/hair|beard|brow|stubble|fur/.test(n)) return 'hair';
   if (/skin|flesh|head|face|body|hand/.test(n)) return 'skin';
-  if (/eye/.test(n)) return 'eyes';
-  if (/hair|beard|stubble/.test(n)) return 'hair';
-  if (/tunic|shirt|linen|cloth|torso|sleeve|cuff/.test(n)) return 'tunic';
-  if (/trouser|pant|wool|leg|thigh|shin/.test(n)) return 'trousers';
-  if (/boot|shoe|foot/.test(n)) return 'boots';
+  if (/top|tunic|shirt|linen|cloth|torso|sleeve|cuff|jacket|chest|upper/.test(n)) return 'tunic';
+  if (/bottom|trouser|pant|wool|leg|thigh|shin|lower/.test(n)) return 'trousers';
+  if (/boot|shoe|foot|footwear/.test(n)) return 'boots';
   if (/belt|rope|strap/.test(n)) return 'belt';
   return null;
 }
 
 function loadModel(){
   setStatus('Loading model…');
-  // clear old
-  if (model){ avatar.remove(model); }
+  if (model){ avatar.remove(model); model = null; }
   materials = {}; handBone = null; weaponHolder = null; mixer = null; clips = []; actions = [];
+  const def = MODELS[S.model];
+  tryLoad(def.urls || [def.url], 0);
+}
 
-  loader.load(MODELS[S.model].url, (gltf) => {
-    model = gltf.scene;
-    model.traverse(o => {
-      if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; }
-      if (o.isBone && !handBone){
-        const bn = o.name.toLowerCase();
-        if (/(right|_r\b|\.r\b|rhand|hand_r)/.test(bn) && /hand|wrist/.test(bn)) handBone = o;
-      }
-    });
-    if (!handBone){ // looser fallback: any hand/wrist bone
-      model.traverse(o => { if (o.isBone && !handBone && /hand|wrist/.test(o.name.toLowerCase())) handBone = o; });
+// Try each candidate URL in turn (e.g. custom.glb, then custom.fbx).
+function tryLoad(urls, i){
+  if (i >= urls.length){
+    if (S.model === 'custom')
+      fail('No custom model found.<br><small>Save your downloaded character as<br><b>character-generator/models/custom.glb</b> (or <b>custom.fbx</b>)<br>then click <b>Custom</b> again.</small>');
+    else
+      fail('Could not load the 3D model.');
+    return;
+  }
+  const url = urls[i];
+  loaderFor(url).load(url,
+    (res) => onModelLoaded(res.scene || res, res.animations || (res.scene && res.scene.animations) || []),
+    (xhr) => { if (xhr.total) setStatus('Loading model… '+Math.round(xhr.loaded/xhr.total*100)+'%'); },
+    (err) => { console.warn('load failed:', url, err && err.message); tryLoad(urls, i+1); }
+  );
+}
+
+function onModelLoaded(root, animations){
+  model = root;
+  model.traverse(o => {
+    if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; }
+    if (o.isBone && !handBone){
+      const bn = o.name.toLowerCase();
+      if (/(right|_r\b|\.r\b|rhand|hand_r|righthand)/.test(bn) && /hand|wrist/.test(bn)) handBone = o;
     }
-    // collect unique materials, clone so we can recolor without touching the file
-    const seen = new Set();
-    model.traverse(o => {
-      if (!o.isMesh) return;
-      const arr = Array.isArray(o.material) ? o.material : [o.material];
-      arr.forEach((m,i) => {
-        if (!m || seen.has(m.uuid)) return;
-        seen.add(m.uuid);
-        const cat = classifyMat(m.name);
-        if (cat && !materials[cat]) materials[cat] = [];
-        if (cat) materials[cat].push(m);
-      });
+  });
+  if (!handBone) model.traverse(o => { if (o.isBone && !handBone && /hand|wrist/.test(o.name.toLowerCase())) handBone = o; });
+
+  // gather recolor-able materials by category (works for GLTF Standard + FBX Phong)
+  const seen = new Set();
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    const arr = Array.isArray(o.material) ? o.material : [o.material];
+    arr.forEach((m) => {
+      if (!m || seen.has(m.uuid)) return;
+      seen.add(m.uuid);
+      const cat = classifyMat(m.name);
+      if (cat){ (materials[cat] = materials[cat] || []).push(m); }
     });
+  });
 
-    // normalize size: scale to ~1.8m tall, feet on ground, centered
-    let box = new THREE.Box3().setFromObject(model);
-    let size = box.getSize(new THREE.Vector3());
-    const norm = 1.8 / (size.y || 1);
-    model.scale.setScalar(norm);
-    box = new THREE.Box3().setFromObject(model);
-    const c = box.getCenter(new THREE.Vector3());
-    model.position.x -= c.x; model.position.z -= c.z;
-    model.position.y -= box.min.y;
-    avatar.add(model);
+  // normalize: ~1.8m tall, centered, feet on the ground (handles FBX cm units too)
+  let box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  model.scale.setScalar(1.8 / (size.y || 1));
+  box = new THREE.Box3().setFromObject(model);
+  const c = box.getCenter(new THREE.Vector3());
+  model.position.x -= c.x; model.position.z -= c.z; model.position.y -= box.min.y;
+  avatar.add(model);
 
-    // animations
-    clips = gltf.animations || [];
-    if (clips.length){
-      mixer = new THREE.AnimationMixer(model);
-      actions = clips.map(c => mixer.clipAction(c));
-    }
+  clips = animations || [];
+  if (clips.length){ mixer = new THREE.AnimationMixer(model); actions = clips.map(c => mixer.clipAction(c)); }
 
-    applyHeight(); applyAnim(); applyColors(); applyWeapon();
-    buildUI();
-    setStatus(null);
-    console.log('Loaded', S.model, '| bones hand:', handBone && handBone.name, '| clips:', clips.map(c=>c.name), '| materials:', Object.keys(materials));
-  },
-  (xhr)=>{ if (xhr.total) setStatus('Loading model… '+Math.round(xhr.loaded/xhr.total*100)+'%'); },
-  (err)=>{ console.error(err); fail('Could not load the 3D model.<br><small>'+(err && err.message ? err.message : err)+'</small>'); });
+  applyHeight(); applyAnim(); applyColors(); applyWeapon();
+  buildUI();
+  setStatus(null);
+  console.log('Loaded', S.model, '| hand bone:', handBone && handBone.name, '| clips:', clips.map(c=>c.name), '| material groups:', Object.keys(materials));
 }
 
 /* ---------------- appliers ---------------- */
@@ -330,7 +343,7 @@ function addToggle(g,key,label,onChange){
 function buildUI(){
   scroll.innerHTML='';
   let g = addGroup('Model');
-  addButtons(g,'model','Base model',[['realistic','Realistic'],['modular','Modular']], ()=>loadModel());
+  addButtons(g,'model','Base model',[['custom','Custom'],['realistic','Peasant'],['modular','Modular']], ()=>loadModel());
 
   g = addGroup('Animation');
   const animOpts = [['-1','T-pose']].concat(clips.map((c,i)=>[String(i), c.name.replace(/_/g,' ').slice(0,14)]));
