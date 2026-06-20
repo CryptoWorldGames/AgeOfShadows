@@ -98,10 +98,10 @@ export function createTownCenter(scene, ghost = true) {
   group.add(base);
 
   // Pitched roof (more realistic)
-  const roofGeo = new THREE.ConeGeometry(3.4 * baseScale, 2.0 * baseScale, 4);
+  const roofGeo = new THREE.ConeGeometry(3.4 * baseScale, 2.0 * baseScale, 16);
   const roof = new THREE.Mesh(roofGeo, roofMat);
   roof.position.y = 3.2 * baseScale;
-  roof.rotation.y = Math.PI / 4;
+  roof.rotation.y = 0;
   roof.castShadow = true;
   group.add(roof);
 
@@ -329,8 +329,8 @@ export function createHouse(scene, ghost = true) {
   const base = new THREE.Mesh(new THREE.BoxGeometry(3.0 * s, 2.0 * s, 3.0 * s), wallMat);
   base.position.y = 1.0 * s; base.castShadow = true; base.receiveShadow = true; group.add(base);
 
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.5 * s, 1.5 * s, 4), roofMat);
-  roof.position.y = 2.75 * s; roof.rotation.y = Math.PI / 4; roof.castShadow = true; group.add(roof);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.5 * s, 1.5 * s, 16), roofMat);
+  roof.position.y = 2.75 * s; roof.rotation.y = 0; roof.castShadow = true; group.add(roof);
 
   const front = 1.5 * s;
   const door = new THREE.Mesh(new THREE.BoxGeometry(0.8 * s, 1.3 * s, 0.16 * s), doorMat);
