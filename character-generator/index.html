@@ -315,9 +315,10 @@ function buildWeapon(kind){
   else if (kind==='rifle'){ const dk=new THREE.MeshStandardMaterial({color:0x2a2d33,roughness:0.5,metalness:0.4});
     B(0,0,0,.04,.10,.05,dk); B(0,.04,.26,.05,.07,.5,dk); B(0,.05,.56,.018,.026,.42,steel);
     B(0,-.06,.30,.03,.17,.06,dk); B(0,.11,.16,.03,.05,.22,dk); B(0,-.02,-.16,.035,.10,.05,dk); }
-  // base grip orientation: melee/tools held vertically; firearms/bow held forward
+  // base grip: blade/head points UP out of the fist by default (clearly visible);
+  // firearms sit flat. Fine-tune with the Spin/Tilt/Roll sliders.
   if (kind==='pistol' || kind==='rifle'){ g.position.set(0,0,0); g.rotation.set(0,0,0); }
-  else { g.position.set(0,-0.08,0.04); g.rotation.x = -Math.PI*0.5; }
+  else { g.position.set(0,-0.12,0); g.rotation.set(0,0,0); }
   return g;
 }
 
@@ -339,28 +340,24 @@ function applyWeapon(){
   toast('Equipped ' + S.weapon + (bone ? (' on ' + bone.name) : ' (no hand bone — placed in front)'));
   console.log('[weapon]', S.weapon, '| bone:', bone && bone.name, '| modelH:', modelH.toFixed(2));
 }
-const _wpos = new THREE.Vector3(), _wquat = new THREE.Quaternion(), _aquat = new THREE.Quaternion();
+const _wpos = new THREE.Vector3();
 function updateWeaponTransform(){
   if (!weaponHolder) return;
   const d = THREE.MathUtils.degToRad;
-  const k = (modelH/1.8) * (S.weaponScale/100);   // size the weapon to the character
-  weaponHolder.scale.setScalar(k);
+  const u = modelH/1.8;
+  weaponHolder.scale.setScalar(u * (S.weaponScale/100));   // size the weapon to the character
   const bone = currentAttachBone();
   if (bone){
     bone.getWorldPosition(_wpos);
     avatar.worldToLocal(_wpos);
     weaponHolder.position.copy(_wpos);
-    // align to the hand's facing (in avatar space), then apply user spin/tilt/roll
-    bone.getWorldQuaternion(_wquat);
-    avatar.getWorldQuaternion(_aquat);
-    weaponHolder.quaternion.copy(_aquat.invert()).multiply(_wquat);
-    weaponHolder.rotateX(d(S.weaponTilt)); weaponHolder.rotateY(d(S.weaponSpin)); weaponHolder.rotateZ(d(S.weaponRoll));
   } else {
     // No hand bone: park it clearly in front of the chest so it's never lost.
-    weaponHolder.position.set(0.25*(modelH/1.8), modelH*0.6, 0.2*(modelH/1.8));
-    weaponHolder.rotation.set(d(S.weaponTilt), d(S.weaponSpin), d(S.weaponRoll));
+    weaponHolder.position.set(0.25*u, modelH*0.6, 0.2*u);
   }
-  const u = modelH/1.8;
+  // Upright in the fist by default; the sliders aim it. (We deliberately do NOT
+  // inherit the bone's rotation — that's what drove the blade through his body.)
+  weaponHolder.rotation.set(d(S.weaponTilt), d(S.weaponSpin), d(S.weaponRoll));
   weaponHolder.position.x += S.weaponX/100*u; weaponHolder.position.y += S.weaponY/100*u; weaponHolder.position.z += S.weaponZ/100*u;
 }
 
@@ -451,13 +448,17 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 /* ---------------- render loop ---------------- */
 function tick(){
+  requestAnimationFrame(tick);            // reschedule FIRST so an error can never freeze the app
   const dt = Math.min(clock.getDelta(), 0.05);
-  if (mixer) mixer.update(dt);
-  updateWeaponTransform();          // keep the weapon glued to the hand each frame
-  if (S.autoSpin) avatar.rotation.y += dt*0.5;
-  controls.update();
-  renderer.render(scene,camera);
-  requestAnimationFrame(tick);
+  try {
+    if (mixer) mixer.update(dt);
+    updateWeaponTransform();              // keep the weapon glued to the hand each frame
+    if (S.autoSpin) avatar.rotation.y += dt*0.5;
+    controls.update();
+  } catch (e) {
+    if (!tick._warned){ console.error('loop error (kept rendering):', e); tick._warned = true; }
+  }
+  renderer.render(scene, camera);         // ALWAYS render so the UI never appears frozen
 }
 function resize(){ const w=host.clientWidth,h=host.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize);
@@ -522,14 +523,19 @@ function buildUI(){
   addButtons(g,'model','Base model',[['agent','Operator'],['custom','Custom'],['realistic','Peasant'],['modular','Modular']], ()=>loadModel());
 
   g = addGroup('Animation');
-  const animOpts = [['-1','T-pose']].concat(clips.map((c,i)=>[String(i), (c.name||('clip '+i)).replace(/_/g,' ').slice(0,14)]).slice(0,12));
-  // animation uses index; store as number
+  // Hide junk face/eye/test clips that some auto-rigged models ship with — only
+  // show real, usable (body) animations.
+  const JUNK = /eye|test|tool|preview|blink|mouth|face|tongue|brow|lid|pupil|wink/i;
+  const realClips = clips.map((c,i)=>({name:c.name||('clip '+i), i})).filter(o=>!JUNK.test(o.name));
+  const animOpts = [['-1','T-pose']].concat(realClips.slice(0,12).map(o=>[String(o.i), o.name.replace(/_/g,' ').slice(0,16)]));
   const arow=el('div','row'); arow.appendChild(el('label',null,'<span>Clip</span>'));
   const awrap=el('div','btns');
   animOpts.forEach(([val,txt])=>{ const b=el('button',null,txt); if(String(S.anim)===val)b.classList.add('active');
     b.onclick=()=>{ S.anim=parseInt(val); awrap.querySelectorAll('button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); applyAnim(); };
     awrap.appendChild(b); });
   arow.appendChild(awrap); g.appendChild(arow);
+  if (realClips.length === 0)
+    g.appendChild(el('div',null,`<div style="font-size:10.5px;color:var(--muted);margin-top:4px">This model has no usable body animations (only face/test clips were hidden). I can add real Walk/Idle/Run to it.</div>`));
   addSlider(g,'speed','Speed',0.1,2.5,0.1,v=>v.toFixed(1)+'x', ()=>{ actions.forEach(a=>a.timeScale=S.speed); });
 
   g = addGroup('Body');
