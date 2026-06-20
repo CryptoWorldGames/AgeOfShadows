@@ -218,14 +218,17 @@ function onModelLoaded(root, animations){
     });
   });
 
-  // normalize: ~1.8m tall, centered, feet on the ground (handles FBX cm units too)
-  let box = new THREE.Box3().setFromObject(model);
+  // normalize: ~1.8m tall, centered, feet on the ground.
+  // precise=true measures actual vertices (skinned meshes report wrong cached bounds).
+  avatar.add(model);
+  model.updateWorldMatrix(true, true);
+  let box = new THREE.Box3().setFromObject(model, true);
   const size = box.getSize(new THREE.Vector3());
-  model.scale.setScalar(1.8 / (size.y || 1));
-  box = new THREE.Box3().setFromObject(model);
+  if (isFinite(size.y) && size.y > 0.0001) model.scale.multiplyScalar(1.8 / size.y);
+  model.updateWorldMatrix(true, true);
+  box = new THREE.Box3().setFromObject(model, true);
   const c = box.getCenter(new THREE.Vector3());
   model.position.x -= c.x; model.position.z -= c.z; model.position.y -= box.min.y;
-  avatar.add(model);
 
   clips = animations || [];
   if (clips.length){ mixer = new THREE.AnimationMixer(model); actions = clips.map(c => mixer.clipAction(c)); }
@@ -244,10 +247,11 @@ function applyHeight(){ const s = S.height/1.8; avatar.scale.setScalar(s); }
 function frameCamera(){
   if (!model) return;
   avatar.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(model);
+  const box = new THREE.Box3().setFromObject(model, true);
   if (box.isEmpty()) return;
   const sphere = box.getBoundingSphere(new THREE.Sphere());
-  const r = sphere.radius || 1;
+  let r = sphere.radius || 1;
+  if (!isFinite(r) || r < 0.2) r = 1.1;   // guard against bad bounds
   controls.target.copy(sphere.center);
   const dir = new THREE.Vector3(0.45, 0.12, 1).normalize();
   const dist = (r / Math.sin(THREE.MathUtils.degToRad(camera.fov * 0.5))) * 1.15;
@@ -309,6 +313,86 @@ function applyWeapon(){
   else { weaponHolder.position.add(new THREE.Vector3(0.35,1.0,0.15)); avatar.add(weaponHolder); } // fallback if no hand bone
 }
 
+/* ---------------- AI prompt (plain-English commands) ---------------- */
+const NAMED_COLORS = {
+  black:'#1a1a1a', white:'#f0f0f0', gray:'#808080', grey:'#808080', silver:'#c8ccd4',
+  red:'#b03030', crimson:'#8a1f2b', maroon:'#5a1f1f', blue:'#2a4a9a', navy:'#16224a',
+  cyan:'#3aa0c0', teal:'#2a8a8a', green:'#2f7a3a', forest:'#244a24', olive:'#6a6a2a',
+  lime:'#7ac84a', brown:'#5a4326', tan:'#c2a878', beige:'#d8c8a0', khaki:'#9a8a5a',
+  yellow:'#d4c24a', gold:'#caa64b', orange:'#c87a2a', purple:'#5a2a7a', violet:'#7a4a9a',
+  pink:'#d07a9a', magenta:'#a02a7a', dark:'#222222', light:'#cfcfcf',
+};
+const PART_WORDS = [
+  ['skin', /\bskin|complexion|face\b/],
+  ['hair', /\bhair|beard|mustache|moustache\b/],
+  ['eyes', /\beyes?\b/],
+  ['tunic', /\bshirt|top|tunic|jacket|coat|chest|armou?r|vest|uniform\b/],
+  ['trousers', /\bpants?|trousers?|legs?\b/],
+  ['boots', /\bboots?|shoes?|feet\b/],
+  ['belt', /\bbelt\b/],
+];
+const WEAPONS = ['sword','axe','pick','mace','spear','bow','staff','dagger','torch'];
+
+function applyPrompt(text){
+  const t = (text||'').toLowerCase();
+  if (!t.trim()) return 'Type something like: "red shirt, tall, holding an axe".';
+  const done = [];
+
+  // model swap
+  if (/\boperator|soldier|tactical|military\b/.test(t) && S.model!=='agent'){ S.model='agent'; loadModel(); done.push('model: operator'); }
+  else if (/\bpeasant|villager|farmer\b/.test(t) && S.model!=='realistic'){ S.model='realistic'; loadModel(); done.push('model: peasant'); }
+  else if (/\bcustom|my model|uploaded\b/.test(t) && S.model!=='custom'){ S.model='custom'; loadModel(); done.push('model: custom'); }
+
+  // find every "<color> <part>" pairing, plus a lone color -> shirt
+  let colorHit = null;
+  for (const cw of Object.keys(NAMED_COLORS)) if (new RegExp('\\b'+cw+'\\b').test(t)) { colorHit = cw; break; }
+  let appliedColor = false;
+  for (const [part, re] of PART_WORDS){
+    if (re.test(t)){
+      // nearest color word to this part word, else the first color found
+      const col = nearestColor(t, part) || colorHit;
+      if (col){ S[part] = NAMED_COLORS[col]; appliedColor = true; done.push(part+': '+col); }
+    }
+  }
+  if (!appliedColor && colorHit){ S.tunic = NAMED_COLORS[colorHit]; done.push('shirt: '+colorHit); appliedColor=true; }
+  if (appliedColor) applyColors();
+
+  // height
+  let h = t.match(/(\d\.\d{1,2})\s*m/) ;
+  let hcm = t.match(/(\d{2,3})\s*cm/);
+  if (h){ S.height = clamp(parseFloat(h[1]),1.4,2.1); applyHeight(); done.push('height '+S.height.toFixed(2)+'m'); }
+  else if (hcm){ S.height = clamp(parseFloat(hcm[1])/100,1.4,2.1); applyHeight(); done.push('height '+S.height.toFixed(2)+'m'); }
+  else if (/\b(taller|tall|big|huge|giant|large)\b/.test(t)){ S.height=clamp(S.height+0.15,1.4,2.1); applyHeight(); done.push('taller'); }
+  else if (/\b(shorter|short|small|tiny|dwarf|little)\b/.test(t)){ S.height=clamp(S.height-0.15,1.4,2.1); applyHeight(); done.push('shorter'); }
+
+  // weapon
+  if (/\b(no weapon|unarmed|empty hand|nothing|drop)\b/.test(t)){ S.weapon='none'; applyWeapon(); done.push('unarmed'); }
+  else for (const w of WEAPONS){ if (new RegExp('\\b'+w+'\\b').test(t)){ S.weapon=w; applyWeapon(); done.push('holding '+w); break; } }
+
+  // animation
+  if (clips.length){
+    if (/\bt-?pose|stand|still\b/.test(t)){ S.anim=-1; applyAnim(); done.push('T-pose'); }
+    else if (/\bwalk|walking\b/.test(t)){ const i=clips.findIndex(c=>/walk/i.test(c.name)); if(i>=0){S.anim=i;applyAnim();done.push('walking');} }
+    else if (/\bidle|breath|stand\b/.test(t)){ const i=clips.findIndex(c=>/idle|breath/i.test(c.name)); if(i>=0){S.anim=i;applyAnim();done.push('idle');} }
+    else if (/\brun|running\b/.test(t)){ const i=clips.findIndex(c=>/run/i.test(c.name)); if(i>=0){S.anim=i;applyAnim();done.push('running');} }
+  }
+
+  buildUI();
+  return done.length ? ('Applied: '+done.join(', ')) : "Didn't catch that. Try colors (red/blue/green), a part (shirt/pants/boots/hair), tall/short, or a weapon name.";
+}
+function nearestColor(t, part){
+  // crude proximity: find a color word within ~20 chars of the part word
+  const partIdx = t.search(PART_WORDS.find(p=>p[0]===part)[1]);
+  if (partIdx < 0) return null;
+  let best=null, bestD=24;
+  for (const cw of Object.keys(NAMED_COLORS)){
+    const m = t.match(new RegExp('\\b'+cw+'\\b'));
+    if (m){ const d = Math.abs(m.index - partIdx); if (d < bestD){ bestD=d; best=cw; } }
+  }
+  return best;
+}
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
 /* ---------------- render loop ---------------- */
 function tick(){
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -361,7 +445,23 @@ function addToggle(g,key,label,onChange){
 
 function buildUI(){
   scroll.innerHTML='';
-  let g = addGroup('Model');
+
+  // AI prompt box — type plain English, it changes the 3D guy.
+  let g = addGroup('AI Prompt');
+  const wrap = el('div','row');
+  const ta = document.createElement('textarea');
+  ta.placeholder = 'e.g. "dark green shirt, brown boots, taller, holding an axe"';
+  ta.value = S._lastPrompt || '';
+  ta.style.cssText = 'width:100%;height:54px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:8px;font-size:12px;resize:vertical;font-family:inherit;';
+  const btn = el('button',null,'✦ Apply');
+  btn.style.cssText = 'width:100%;margin-top:6px;padding:9px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#15171c;font-weight:700;cursor:pointer;font-size:12px;';
+  btn.onclick = ()=>{ S._lastPrompt = ta.value; toast(applyPrompt(ta.value)); };
+  ta.addEventListener('keydown', e=>{ if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); btn.onclick(); } });
+  wrap.appendChild(ta); wrap.appendChild(btn);
+  wrap.appendChild(el('div',null,'<div style="font-size:10px;color:var(--muted);margin-top:4px;">Understands colors, parts, height, weapons, animation. Ctrl+Enter to apply.</div>'));
+  g.appendChild(wrap);
+
+  g = addGroup('Model');
   addButtons(g,'model','Base model',[['agent','Operator'],['custom','Custom'],['realistic','Peasant'],['modular','Modular']], ()=>loadModel());
 
   g = addGroup('Animation');
