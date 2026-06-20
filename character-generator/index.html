@@ -155,6 +155,7 @@ function loaderFor(url){ return url.toLowerCase().endsWith('.fbx') ? fbxLoader :
 const avatar = new THREE.Group();      // height scaling applies here
 scene.add(avatar);
 let model = null, mixer = null, clips = [], actions = [], materials = {}, matGroups = [], boneList = [], handBone = null, weaponHolder = null;
+let modelH = 1.8;   // the character's rendered height (drives weapon sizing)
 const clock = new THREE.Clock();
 
 // Friendly label for a material swatch (uses its category, else humanizes the name).
@@ -263,6 +264,7 @@ function frameCamera(){
   avatar.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(model, true);
   if (box.isEmpty()) return;
+  modelH = box.getSize(new THREE.Vector3()).y || 1.8;   // remember rendered height
   const sphere = box.getBoundingSphere(new THREE.Sphere());
   let r = sphere.radius || 1;
   if (!isFinite(r) || r < 0.2) r = 1.1;   // guard against bad bounds
@@ -333,26 +335,33 @@ function applyWeapon(){
   weaponHolder.add(buildWeapon(S.weapon));
   avatar.add(weaponHolder);
   updateWeaponTransform();
+  const bone = currentAttachBone();
+  toast('Equipped ' + S.weapon + (bone ? (' on ' + bone.name) : ' (no hand bone — placed in front)'));
+  console.log('[weapon]', S.weapon, '| bone:', bone && bone.name, '| modelH:', modelH.toFixed(2));
 }
-const _wpos = new THREE.Vector3(), _wquat = new THREE.Quaternion();
+const _wpos = new THREE.Vector3(), _wquat = new THREE.Quaternion(), _aquat = new THREE.Quaternion();
 function updateWeaponTransform(){
   if (!weaponHolder) return;
   const d = THREE.MathUtils.degToRad;
-  weaponHolder.scale.setScalar(S.weaponScale/100);
+  const k = (modelH/1.8) * (S.weaponScale/100);   // size the weapon to the character
+  weaponHolder.scale.setScalar(k);
   const bone = currentAttachBone();
   if (bone){
     bone.getWorldPosition(_wpos);
     avatar.worldToLocal(_wpos);
     weaponHolder.position.copy(_wpos);
-    // align to the hand's facing, then apply the user's spin/tilt/roll on top
+    // align to the hand's facing (in avatar space), then apply user spin/tilt/roll
     bone.getWorldQuaternion(_wquat);
-    weaponHolder.quaternion.copy(_wquat);
+    avatar.getWorldQuaternion(_aquat);
+    weaponHolder.quaternion.copy(_aquat.invert()).multiply(_wquat);
     weaponHolder.rotateX(d(S.weaponTilt)); weaponHolder.rotateY(d(S.weaponSpin)); weaponHolder.rotateZ(d(S.weaponRoll));
   } else {
-    weaponHolder.position.set(0.2, 1.0, 0.15);
+    // No hand bone: park it clearly in front of the chest so it's never lost.
+    weaponHolder.position.set(0.25*(modelH/1.8), modelH*0.6, 0.2*(modelH/1.8));
     weaponHolder.rotation.set(d(S.weaponTilt), d(S.weaponSpin), d(S.weaponRoll));
   }
-  weaponHolder.position.x += S.weaponX/100; weaponHolder.position.y += S.weaponY/100; weaponHolder.position.z += S.weaponZ/100;
+  const u = modelH/1.8;
+  weaponHolder.position.x += S.weaponX/100*u; weaponHolder.position.y += S.weaponY/100*u; weaponHolder.position.z += S.weaponZ/100*u;
 }
 
 /* ---------------- AI prompt (plain-English commands) ---------------- */
