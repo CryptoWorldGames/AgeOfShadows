@@ -104,11 +104,12 @@ const DEFAULTS = {
   beard: 'none',        // none stubble full
   // headgear
   headgear: 'none',     // none helm hood horned cap
-  // clothing
-  armor: 'tunic',       // tunic leather chain plate robe bare
+  // clothing  (start BARE so you sculpt the realistic body first)
+  armor: 'bare',        // tunic leather chain plate robe bare
   primary: '#5a4632',   // tunic/armor main
   trim: '#caa64b',      // metal/trim accent
   pants: '#3b3128', boots: '#2a1f17',
+  underwearColor: '#3a3f4c',
   gloves: true, belt: true,
   cape: false, capeColor: '#6e2b2b',
   // gear
@@ -116,6 +117,9 @@ const DEFAULTS = {
   backpackColor: '#4a3522',
   weapon: 'none',       // none sword axe pick mace spear bow staff dagger torch
   offhand: 'none',      // none shield torch dagger
+  weaponSpin: 0,        // 0..360  full-circle spin of the held weapon
+  weaponTilt: 0,        // -180..180
+  weaponRoll: 0,        // -180..180
   // animation
   anim: 'walk',         // idle walk run attack
   speed: 1.4,
@@ -161,8 +165,9 @@ controls.maxDistance = 16;
 controls.maxPolarAngle = Math.PI * 0.92;
 controls.target.set(0, 1.0, 0);
 
-const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x3a3326, 0.85);
+const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x3a3326, 1.05);
 scene.add(hemi);
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 const key = new THREE.DirectionalLight(0xfff2dd, 1.6);
 key.position.set(4, 8, 5);
 key.castShadow = true;
@@ -253,26 +258,58 @@ function buildCharacter(){
   const hipW = 0.11 * (1 + S.belly*0.15);
   const pelvisY = thighLen + shinLen + 0.14;
 
+  const bare = (S.armor === 'bare');
+  const bodyMat = bare ? skinMat : torsoMat;
+
   const pelvis = new THREE.Object3D();
   pelvis.position.y = pelvisY;
   root.add(pelvis);
-  box(pelvis, 0, 0, 0, 0.30*S.shoulders*0.8, 0.18, 0.20*(1+S.belly*0.25), pantsMat);
-  // skirt/tassets for robe & plate
-  if (S.armor === 'robe') box(pelvis, 0, -0.18, 0, 0.40, 0.4, 0.30, torsoMat);
-  if (S.armor === 'plate') box(pelvis, 0, -0.08, 0.02, 0.34, 0.16, 0.26, trim);
+  // rounded hips
+  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.155*S.shoulders, 18, 14), bare ? skinMat : pantsMat);
+  hips.scale.set((1+S.belly*0.3)*1.02, 0.72, 0.86); hips.castShadow = true; pelvis.add(hips);
+  if (bare){
+    // glutes
+    for(const sx of [-1,1]){ const gl=new THREE.Mesh(new THREE.SphereGeometry(0.078*t,12,10),skinMat); gl.scale.set(1,0.95,0.8); gl.position.set(sx*0.07,-0.04,-0.07); gl.castShadow=true; pelvis.add(gl); }
+    // underwear briefs + waistband
+    const uw = mat(S.underwearColor, 0.8);
+    const brief = new THREE.Mesh(new THREE.SphereGeometry(0.16*S.shoulders,16,12), uw);
+    brief.scale.set((1+S.belly*0.3)*1.04, 0.62, 0.95); brief.position.y=-0.045; pelvis.add(brief);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.15*S.shoulders,0.022,8,20), uw);
+    band.rotation.x=Math.PI/2; band.position.y=0.04; band.scale.set((1+S.belly*0.3)*1.02,0.92,1); pelvis.add(band);
+  } else {
+    if (S.armor === 'robe') box(pelvis, 0, -0.18, 0, 0.40, 0.4, 0.30, torsoMat);
+    if (S.armor === 'plate') box(pelvis, 0, -0.08, 0.02, 0.34, 0.16, 0.26, trim);
+  }
 
-  // ---- Torso ----
+  // ---- Torso (rounded anatomy) ----
   const lowerLen = 0.26, chestLen = 0.30;
   const spine = new THREE.Object3D();
   spine.position.y = 0.09;
   pelvis.add(spine);
-  box(spine, 0, lowerLen/2, 0, 0.32*(1+S.belly*0.5), lowerLen, 0.22*(1+S.belly*0.5), torsoMat);
+  // abdomen
+  const abd = new THREE.Mesh(new THREE.CapsuleGeometry(0.115*(1+S.belly*0.3), 0.13, 6, 16), bodyMat);
+  abd.scale.set((1+S.belly*0.4)*1.04, 1, 0.82); abd.position.y = lowerLen*0.5; abd.castShadow = true; spine.add(abd);
+  if (bare && t > 1.02){ // six-pack on muscular builds
+    for(let r=0;r<3;r++) for(const sx of [-1,1]){
+      const ab=new THREE.Mesh(new THREE.SphereGeometry(0.028*t,8,6),skinMat);
+      ab.scale.set(1,0.8,0.5); ab.position.set(sx*0.04, lowerLen*0.78 - r*0.058, 0.105); spine.add(ab);
+    }
+  }
 
   const chest = new THREE.Object3D();
   chest.position.y = lowerLen;
   spine.add(chest);
   const chestW = 0.40 * S.shoulders * (0.9 + t*0.15);
-  box(chest, 0, chestLen/2, 0, chestW, chestLen, 0.24*(1+S.belly*0.3), torsoMat);
+  // ribcage
+  const rib = new THREE.Mesh(new THREE.CapsuleGeometry(0.15*S.shoulders*(0.95+t*0.12), 0.13, 6, 16), bodyMat);
+  rib.scale.set(1.12, 1, 0.86); rib.position.y = chestLen*0.45; rib.castShadow = true; chest.add(rib);
+  // trapezius bridge to the neck
+  const trap = new THREE.Mesh(new THREE.SphereGeometry(0.10*S.shoulders,12,10), bodyMat);
+  trap.scale.set(1.7,0.5,0.85); trap.position.set(0, chestLen*0.92, -0.02); chest.add(trap);
+  // deltoids (shoulder caps)
+  for(const sx of [-1,1]){ const d=new THREE.Mesh(new THREE.SphereGeometry(0.078*t,12,10), bodyMat); d.position.set(sx*chestW*0.5, chestLen*0.78, 0); d.castShadow=true; chest.add(d); }
+  // pecs (bare)
+  if (bare){ for(const sx of [-1,1]){ const pec=new THREE.Mesh(new THREE.SphereGeometry(0.078*t,14,12),skinMat); pec.scale.set(1.05,0.85,0.62); pec.position.set(sx*0.075, chestLen*0.6, 0.10); pec.castShadow=true; chest.add(pec); } }
 
   // armor overlays
   if (S.armor === 'plate'){
@@ -299,7 +336,8 @@ function buildCharacter(){
   const neck = new THREE.Object3D();
   neck.position.y = chestLen;
   chest.add(neck);
-  box(neck, 0, 0.05, 0, 0.10, 0.10, 0.10, skinMat);
+  const neckM = new THREE.Mesh(new THREE.CapsuleGeometry(0.046, 0.06, 6, 12), skinMat);
+  neckM.position.y = 0.05; neckM.castShadow = true; neck.add(neckM);
 
   const head = new THREE.Object3D();
   head.position.y = 0.10;
@@ -362,22 +400,28 @@ function buildCharacter(){
   for(const side of ['L','R']){
     const sx = side==='L' ? -1 : 1;
     const shoulder = limb(chest, sx*chestW*0.55, shoulderY, 0, upperLen, armR*1.15, sleeveMat);
-    const elbow = limb(shoulder, 0, -upperLen, 0, foreLen, armR, (S.armor==='bare')?skinMat:sleeveMat);
+    if (bare){ const bicep=new THREE.Mesh(new THREE.SphereGeometry(armR*1.5,12,10),skinMat); bicep.scale.set(1,1.3,1); bicep.position.set(0,-upperLen*0.42,0.02); bicep.castShadow=true; shoulder.add(bicep); }
+    const elbow = limb(shoulder, 0, -upperLen, 0, foreLen, armR*0.92, bare?skinMat:sleeveMat);
+    if (bare){ const fore=new THREE.Mesh(new THREE.SphereGeometry(armR*1.25,12,10),skinMat); fore.scale.set(1,1.4,1); fore.position.set(0,-foreLen*0.32,0); elbow.add(fore); }
     if (S.gloves || isMetal) box(elbow, 0, -foreLen*0.7, 0, armR*2.2, foreLen*0.5, armR*2.2, gloveMat); // bracer
     const hand = new THREE.Object3D();
     hand.position.y = -foreLen;
     elbow.add(hand);
-    box(hand, 0, -0.05, 0, armR*2.2, 0.11, armR*1.8, gloveMat);
+    const palm = new THREE.Mesh(new THREE.SphereGeometry(armR*1.5,12,10), gloveMat);
+    palm.scale.set(1,0.85,1.25); palm.position.y=-0.05; palm.castShadow=true; hand.add(palm);
     arms[side] = { shoulder, elbow, hand };
   }
 
   // ---- Legs ----
   const legR = 0.07 * t;
+  const legMat = bare ? skinMat : pantsMat;
   const legs = {};
   for(const side of ['L','R']){
     const sx = side==='L' ? -1 : 1;
-    const hip = limb(pelvis, sx*hipW, -0.06, 0, thighLen, legR, pantsMat);
-    const knee = limb(hip, 0, -thighLen, 0, shinLen, legR*0.85, pantsMat);
+    const hip = limb(pelvis, sx*hipW, -0.06, 0, thighLen, legR, legMat);
+    if (bare){ const quad=new THREE.Mesh(new THREE.SphereGeometry(legR*1.35,12,10),skinMat); quad.scale.set(1,1.5,1); quad.position.set(0,-thighLen*0.38,0.02); quad.castShadow=true; hip.add(quad); }
+    const knee = limb(hip, 0, -thighLen, 0, shinLen, legR*0.82, legMat);
+    if (bare){ const calf=new THREE.Mesh(new THREE.SphereGeometry(legR*1.1,12,10),skinMat); calf.scale.set(1,1.4,1); calf.position.set(0,-shinLen*0.4,-0.03); calf.castShadow=true; knee.add(calf); }
     if (isMetal) box(knee, 0, -shinLen*0.5, 0.03, legR*2.2, shinLen*0.5, legR*2.2, trim); // greave
     const ankle = new THREE.Object3D();
     ankle.position.y = -shinLen;
@@ -400,7 +444,13 @@ function buildCharacter(){
   if (S.backpack !== 'none') buildBackpack(chest, chestLen, chestW);
 
   // ---- Weapons ----
-  if (S.weapon !== 'none') arms.R.hand.add(buildWeapon(S.weapon));
+  if (S.weapon !== 'none'){
+    const d = THREE.MathUtils.degToRad;
+    const holder = new THREE.Group();            // user spin/tilt/roll wraps the grip
+    holder.rotation.set(d(S.weaponTilt), d(S.weaponSpin), d(S.weaponRoll));
+    holder.add(buildWeapon(S.weapon));
+    arms.R.hand.add(holder);
+  }
   if (S.offhand !== 'none') arms.L.hand.add(buildOffhand(S.offhand));
 
   root.scale.setScalar(s);
@@ -701,6 +751,10 @@ function buildUI(){
   addButtons(g, 'offhand', 'Off hand', [['none','None'],['shield','Shield'],['torch','Torch'],['dagger','Dagger']]);
   addButtons(g, 'backpack', 'Backpack', [['none','None'],['pack','Pack'],['satchel','Satchel'],['quiver','Quiver']]);
   addColor(g, 'backpackColor', 'Pack color');
+  // Weapon angle — spin the held weapon a full circle, then stop where you like.
+  addSlider(g, 'weaponSpin', 'Weapon spin', 0, 360, 1, v=>Math.round(v)+'°');
+  addSlider(g, 'weaponTilt', 'Weapon tilt', -180, 180, 1, v=>Math.round(v)+'°');
+  addSlider(g, 'weaponRoll', 'Weapon roll', -180, 180, 1, v=>Math.round(v)+'°');
 
   g = addGroup('Body');
   addSlider(g, 'height', 'Height', 1.4, 2.1, 0.01, v=>v.toFixed(2)+' m');
@@ -718,7 +772,8 @@ function buildUI(){
   addColor(g, 'eyeColor', 'Eye color');
 
   g = addGroup('Armor & Clothing');
-  addButtons(g, 'armor', 'Outfit', [['tunic','Tunic'],['leather','Leather'],['chain','Chain'],['plate','Plate'],['robe','Robe'],['bare','Bare']]);
+  addButtons(g, 'armor', 'Outfit', [['bare','Bare'],['tunic','Tunic'],['leather','Leather'],['chain','Chain'],['plate','Plate'],['robe','Robe']]);
+  addColor(g, 'underwearColor', 'Underwear');
   addColor(g, 'primary', 'Main color');
   addColor(g, 'trim', 'Trim / metal');
   addColor(g, 'pants', 'Pants');
