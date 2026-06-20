@@ -167,6 +167,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
   let huntAngle=0;
 
   let moving=false; let walkClock=0; let chopPhase=0;
+  let serverPos=null;   // when set + world.serverDriven, this worker follows the server
   let stoneHitCount=0; let goldHitCount=0; let woodHitCount=0;
   let gatherTimer=0; let chopActive=false; let frozen=false;
   let waterDrainTimer=0; let foodDrainTimer=0; let waterRefillTimer=0;
@@ -382,6 +383,26 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
   }
 
   function update(dt,world) {
+    // SERVER-DRIVEN MODE: the server simulates this worker (gather/deposit). The
+    // client just smoothly follows the server position and animates — no local AI.
+    if (world.serverDriven && serverPos) {
+      resetPose(); chopActive=false; frozen=false;
+      const me=group.position;
+      const dx=serverPos.x-me.x, dz=serverPos.z-me.z;
+      const d=Math.sqrt(dx*dx+dz*dz);
+      if (d>0.06) {
+        const step=Math.min(d, speed*dt*1.6);
+        me.x+=dx/d*step; me.z+=dz/d*step;
+        faceToward(serverPos.x, serverPos.z);
+        walkPose(dt); moving=true;
+      } else { moving=false; modelHolder.position.y*=0.7; }
+      axeRot.x+=(axeRestRot.x-axeRot.x)*0.3; axeRot.y+=(axeRestRot.y-axeRot.y)*0.3; axeRot.z+=(axeRestRot.z-axeRot.z)*0.3;
+      if (handR) { handR.getWorldPosition(handWorld); axeHolder.parent.worldToLocal(axeHolder.position.copy(handWorld)); axeHolder.rotation.set(axeRot.x,axeRot.y,axeRot.z); }
+      if (world.camera) healthBar.group.quaternion.copy(world.camera.quaternion);
+      healthBar.update(unit.health/unit.maxHealth);
+      return;
+    }
+
     resetPose();
     moving=false; chopActive=false; frozen=false;
 
@@ -710,6 +731,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     aliveTime: getAliveTime,
     getModelCenterY:()=>modelCenterY,
     setSelected(b){unit.selected=b;healthBar.group.visible=b;},
+    setServerPos(x,z){ if(!serverPos) serverPos={x,z}; else { serverPos.x=x; serverPos.z=z; } },
     moveTo(v){target=v.clone();chopTarget=null;animalTarget=null;stoneTarget=null;goldTarget=null;chopPhase=0;stoneHitCount=0;goldHitCount=0;woodHitCount=0;autoTask=null;returning=false;depositTarget=null;lastKillPos=null;},
     chopTree(tree,slot){chopTarget=tree;chopSlot=slot||null;animalTarget=null;stoneTarget=null;goldTarget=null;target=null;chopPhase=0;woodHitCount=0;autoTask='chop';returning=false;},
     killAnimal(animal){animalTarget=animal;chopTarget=null;stoneTarget=null;goldTarget=null;target=null;chopPhase=0;autoTask='hunt';returning=false;huntSearchRadius=20;},

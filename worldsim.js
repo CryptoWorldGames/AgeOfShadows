@@ -120,6 +120,88 @@ function gatherWood(tree, player, tNow = nowMs()) {
   return got;
 }
 
+/* ============================================================
+   SERVER-SIDE WORKER SIMULATION
+   Each unit runs a gather -> deposit loop entirely on the server, so it keeps
+   working whether the player is online, AFK, or logged out. Pure functions that
+   mutate the unit/trees/stockpile in place so they can be unit-tested.
+   ============================================================ */
+const UNIT_SPEED   = 3.0;   // metres / second
+const CARRY_MAX    = 10;    // wood carried before returning to deposit
+const REACH        = 2.2;   // how close to a tree/town centre counts as "arrived"
+const CHOP_EVERY   = 0.5;   // seconds between chop hits
+const GATHER_EVERY = 0.5;   // seconds between picking up 1 wood
+
+// Move a unit toward (x,z) by up to `step`. Returns true once it arrives.
+function moveToward(unit, x, z, step) {
+  const dx = x - unit.x, dz = z - unit.z;
+  const d = Math.hypot(dx, dz);
+  if (d <= step || d < 1e-6) { unit.x = x; unit.z = z; return true; }
+  unit.x += (dx / d) * step;
+  unit.z += (dz / d) * step;
+  return false;
+}
+
+// Nearest tree this unit may work: a standing tree, or a woodpile it can gather.
+function nearestWorkTree(trees, unit, playerId, tNow) {
+  let best = null, bestD = Infinity;
+  for (const t of trees) {
+    const workable = t.state === 'standing' || (t.state === 'woodpile' && t.wood > 0 && canGather(t, playerId, tNow));
+    if (!workable) continue;
+    const d = Math.hypot(t.x - unit.x, t.z - unit.z);
+    if (d < bestD) { bestD = d; best = t; }
+  }
+  return best;
+}
+
+// Advance ONE unit by dt seconds. Mutates unit, trees, and the player's stockpile.
+function stepUnit(unit, trees, stockpile, player, dt, tNow = nowMs()) {
+  if (unit.task == null) unit.task = 'gatherWood';
+  if (unit.carry == null) unit.carry = 0;
+  if (unit.phase == null) unit.phase = 'toResource';
+  const step = UNIT_SPEED * dt;
+
+  // Returning to the town centre to deposit.
+  if (unit.phase === 'returning') {
+    if (moveToward(unit, TOWN_CENTER.x, TOWN_CENTER.z, step)) {
+      const kept = Math.floor(unit.carry * (1 - TC_TAX));   // 50% town-centre tax
+      stockpile.wood = (stockpile.wood || 0) + kept;
+      unit.deposited = (unit.deposited || 0) + kept;
+      unit.carry = 0;
+      unit.phase = 'toResource';
+      unit.targetTreeId = null;
+    }
+    unit.moving = true;
+    return;
+  }
+
+  // Make sure we have a valid target tree.
+  let tree = unit.targetTreeId && trees.find(t => t.id === unit.targetTreeId);
+  const valid = tree && (tree.state === 'standing' || (tree.state === 'woodpile' && tree.wood > 0 && canGather(tree, player.id, tNow)));
+  if (!valid) {
+    tree = nearestWorkTree(trees, unit, player.id, tNow);
+    unit.targetTreeId = tree ? tree.id : null;
+    unit._t = 0;
+  }
+  if (!tree) { unit.moving = false; return; }   // nothing to do right now
+
+  const dist = Math.hypot(tree.x - unit.x, tree.z - unit.z);
+  if (dist > REACH) { moveToward(unit, tree.x, tree.z, step); unit.moving = true; return; }
+
+  // In range: chop a standing tree, or gather from a pile.
+  unit.moving = false;
+  unit._t = (unit._t || 0) + dt;
+  if (tree.state === 'standing') {
+    if (unit._t >= CHOP_EVERY) { unit._t = 0; chopTree(tree, player, tNow); }
+  } else if (tree.state === 'woodpile') {
+    if (unit._t >= GATHER_EVERY) {
+      unit._t = 0;
+      unit.carry += gatherWood(tree, player, tNow);
+      if (unit.carry >= CARRY_MAX) { unit.phase = 'returning'; unit.targetTreeId = null; }
+    }
+  }
+}
+
 // Apply a deposit of carried resources into a player's persistent stockpile.
 // Town Center charges TC_TAX; a player's own house is tax-free. Mutates
 // stockpile in place and returns the net amounts actually banked.
@@ -139,7 +221,9 @@ function applyDeposit(stockpile, carried, isTownCenter) {
 module.exports = {
   // constants (exported for the server + tests)
   TREE_COUNT, TREE_MAX_HP, TREE_WOOD, FALL_MS, RESPAWN_MS, CLAIM_MS, TC_TAX, TOWN_CENTER,
+  UNIT_SPEED, CARRY_MAX, REACH,
   // functions
   nowMs, freshTree, generateTrees, resetTree, tickTrees,
   chopTree, canGather, gatherWood, applyDeposit,
+  moveToward, nearestWorkTree, stepUnit,
 };

@@ -141,7 +141,8 @@ export default function GameScene({ auth }) {
       const world = {
         camera, socket, playerId: joinData.playerId,
         units: [], trees: [], buildings: [], animals: [],
-        stones: [], golds: [], resources, ui, pondPosition: env.pondPosition
+        stones: [], golds: [], resources, ui, pondPosition: env.pondPosition,
+        serverDriven: true   // workers are simulated on the server; client just renders them
       };
 
       document.getElementById('inv-btn-inline').onclick = () => showInventoryModal(world.resources);
@@ -179,15 +180,16 @@ export default function GameScene({ auth }) {
       function addSpot(x, z) { usedSpots.push({ x, z }); }
       const pondX = -35, pondZ = -30; // keep things out of the pond
       const inPond = (x, z) => Math.sqrt((x-pondX)**2 + (z-pondZ)**2) < 11;
-      let attempts = 0;
-      while (world.trees.length < 100 && attempts < 4000) {
-        attempts++;
-        const x = (Math.random()-0.5)*150; const z = (Math.random()-0.5)*150;
-        if (Math.sqrt(x*x+z*z) < 12) continue;
-        if (inPond(x, z)) continue;
-        if (isTooClose(x, z, 4)) continue;
-        addSpot(x, z); world.trees.push(createTree(scene, { x, y:0, z }));
-      }
+      // SHARED WORLD: render the SERVER's trees (same for every player) instead of
+      // a private random forest. The server owns their state; we just reflect it.
+      const serverTrees = (joinData.world && joinData.world.trees) || [];
+      serverTrees.forEach(st => {
+        const t = createTree(scene, { x: st.x, y:0, z: st.z });
+        t.id = st.id;
+        if (t.applyServer) t.applyServer(st);
+        addSpot(st.x, st.z);
+        world.trees.push(t);
+      });
 
       attempts = 0;
       while (world.stones.length < 8 && attempts < 300) {
@@ -260,9 +262,13 @@ export default function GameScene({ auth }) {
         world.resources = res;
       });
 
-      socket.on('treeUpdate', (tree) => {
-        const t = world.trees.find(x => x.id === tree.id);
-        if (t) { t.hp = tree.hp; t.wood = tree.wood; t.state = tree.state; }
+      // Authoritative tree state from the server (chop/fall/woodpile/respawn),
+      // shared by everyone — so you see other players' trees fall too.
+      socket.on('treesUpdate', (arr) => {
+        (arr || []).forEach(st => {
+          const t = world.trees.find(x => x.id === st.id);
+          if (t && t.applyServer) t.applyServer(st);
+        });
       });
 
       socket.on('buildingPlaced', (building) => {
@@ -301,6 +307,15 @@ export default function GameScene({ auth }) {
 
       socket.on('worldUpdate', (data) => {
         if (!data.players) return;
+        // Our OWN workers are server-simulated: feed their server positions to the
+        // local avatars so they walk/gather exactly as the server says.
+        const me = data.players[world.playerId];
+        if (me && me.units) {
+          me.units.forEach(u => {
+            const h = world.units.find(x => x.serverId === u.id);
+            if (h && h.setServerPos) h.setServerPos(u.x, u.z);
+          });
+        }
         Object.entries(data.players).forEach(([pId, player]) => {
           if (pId === world.playerId) return;
           if (!otherPlayers[pId]) {
@@ -326,16 +341,8 @@ export default function GameScene({ auth }) {
         if (stockpile) world.resources = stockpile;
       });
 
-      // Report each of our workers' positions to the server so it persists WHERE he
-      // is. Without this the server only knows his spawn point, so a refresh would
-      // teleport him home. (Server-side movement itself comes in the next milestone.)
-      const posSyncInterval = setInterval(() => {
-        world.units.forEach((u) => {
-          if (!u.serverId || !u.group) return;
-          const p = u.group.position;
-          socket.emit('unitMove', { unitId: u.serverId, x: p.x, z: p.z });
-        });
-      }, 1500);
+      // (Position is now owned by the server simulation — the client no longer
+      // pushes unit positions, which would fight the authoritative worker.)
 
       let update = () => {}, dispose = () => {};
       try {
@@ -419,7 +426,6 @@ export default function GameScene({ auth }) {
       window.addEventListener('resize', handleResize);
 
       gameCleanup = () => {
-        clearInterval(posSyncInterval);
         Object.keys(otherPlayers).forEach(removeOtherPlayer);
         window.removeEventListener('resize', handleResize);
         dispose();

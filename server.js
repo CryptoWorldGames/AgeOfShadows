@@ -79,6 +79,35 @@ setInterval(() => {
   if (changed.length) io.emit('treesUpdate', changed);
 }, 250);
 
+// ===== AUTHORITATIVE WORKER SIMULATION =====
+// Every player's units gather wood and deposit into their stockpile on the
+// SERVER, whether the player is online, AFK, or logged out. This is what makes
+// workers keep working offline and resources persist.
+let lastSim = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  let dt = (now - lastSim) / 1000; lastSim = now;
+  if (dt > 0.5) dt = 0.5;
+  for (const sid in world.players) {
+    const player = world.players[sid];
+    if (!player.units) continue;
+    const ref = { id: sid, name: player.name };
+    for (const unit of player.units) {
+      try { worldsim.stepUnit(unit, world.trees, player.resources, ref, dt, now); }
+      catch (e) { /* never let one unit break the whole tick */ }
+    }
+    // push fresh stockpile to the owner if they're connected
+    if (player.online !== false) io.to(sid).emit('resourceUpdate', player.resources);
+  }
+  // Drop players who've been offline for over an hour (after a final save).
+  for (const sid in world.players) {
+    const p = world.players[sid];
+    if (p.online === false && p.offlineSince && now - p.offlineSince > 3600000) {
+      delete world.players[sid]; delete socketUserMap[sid];
+    }
+  }
+}, 250);
+
 // Regular world snapshot (unit positions, players, buildings) for everyone.
 setInterval(() => {
   io.emit('worldUpdate', {
@@ -108,8 +137,17 @@ io.on('connection', (socket) => {
       const savedData = await loadPlayerData(data.userId);
       const user = await getUserById(data.userId);
 
+      // If this account already has a LIVE in-memory session (e.g. it kept working
+      // while logged out), resume that exact state so no offline progress is lost.
+      const liveSid = Object.keys(world.players).find(sid => world.players[sid].userId === data.userId);
+      const live = liveSid ? world.players[liveSid] : null;
+
       let units, resources, buildings;
-      if (savedData) {
+      if (live) {
+        resources = live.resources;
+        units = live.units;
+        buildings = live.buildings || [];
+      } else if (savedData) {
         resources = savedData.resources;
         buildings = savedData.buildings;
         units = savedData.units.length > 0 ? savedData.units : createPlayerUnits(socket.id, 1);
@@ -126,7 +164,8 @@ io.on('connection', (socket) => {
         color: data.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
         resources,
         units,
-        buildings
+        buildings,
+        online: true
       };
 
       // Remove any stale session for the SAME user (e.g. a reconnect under a new
@@ -252,10 +291,12 @@ io.on('connection', (socket) => {
           console.error(`Failed to save player data for ${player.name}:`, err);
         }
       }
-      console.log(`${player.name} disconnected.`);
-      delete world.players[socket.id];
-      delete socketUserMap[socket.id];
-      io.emit('playerLeft', { playerId: socket.id });
+      console.log(`${player.name} disconnected — workers keep running offline.`);
+      // Do NOT delete the player: keep its units simulating on the server so they
+      // keep gathering while the player is logged out. socketUserMap is kept so the
+      // autosave loop still persists this player. It's cleaned up after 1h offline.
+      player.online = false;
+      player.offlineSince = Date.now();
     }
   });
 });

@@ -95,4 +95,36 @@ test('two players cannot gather the same last wood (server arbitrates)', () => {
   assert.strictEqual(a + b, 1, 'only one wood should be handed out');
 });
 
+test('a unit walks to a tree, fells it, gathers, returns and deposits (offline loop)', () => {
+  // one tree at (30,0); town centre at origin
+  const trees = [W.freshTree('t', 30, 0)];
+  const stock = { wood: 0 };
+  const unit = { x: 0, z: 0 };
+  const player = { id: 'p1', name: 'Alice' };
+  let tNow = 0;
+  // run ~120 simulated seconds at 0.25s steps
+  for (let i = 0; i < 480; i++) {
+    tNow += 250;
+    W.tickTrees(trees, tNow);                 // fall->woodpile transitions
+    W.stepUnit(unit, trees, stock, player, 0.25, tNow);
+  }
+  assert.ok(stock.wood > 0, 'unit should have banked some wood by walking the full loop');
+  // banked is taxed (50%): from 10 wood gathered, ~5 kept per trip
+  assert.ok(stock.wood >= 5, 'expected at least one full taxed deposit, got ' + stock.wood);
+});
+
+test('unit moves toward its target each step', () => {
+  const unit = { x: 0, z: 0 };
+  const arrived = W.moveToward(unit, 10, 0, 3);
+  assert.strictEqual(arrived, false);
+  assert.ok(unit.x > 0 && unit.x <= 3);
+});
+
+test('nearestWorkTree ignores depleted/respawning trees', () => {
+  const trees = [W.freshTree('a', 5, 0), W.freshTree('b', 50, 0)];
+  trees[0].state = 'respawning';
+  const t = W.nearestWorkTree(trees, { x:0, z:0 }, 'p1', 1000);
+  assert.strictEqual(t.id, 'b');
+});
+
 console.log(`\n${passed} passed`);

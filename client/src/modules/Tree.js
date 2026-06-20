@@ -152,8 +152,23 @@ export function createTree(scene, position = { x: 0, y: 0, z: 0 }) {
         state = 'woodpile';
       }
     } else if (state === 'respawning') {
+      if (serverMode) return;   // server decides when it grows back
       respawnTimer += dt;
       if (respawnTimer >= (SETTINGS.tree.respawnTime || 900)) reset();
+    }
+  }
+
+  // When the server owns the trees, the client reflects authoritative state.
+  let serverMode = false;
+  function applyServer(s) {
+    serverMode = true;
+    if (typeof s.wood === 'number') { wood = s.wood; pile.scale.setScalar(Math.max(0.05, wood / 10)); }
+    if (typeof s.hp === 'number') hp = s.hp;
+    if (s.state && s.state !== state) {
+      if (s.state === 'falling') { if (state === 'standing') state = 'falling'; }   // play the fall anim
+      else if (s.state === 'woodpile') { state = 'woodpile'; pivot.rotation.x = -Math.PI/2; pivot.visible = false; pile.visible = true; }
+      else if (s.state === 'standing') { reset(); }
+      else if (s.state === 'respawning') { state = 'respawning'; pile.visible = false; pivot.visible = false; }
     }
   }
 
@@ -175,6 +190,7 @@ export function createTree(scene, position = { x: 0, y: 0, z: 0 }) {
       if (wood <= 0) { state = 'respawning'; pile.visible = false; }
       return give;
     },
+    applyServer,
     update
   };
 
