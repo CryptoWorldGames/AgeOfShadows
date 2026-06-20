@@ -18,7 +18,7 @@
   #hud{position:absolute;left:14px;top:12px;font-size:12px;color:var(--muted);
     background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px;pointer-events:none;line-height:1.5}
   #hud b{color:var(--text)}
-  #panel{width:330px;background:var(--panel);border-left:1px solid var(--line);
+  #panel{width:340px;background:var(--panel);border-left:1px solid var(--line);
     display:flex;flex-direction:column;height:100%}
   #panel header{padding:14px 16px;border-bottom:1px solid var(--line)}
   #panel header h1{margin:0;font-size:16px;letter-spacing:.5px}
@@ -34,10 +34,11 @@
   input[type=color]{width:100%;height:30px;border:1px solid var(--line);
     background:var(--panel2);border-radius:6px;cursor:pointer;padding:2px}
   .btns{display:flex;flex-wrap:wrap;gap:6px}
-  .btns button{flex:1 1 auto;min-width:64px;background:var(--panel2);color:var(--text);
+  .btns button{flex:1 1 auto;min-width:58px;background:var(--panel2);color:var(--text);
     border:1px solid var(--line);border-radius:7px;padding:8px 6px;font-size:12px;cursor:pointer;transition:.12s}
   .btns button:hover{border-color:var(--accent)}
   .btns button.active{background:var(--accent);color:#15171c;border-color:var(--accent);font-weight:700}
+  .presets button{background:linear-gradient(180deg,#2b3140,#222632)}
   .toggle{display:flex;align-items:center;justify-content:space-between;font-size:12px;
     padding:7px 0;color:var(--muted)}
   .switch{position:relative;width:42px;height:22px}
@@ -55,9 +56,6 @@
     background:rgba(0,0,0,.8);color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;
     opacity:0;transition:.25s;pointer-events:none}
   #toast.show{opacity:1}
-  .hint{font-size:10.5px;color:var(--muted);margin-top:3px}
-  select{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);
-    border-radius:6px;padding:7px;font-size:12px}
 </style>
 </head>
 <body>
@@ -97,31 +95,45 @@ import { OrbitControls } from './vendor/OrbitControls.js';
    STATE — every customizable value lives here
    ============================================================ */
 const DEFAULTS = {
-  height: 1.80,      // metres
-  build: 1.00,       // limb thickness multiplier (skinny..muscular)
-  belly: 0.00,       // torso girth / weight
-  shoulders: 1.00,   // shoulder width
-  headSize: 1.00,
-  skin: '#c68642',
-  hairStyle: 'short',// none | short | long | mohawk
+  // body
+  height: 1.82, build: 1.05, belly: 0.0, shoulders: 1.05, headSize: 1.0,
+  skin: '#c68642', eyeColor: '#3b2a18',
+  // hair / face
+  hairStyle: 'short',   // none short long mohawk ponytail topknot
   hairColor: '#2b1d12',
-  beard: 'none',     // none | stubble | full
-  tunic: '#5a4632',
-  tunicStyle: 'tunic', // tunic | shirtless | armor
-  pants: '#3b3128',
-  boots: '#2a1f17',
-  belt: true,
-  cape: false,
-  capeColor: '#6e2b2b',
-  eyeColor: '#3b2a18',
-  weapon: 'none',    // none | sword | axe | pick
-  anim: 'walk',      // idle | walk
-  walkSpeed: 1.6,
-  autoSpin: false,
-  showGrid: true,
-  bgColor: '#1b2330',
+  beard: 'none',        // none stubble full
+  // headgear
+  headgear: 'none',     // none helm hood horned cap
+  // clothing
+  armor: 'tunic',       // tunic leather chain plate robe bare
+  primary: '#5a4632',   // tunic/armor main
+  trim: '#caa64b',      // metal/trim accent
+  pants: '#3b3128', boots: '#2a1f17',
+  gloves: true, belt: true,
+  cape: false, capeColor: '#6e2b2b',
+  // gear
+  backpack: 'none',     // none pack satchel quiver
+  backpackColor: '#4a3522',
+  weapon: 'none',       // none sword axe pick mace spear bow staff dagger torch
+  offhand: 'none',      // none shield torch dagger
+  // animation
+  anim: 'walk',         // idle walk run attack
+  speed: 1.4,
+  // scene
+  autoSpin: false, showGrid: true, bgColor: '#1b2330',
 };
 let S = structuredClone(DEFAULTS);
+
+/* Class presets — one click to look like an archetype. */
+const PRESETS = {
+  Knight:    { armor:'plate', primary:'#6f7782', trim:'#d8dde4', headgear:'helm', weapon:'sword', offhand:'shield', cape:true, capeColor:'#7a1f2b', gloves:true, boots:'#3a3a40', backpack:'none', hairStyle:'short', beard:'stubble' },
+  Archer:    { armor:'leather', primary:'#5a4326', trim:'#3c2c18', headgear:'hood', weapon:'bow', offhand:'none', backpack:'quiver', backpackColor:'#3a2a18', cape:false, gloves:true, boots:'#2a1f14', hairStyle:'ponytail', beard:'none' },
+  Rogue:     { armor:'leather', primary:'#2c2c33', trim:'#15151a', headgear:'hood', weapon:'dagger', offhand:'dagger', backpack:'satchel', backpackColor:'#1d1d22', cape:true, capeColor:'#1a1a1f', gloves:true, boots:'#1c1c20', hairStyle:'short', beard:'none' },
+  Mage:      { armor:'robe', primary:'#33306b', trim:'#caa64b', headgear:'cap', weapon:'staff', offhand:'none', backpack:'none', cape:true, capeColor:'#23204e', gloves:false, boots:'#2a2440', hairStyle:'long', beard:'full', hairColor:'#cfcfcf', beardColor:'#cfcfcf' },
+  Miner:     { armor:'tunic', primary:'#6b5230', trim:'#8a6a3a', headgear:'cap', weapon:'pick', offhand:'torch', backpack:'pack', backpackColor:'#4a3522', cape:false, gloves:true, boots:'#3a2a18', hairStyle:'short', beard:'full' },
+  Barbarian: { armor:'bare', primary:'#7a5a3a', trim:'#caa64b', headgear:'horned', weapon:'axe', offhand:'none', backpack:'none', cape:true, capeColor:'#5a3a22', gloves:false, boots:'#3a2a18', belly:0.15, build:1.45, shoulders:1.2, hairStyle:'long', beard:'full' },
+  Peasant:   { armor:'tunic', primary:'#6e5a3a', trim:'#8a7a5a', headgear:'none', weapon:'none', offhand:'none', backpack:'satchel', backpackColor:'#5a4a30', cape:false, gloves:false, boots:'#3a2a18', hairStyle:'short', beard:'stubble' },
+};
 
 /* ============================================================
    THREE.JS SCENE
@@ -131,27 +143,27 @@ const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 host.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(S.bgColor);
-scene.fog = new THREE.Fog(S.bgColor, 14, 36);
+scene.fog = new THREE.Fog(S.bgColor, 14, 40);
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
-camera.position.set(2.6, 1.7, 4.4);
+camera.position.set(2.6, 1.7, 4.6);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 1.6;
-controls.maxDistance = 14;
+controls.maxDistance = 16;
 controls.maxPolarAngle = Math.PI * 0.92;
 controls.target.set(0, 1.0, 0);
 
-// Lights
-const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x3a3326, 0.9);
+const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x3a3326, 0.85);
 scene.add(hemi);
-const key = new THREE.DirectionalLight(0xfff2dd, 1.5);
+const key = new THREE.DirectionalLight(0xfff2dd, 1.6);
 key.position.set(4, 8, 5);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
@@ -160,11 +172,10 @@ key.shadow.camera.left = -6; key.shadow.camera.right = 6;
 key.shadow.camera.top = 6; key.shadow.camera.bottom = -6;
 key.shadow.bias = -0.0004;
 scene.add(key);
-const rim = new THREE.DirectionalLight(0x88aaff, 0.5);
+const rim = new THREE.DirectionalLight(0x88aaff, 0.55);
 rim.position.set(-5, 4, -4);
 scene.add(rim);
 
-// Ground
 const ground = new THREE.Mesh(
   new THREE.CircleGeometry(20, 64),
   new THREE.MeshStandardMaterial({ color:0x2c3322, roughness:1 })
@@ -178,19 +189,11 @@ grid.material.opacity = 0.35; grid.material.transparent = true;
 scene.add(grid);
 
 /* ============================================================
-   PROCEDURAL HUMAN RIG
-   Joints are Object3D pivots; limb meshes hang from them so a
-   rotation on the joint swings the whole limb about that joint.
+   HELPERS
    ============================================================ */
-const character = new THREE.Group();
-scene.add(character);
-let RIG = null;        // holds joint references for animation
-let walkPhase = 0;     // kept continuous across rebuilds
-
 function mat(color, rough=0.85, metal=0.0){
   return new THREE.MeshStandardMaterial({ color:new THREE.Color(color), roughness:rough, metalness:metal });
 }
-
 // A limb: pivot at the TOP, capsule hangs DOWN by `len`.
 function limb(parent, x, y, z, len, radius, material){
   const joint = new THREE.Object3D();
@@ -203,53 +206,66 @@ function limb(parent, x, y, z, len, radius, material){
   joint.add(mesh);
   return joint;
 }
-
 function box(parent, x,y,z, w,h,d, material){
   const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), material);
   m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true;
   parent.add(m); return m;
 }
-
+function cyl(parent, x,y,z, rt,rb,h, material, segs=10){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,segs), material);
+  m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true;
+  parent.add(m); return m;
+}
 function disposeGroup(g){
   g.traverse(o=>{ if(o.geometry) o.geometry.dispose();
     if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose()); } });
 }
 
+/* ============================================================
+   CHARACTER
+   ============================================================ */
+const character = new THREE.Group();
+scene.add(character);
+let RIG = null;
+let walkPhase = 0, attackPhase = 0;
+
 function buildCharacter(){
-  // clear
   while(character.children.length) character.remove(character.children[0]);
   if (RIG && RIG.root) disposeGroup(RIG.root);
 
-  const s = S.height / 1.80;                 // global scale from height
-  const t = S.build;                          // limb thickness
-  const skinMat = mat(S.skin, 0.65);
-  const tunicMat = mat(S.tunic, 0.9);
-  const pantsMat = mat(S.pants, 0.92);
-  const bootMat  = mat(S.boots, 0.7);
-  const hairMat  = mat(S.hairColor, 0.85);
+  const s = S.height / 1.80;
+  const t = S.build;
+  const skinMat = mat(S.skin, 0.6);
+  const hairMat = mat(S.hairColor, 0.85);
+  const primary = mat(S.primary, 0.85);
+  const trim    = mat(S.trim, 0.4, 0.6);
+  const pantsMat= mat(S.pants, 0.92);
+  const bootMat = mat(S.boots, 0.7);
+  const isMetal = (S.armor === 'plate' || S.armor === 'chain');
+  const torsoMat = (S.armor === 'bare') ? skinMat
+                 : isMetal ? mat(S.primary, 0.35, 0.75)
+                 : primary;
 
   const root = new THREE.Group();
   character.add(root);
 
-  // --- proportions (metres, before scale) ---
   const thighLen = 0.45, shinLen = 0.45, footLen = 0.26;
   const hipW = 0.11 * (1 + S.belly*0.15);
-  const pelvisY = thighLen + shinLen + 0.14;   // hip height so boots rest on ground
+  const pelvisY = thighLen + shinLen + 0.14;
 
   const pelvis = new THREE.Object3D();
   pelvis.position.y = pelvisY;
   root.add(pelvis);
-
-  // pelvis block
   box(pelvis, 0, 0, 0, 0.30*S.shoulders*0.8, 0.18, 0.20*(1+S.belly*0.25), pantsMat);
+  // skirt/tassets for robe & plate
+  if (S.armor === 'robe') box(pelvis, 0, -0.18, 0, 0.40, 0.4, 0.30, torsoMat);
+  if (S.armor === 'plate') box(pelvis, 0, -0.08, 0.02, 0.34, 0.16, 0.26, trim);
 
-  // ---- Torso chain ----
-  const torsoMat = (S.tunicStyle === 'shirtless') ? skinMat : tunicMat;
+  // ---- Torso ----
   const lowerLen = 0.26, chestLen = 0.30;
-  const spine = new THREE.Object3D();          // pivot at pelvis top
+  const spine = new THREE.Object3D();
   spine.position.y = 0.09;
   pelvis.add(spine);
-  // lower torso
   box(spine, 0, lowerLen/2, 0, 0.32*(1+S.belly*0.5), lowerLen, 0.22*(1+S.belly*0.5), torsoMat);
 
   const chest = new THREE.Object3D();
@@ -257,15 +273,26 @@ function buildCharacter(){
   spine.add(chest);
   const chestW = 0.40 * S.shoulders * (0.9 + t*0.15);
   box(chest, 0, chestLen/2, 0, chestW, chestLen, 0.24*(1+S.belly*0.3), torsoMat);
-  if (S.tunicStyle === 'armor'){
-    box(chest, 0, chestLen/2, 0.01, chestW*1.05, chestLen*0.95, 0.26*(1+S.belly*0.3), mat('#5b6470',0.4,0.7));
-    box(chest, 0, chestLen*0.85, 0, chestW*1.08, 0.06, 0.27, mat('#7d8794',0.4,0.7));
+
+  // armor overlays
+  if (S.armor === 'plate'){
+    box(chest, 0, chestLen/2, 0.015, chestW*1.06, chestLen*0.96, 0.27*(1+S.belly*0.3), mat(S.primary,0.3,0.8));
+    box(chest, 0, chestLen*0.9, 0, chestW*1.1, 0.06, 0.28, trim);      // collar
+    box(chest, 0, chestLen*0.5, 0.14, 0.10, 0.20, 0.03, trim);        // chest emblem
+  } else if (S.armor === 'chain'){
+    box(chest, 0, chestLen/2, 0.012, chestW*1.04, chestLen*0.98, 0.26, mat(S.primary,0.45,0.65));
+  } else if (S.armor === 'leather'){
+    box(chest, 0, chestLen*0.5, 0.13, chestW*0.5, chestLen*0.85, 0.03, mat(S.trim,0.8)); // strap
   }
 
-  // belt
+  // pauldrons (shoulder armor) for plate/chain
+  if (isMetal){
+    for(const sx of [-1,1]) box(chest, sx*chestW*0.55, chestLen*0.82, 0, 0.14, 0.12, 0.22, trim);
+  }
+
   if (S.belt){
     box(spine, 0, 0.02, 0, 0.34*(1+S.belly*0.5), 0.06, 0.24*(1+S.belly*0.5), mat('#241a12',0.6));
-    box(spine, 0, 0.02, 0.13, 0.07, 0.07, 0.03, mat('#caa64b',0.4,0.6));
+    box(spine, 0, 0.02, 0.13, 0.07, 0.07, 0.03, trim);
   }
 
   // ---- Neck + Head ----
@@ -283,55 +310,64 @@ function buildCharacter(){
   skull.position.y = hsz*0.9;
   skull.castShadow = true;
   head.add(skull);
-  // jaw
-  box(head, 0, hsz*0.45, hsz*0.18, hsz*1.2, hsz*0.7, hsz*1.1, skinMat);
-  // nose
-  box(head, 0, hsz*0.85, hsz*0.95, 0.03, 0.05, 0.05, skinMat);
-  // eyes
-  const eyeMat = mat(S.eyeColor, 0.3);
-  const eyeW = mat('#f2efe6',0.3);
+  box(head, 0, hsz*0.45, hsz*0.18, hsz*1.2, hsz*0.7, hsz*1.1, skinMat); // jaw
+  box(head, 0, hsz*0.85, hsz*0.95, 0.03, 0.05, 0.05, skinMat);          // nose
+  const eyeW = mat('#f2efe6',0.3), eyeI = mat(S.eyeColor, 0.3);
   for(const sx of [-1,1]){
     const e = new THREE.Mesh(new THREE.SphereGeometry(hsz*0.16,12,10), eyeW);
     e.position.set(sx*hsz*0.4, hsz*1.0, hsz*0.82); head.add(e);
-    const ir = new THREE.Mesh(new THREE.SphereGeometry(hsz*0.07,10,8), eyeMat);
+    const ir = new THREE.Mesh(new THREE.SphereGeometry(hsz*0.07,10,8), eyeI);
     ir.position.set(sx*hsz*0.4, hsz*1.0, hsz*0.94); head.add(ir);
   }
 
-  // hair
-  if (S.hairStyle !== 'none'){
+  // hair (hidden under full helm/hood)
+  const hairHidden = (S.headgear === 'helm' || S.headgear === 'hood');
+  if (S.hairStyle !== 'none' && !hairHidden){
     if (S.hairStyle === 'short'){
       const h = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.02,20,16,0,Math.PI*2,0,Math.PI*0.62), hairMat);
       h.scale.set(0.95,1.05,0.98); h.position.y = hsz*0.95; head.add(h);
     } else if (S.hairStyle === 'long'){
       const h = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.04,20,16,0,Math.PI*2,0,Math.PI*0.6), hairMat);
       h.scale.set(0.97,1.05,1.0); h.position.y = hsz*0.95; head.add(h);
-      box(head, 0, hsz*0.35, -hsz*0.7, hsz*1.6, hsz*1.6, hsz*0.4, hairMat); // back length
+      box(head, 0, hsz*0.2, -hsz*0.7, hsz*1.6, hsz*1.9, hsz*0.4, hairMat);
     } else if (S.hairStyle === 'mohawk'){
       box(head, 0, hsz*1.4, 0, hsz*0.3, hsz*0.8, hsz*1.7, hairMat);
+    } else if (S.hairStyle === 'ponytail'){
+      const h = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.02,20,16,0,Math.PI*2,0,Math.PI*0.6), hairMat);
+      h.scale.set(0.95,1.05,0.98); h.position.y = hsz*0.95; head.add(h);
+      cyl(head, 0, hsz*0.6, -hsz*0.95, hsz*0.18, hsz*0.12, hsz*1.5, hairMat); // tail
+    } else if (S.hairStyle === 'topknot'){
+      const h = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.0,20,16,0,Math.PI*2,0,Math.PI*0.5), hairMat);
+      h.position.y = hsz*0.95; head.add(h);
+      const k = new THREE.Mesh(new THREE.SphereGeometry(hsz*0.32,12,10), hairMat);
+      k.position.y = hsz*1.95; head.add(k);
     }
   }
   // beard
-  if (S.beard !== 'none'){
+  if (S.beard !== 'none' && S.headgear !== 'hood'){
     const d = S.beard === 'full' ? hsz*0.55 : hsz*0.18;
-    box(head, 0, hsz*0.35, hsz*0.55, hsz*1.15, hsz*0.9, d, hairMat);
+    const beardMat = mat(S.beardColor || S.hairColor, 0.85);
+    box(head, 0, hsz*0.35, hsz*0.55, hsz*1.15, hsz*0.9, d, beardMat);
   }
+  // headgear
+  buildHeadgear(head, hsz, trim, hairMat);
 
   // ---- Arms ----
   const armR = 0.052 * t;
   const upperLen = 0.30, foreLen = 0.28;
-  const shoulderX = chestW*0.55;
   const shoulderY = chestLen*0.85;
+  const sleeveMat = (S.armor === 'bare') ? skinMat : (isMetal ? mat(S.primary,0.4,0.6) : primary);
+  const gloveMat = S.gloves ? mat(isMetal ? S.trim : '#3a2a1a', isMetal?0.4:0.8, isMetal?0.6:0) : skinMat;
   const arms = {};
   for(const side of ['L','R']){
     const sx = side==='L' ? -1 : 1;
-    const sleeveMat = (S.tunicStyle === 'shirtless') ? skinMat : tunicMat;
-    const shoulder = limb(chest, sx*shoulderX, shoulderY, 0, upperLen, armR*1.15, sleeveMat);
-    const elbow = limb(shoulder, 0, -upperLen, 0, foreLen, armR, skinMat);
-    // hand
+    const shoulder = limb(chest, sx*chestW*0.55, shoulderY, 0, upperLen, armR*1.15, sleeveMat);
+    const elbow = limb(shoulder, 0, -upperLen, 0, foreLen, armR, (S.armor==='bare')?skinMat:sleeveMat);
+    if (S.gloves || isMetal) box(elbow, 0, -foreLen*0.7, 0, armR*2.2, foreLen*0.5, armR*2.2, gloveMat); // bracer
     const hand = new THREE.Object3D();
     hand.position.y = -foreLen;
     elbow.add(hand);
-    box(hand, 0, -0.05, 0, armR*2.2, 0.11, armR*1.8, skinMat);
+    box(hand, 0, -0.05, 0, armR*2.2, 0.11, armR*1.8, gloveMat);
     arms[side] = { shoulder, elbow, hand };
   }
 
@@ -342,7 +378,7 @@ function buildCharacter(){
     const sx = side==='L' ? -1 : 1;
     const hip = limb(pelvis, sx*hipW, -0.06, 0, thighLen, legR, pantsMat);
     const knee = limb(hip, 0, -thighLen, 0, shinLen, legR*0.85, pantsMat);
-    // foot
+    if (isMetal) box(knee, 0, -shinLen*0.5, 0.03, legR*2.2, shinLen*0.5, legR*2.2, trim); // greave
     const ankle = new THREE.Object3D();
     ankle.position.y = -shinLen;
     knee.add(ankle);
@@ -353,123 +389,218 @@ function buildCharacter(){
   // ---- Cape ----
   let cape = null;
   if (S.cape){
-    cape = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.85, 4, 6),
+    cape = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.9, 4, 6),
       new THREE.MeshStandardMaterial({ color:new THREE.Color(S.capeColor), roughness:0.9, side:THREE.DoubleSide }));
-    cape.position.set(0, chestLen*0.7, -0.14);
+    cape.position.set(0, chestLen*0.75, -0.15);
     cape.castShadow = true;
     chest.add(cape);
   }
 
-  // ---- Weapon (attached to right hand) ----
-  if (S.weapon !== 'none'){
-    const w = buildWeapon(S.weapon);
-    arms.R.hand.add(w);
-  }
+  // ---- Backpack (on the upper back) ----
+  if (S.backpack !== 'none') buildBackpack(chest, chestLen, chestW);
+
+  // ---- Weapons ----
+  if (S.weapon !== 'none') arms.R.hand.add(buildWeapon(S.weapon));
+  if (S.offhand !== 'none') arms.L.hand.add(buildOffhand(S.offhand));
 
   root.scale.setScalar(s);
   RIG = { root, pelvis, spine, chest, neck, head, arms, legs, cape };
 }
 
+function buildHeadgear(head, hsz, trim, hairMat){
+  const steel = mat(S.trim, 0.35, 0.8);
+  const cloth = mat(S.primary, 0.9);
+  if (S.headgear === 'helm'){
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.12,16,14,0,Math.PI*2,0,Math.PI*0.62), steel);
+    dome.scale.set(1,1.05,1.02); dome.position.y = hsz*0.95; head.add(dome);
+    box(head, 0, hsz*1.0, hsz*0.95, 0.05, hsz*1.4, 0.06, steel);   // nose guard
+    box(head, 0, hsz*1.7, 0, 0.05, hsz*0.7, hsz*2.0, trim);        // crest
+  } else if (S.headgear === 'horned'){
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.12,16,14,0,Math.PI*2,0,Math.PI*0.55), steel);
+    dome.position.y = hsz*0.95; head.add(dome);
+    for(const sx of [-1,1]){
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(hsz*0.22, hsz*1.3, 8), mat('#e8e2d0',0.6));
+      horn.position.set(sx*hsz*1.0, hsz*1.5, 0);
+      horn.rotation.z = sx*0.5; head.add(horn);
+    }
+  } else if (S.headgear === 'hood'){
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.2,16,14,0,Math.PI*2,0,Math.PI*0.7), cloth);
+    hood.scale.set(1.05,1.1,1.08); hood.position.y = hsz*0.85; head.add(hood);
+    box(head, 0, -hsz*0.1, -hsz*0.5, hsz*2.0, hsz*1.2, hsz*1.2, cloth); // back drape
+  } else if (S.headgear === 'cap'){
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(hsz*1.05,16,12,0,Math.PI*2,0,Math.PI*0.5), cloth);
+    cap.position.y = hsz*0.95; head.add(cap);
+    box(head, 0, hsz*0.9, hsz*0.9, hsz*1.6, 0.04, hsz*0.5, cloth); // brim
+  }
+}
+
+function buildBackpack(chest, chestLen, chestW){
+  const packMat = mat(S.backpackColor, 0.9);
+  const strap = mat('#2a1f14', 0.8);
+  // shoulder straps (front)
+  for(const sx of [-1,1]) box(chest, sx*chestW*0.28, chestLen*0.45, 0.13, 0.05, chestLen*0.9, 0.03, strap);
+  if (S.backpack === 'pack'){
+    box(chest, 0, chestLen*0.55, -0.20, 0.34, 0.42, 0.20, packMat);
+    box(chest, 0, chestLen*0.9, -0.20, 0.36, 0.10, 0.22, mat(S.backpackColor,0.85)); // flap
+    box(chest, 0, chestLen*0.2, -0.22, 0.20, 0.14, 0.06, strap);                      // bedroll
+  } else if (S.backpack === 'satchel'){
+    box(chest, 0, chestLen*0.2, -0.18, 0.28, 0.26, 0.14, packMat);
+  } else if (S.backpack === 'quiver'){
+    const q = cyl(chest, 0.16, chestLen*0.5, -0.18, 0.06, 0.07, 0.5, packMat, 10);
+    q.rotation.x = -0.25; q.rotation.z = -0.3;
+    for(let i=0;i<5;i++){
+      const a = cyl(chest, 0.16+(i-2)*0.02, chestLen*0.95, -0.24, 0.006,0.006,0.18, mat('#d8c8a0',0.7),6);
+      a.rotation.x = -0.25; a.rotation.z=-0.3;
+      const f = box(chest, 0.16+(i-2)*0.02, chestLen*1.05, -0.27, 0.03,0.04,0.005, mat('#b04030',0.8));
+      f.rotation.z=-0.3;
+    }
+  }
+}
+
 function buildWeapon(kind){
   const g = new THREE.Group();
-  // grip sits in the hand, blade points away
-  const steel = mat('#b9c0c9', 0.35, 0.85);
-  const dark  = mat('#3a2a1c', 0.7);
-  const woodH = mat('#6b4a2b', 0.8);
+  const steel = mat('#c2c9d2', 0.3, 0.85);
+  const wood  = mat('#6b4a2b', 0.8);
+  const gold  = mat('#caa64b', 0.4, 0.7);
   if (kind === 'sword'){
-    box(g, 0, 0.0, 0, 0.035, 0.16, 0.035, woodH);          // handle
-    box(g, 0, 0.10, 0, 0.18, 0.03, 0.04, steel);            // guard
-    box(g, 0, 0.46, 0, 0.05, 0.62, 0.02, steel);            // blade
-    box(g, 0, -0.10, 0, 0.06, 0.06, 0.06, mat('#caa64b',0.4,0.7)); // pommel
+    box(g, 0, 0, 0, 0.035, 0.16, 0.035, wood);
+    box(g, 0, 0.10, 0, 0.18, 0.03, 0.04, steel);
+    box(g, 0, 0.46, 0, 0.05, 0.62, 0.02, steel);
+    box(g, 0, -0.10, 0, 0.06, 0.06, 0.06, gold);
   } else if (kind === 'axe'){
-    box(g, 0, 0.05, 0, 0.04, 0.62, 0.04, woodH);            // haft
-    const head = box(g, 0.0, 0.40, 0.0, 0.04, 0.22, 0.04, steel);
+    cyl(g, 0, 0.18, 0, 0.022, 0.022, 0.70, wood);
     const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.05,16,1,false,-0.5,1.6), steel);
-    blade.rotation.z = Math.PI/2; blade.position.set(0.0, 0.42, 0.1);
-    g.add(blade);
+    blade.rotation.z = Math.PI/2; blade.position.set(0.02, 0.46, 0.1); g.add(blade);
+    box(g, 0, 0.46, 0, 0.05, 0.18, 0.05, steel);
   } else if (kind === 'pick'){
-    box(g, 0, 0.05, 0, 0.04, 0.66, 0.04, woodH);            // handle
-    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.012,0.7,8), steel);
-    head.rotation.x = Math.PI/2; head.position.set(0,0.42,0); head.rotation.z=0;
-    head.geometry.rotateZ(Math.PI/2);
-    g.add(head);
-    // slight curve tips
-    box(g, 0.32, 0.42, 0, 0.06, 0.03, 0.03, steel);
-    box(g, -0.32,0.42, 0, 0.06, 0.03, 0.03, steel);
+    cyl(g, 0, 0.18, 0, 0.022, 0.022, 0.72, wood);
+    const head = cyl(g, 0, 0.5, 0, 0.018, 0.012, 0.66, steel, 8);
+    head.rotation.z = Math.PI/2;
+  } else if (kind === 'mace'){
+    cyl(g, 0, 0.16, 0, 0.022, 0.022, 0.55, wood);
+    const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.10,0), steel);
+    ball.position.y = 0.46; g.add(ball);
+    box(g, 0, 0.46, 0, 0.24, 0.05, 0.05, steel); box(g, 0, 0.46, 0, 0.05, 0.05, 0.24, steel);
+  } else if (kind === 'spear'){
+    cyl(g, 0, 0.2, 0, 0.02, 0.02, 1.4, wood);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.24, 8), steel);
+    tip.position.y = 1.02; g.add(tip);
+  } else if (kind === 'staff'){
+    cyl(g, 0, 0.2, 0, 0.025, 0.03, 1.4, wood);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.09,16,14),
+      new THREE.MeshStandardMaterial({color:new THREE.Color(S.trim),roughness:0.1,metalness:0.2,emissive:new THREE.Color(S.trim),emissiveIntensity:0.5}));
+    orb.position.y = 1.0; g.add(orb);
+    box(g, 0, 0.92, 0, 0.06, 0.18, 0.06, gold);
+  } else if (kind === 'dagger'){
+    box(g, 0, 0, 0, 0.03, 0.12, 0.03, wood);
+    box(g, 0, 0.07, 0, 0.10, 0.02, 0.03, gold);
+    box(g, 0, 0.24, 0, 0.04, 0.30, 0.015, steel);
+  } else if (kind === 'torch'){
+    cyl(g, 0, 0.18, 0, 0.018, 0.022, 0.5, wood);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.07,0.22,10),
+      new THREE.MeshStandardMaterial({color:0xffae33,emissive:0xff7a00,emissiveIntensity:1.4,roughness:1}));
+    flame.position.y = 0.52; g.add(flame);
+    const lamp = new THREE.PointLight(0xff8a33, 1.4, 6); lamp.position.y=0.52; g.add(lamp);
   }
-  // orient so it's gripped in the fist, pointing forward/up
+  // grip in the fist, blade up & slightly forward
   g.position.set(0, -0.08, 0.04);
   g.rotation.x = -Math.PI*0.5;
   return g;
 }
 
+function buildOffhand(kind){
+  const g = new THREE.Group();
+  const steel = mat('#c2c9d2', 0.35, 0.8);
+  if (kind === 'shield'){
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.20,0.04,6,1), mat(S.primary,0.6,0.2));
+    body.rotation.x = Math.PI/2; g.add(body);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.24,0.02,8,6), mat(S.trim,0.4,0.6));
+    g.add(rim);
+    box(g, 0, 0, 0.03, 0.06, 0.20, 0.02, mat(S.trim,0.4,0.6)); // emblem
+    g.position.set(0.0, -0.16, -0.02);
+    g.rotation.set(Math.PI*0.5, 0, 0);
+    return g;
+  }
+  // dagger / torch reuse the main builder, repositioned for the off hand
+  const w = buildWeapon(kind);
+  return w;
+}
+
 /* ============================================================
    ANIMATION
    ============================================================ */
+function setArmHold(side, basePitch, elbowBend){
+  RIG.arms[side].shoulder.rotation.set(basePitch, 0, side==='R'?-0.12:0.12);
+  RIG.arms[side].elbow.rotation.x = elbowBend;
+}
+
 function animateRig(dt){
   if (!RIG) return;
-  const holding = S.weapon !== 'none';
+  const holdR = S.weapon !== 'none';
+  const holdL = S.offhand !== 'none';
+  const twoH = (S.weapon === 'bow' || S.weapon === 'staff' || S.weapon === 'spear');
 
-  if (S.anim === 'walk'){
-    walkPhase += dt * S.walkSpeed * 3.4;
+  // reset
+  RIG.arms.L.shoulder.rotation.set(0,0,0); RIG.arms.R.shoulder.rotation.set(0,0,0);
+  RIG.arms.L.elbow.rotation.set(0,0,0); RIG.arms.R.elbow.rotation.set(0,0,0);
+  RIG.pelvis.rotation.set(0,0,0); RIG.chest.rotation.set(0,0,0); RIG.head.rotation.set(0,0,0);
+
+  if (S.anim === 'walk' || S.anim === 'run'){
+    const fast = S.anim === 'run';
+    walkPhase += dt * S.speed * (fast?5.2:3.4);
     const p = walkPhase;
-    const swing = 0.62, armSwing = 0.5, kneeBend = 0.9;
-
-    // legs (opposite phase)
+    const swing = fast?0.95:0.62, armSwing = fast?0.8:0.5, kneeBend = fast?1.2:0.9;
     RIG.legs.L.hip.rotation.x = Math.sin(p) * swing;
     RIG.legs.R.hip.rotation.x = Math.sin(p + Math.PI) * swing;
     RIG.legs.L.knee.rotation.x = Math.max(0, -Math.sin(p - 0.4)) * kneeBend;
     RIG.legs.R.knee.rotation.x = Math.max(0, -Math.sin(p + Math.PI - 0.4)) * kneeBend;
     RIG.legs.L.ankle.rotation.x = Math.cos(p)*0.2;
     RIG.legs.R.ankle.rotation.x = Math.cos(p+Math.PI)*0.2;
-
-    // arms (opposite to same-side leg)
-    if (holding){
-      // right arm holds weapon shouldered, left arm swings normally
-      RIG.arms.R.shoulder.rotation.x = -0.5 + Math.sin(p)*0.05;
-      RIG.arms.R.elbow.rotation.x = -1.7;
-      RIG.arms.R.shoulder.rotation.z = -0.12;
-      RIG.arms.L.shoulder.rotation.x = Math.sin(p)*armSwing;
-      RIG.arms.L.elbow.rotation.x = -0.25 - Math.max(0,Math.sin(p))*0.3;
-    } else {
-      RIG.arms.L.shoulder.rotation.x = Math.sin(p)*armSwing;
-      RIG.arms.R.shoulder.rotation.x = Math.sin(p+Math.PI)*armSwing;
-      RIG.arms.L.elbow.rotation.x = -0.2 - Math.max(0,Math.sin(p))*0.3;
-      RIG.arms.R.elbow.rotation.x = -0.2 - Math.max(0,Math.sin(p+Math.PI))*0.3;
-      RIG.arms.R.shoulder.rotation.z = 0;
-    }
-    // body bob + sway
-    RIG.root.position.y = Math.abs(Math.sin(p)) * 0.04;
+    RIG.root.position.y = Math.abs(Math.sin(p)) * (fast?0.07:0.04);
     RIG.pelvis.rotation.y = Math.sin(p)*0.08;
-    RIG.pelvis.rotation.z = Math.sin(p)*0.04;
+    RIG.chest.rotation.x = fast?0.25:0.05;
     RIG.chest.rotation.y = -Math.sin(p)*0.06;
-    RIG.head.rotation.y = Math.sin(p)*0.03;
-  } else {
-    // idle: gentle breathing + relaxed arms
+    // arms
+    if (holdR){ setArmHold('R', -0.5+Math.sin(p)*0.05, -1.7); }
+    else { RIG.arms.R.shoulder.rotation.x = Math.sin(p+Math.PI)*armSwing; RIG.arms.R.elbow.rotation.x = -0.2-Math.max(0,Math.sin(p+Math.PI))*0.3; }
+    if (holdL){ setArmHold('L', -0.5+Math.sin(p+Math.PI)*0.05, -1.7); }
+    else { RIG.arms.L.shoulder.rotation.x = Math.sin(p)*armSwing; RIG.arms.L.elbow.rotation.x = -0.2-Math.max(0,Math.sin(p))*0.3; }
+    if (twoH){ setArmHold('L', -0.7, -1.3); setArmHold('R', -0.6, -1.3); }
+  } else if (S.anim === 'attack'){
+    attackPhase += dt * 3.0;
+    const a = (Math.sin(attackPhase)*0.5+0.5); // 0..1
+    // legs planted, slight stance
+    RIG.legs.L.hip.rotation.x = 0.15; RIG.legs.R.hip.rotation.x = -0.15;
+    RIG.legs.L.knee.rotation.x = 0.2; RIG.legs.R.knee.rotation.x = 0.2;
+    RIG.root.position.y = 0;
+    RIG.chest.rotation.y = -0.2 + a*0.4;
+    if (twoH){
+      setArmHold('L', -0.7-a*0.6, -1.0); setArmHold('R', -0.6-a*0.6, -1.0);
+    } else {
+      // overhead chop with right arm
+      RIG.arms.R.shoulder.rotation.set(-2.4 + a*2.6, 0, -0.1);
+      RIG.arms.R.elbow.rotation.x = -0.4 - a*0.6;
+      if (holdL) setArmHold('L', -0.5, -1.6);
+      else { RIG.arms.L.shoulder.rotation.set(0.1,0,0.2); RIG.arms.L.elbow.rotation.x=-0.5; }
+    }
+  } else { // idle
     walkPhase += dt;
     const b = Math.sin(walkPhase*1.5);
     RIG.legs.L.hip.rotation.x = 0; RIG.legs.R.hip.rotation.x = 0;
     RIG.legs.L.knee.rotation.x = 0; RIG.legs.R.knee.rotation.x = 0;
     RIG.legs.L.ankle.rotation.x = 0; RIG.legs.R.ankle.rotation.x = 0;
     RIG.root.position.y = b*0.008;
-    RIG.pelvis.rotation.set(0,0,0); RIG.chest.rotation.set(0,0,0);
-    if (holding){
-      RIG.arms.R.shoulder.rotation.set(-0.5,0,-0.12);
-      RIG.arms.R.elbow.rotation.x = -1.7;
-      RIG.arms.L.shoulder.rotation.set(0.04,0,0.08);
-      RIG.arms.L.elbow.rotation.x = -0.25;
-    } else {
-      RIG.arms.L.shoulder.rotation.set(0.04 + b*0.02,0,0.10);
-      RIG.arms.R.shoulder.rotation.set(0.04 - b*0.02,0,-0.10);
-      RIG.arms.L.elbow.rotation.x = -0.18;
-      RIG.arms.R.elbow.rotation.x = -0.18;
-    }
+    if (holdR) setArmHold('R', -0.5, -1.7);
+    else { RIG.arms.R.shoulder.rotation.set(0.04 - b*0.02,0,-0.10); RIG.arms.R.elbow.rotation.x=-0.18; }
+    if (holdL) setArmHold('L', -0.5, -1.7);
+    else { RIG.arms.L.shoulder.rotation.set(0.04 + b*0.02,0,0.10); RIG.arms.L.elbow.rotation.x=-0.18; }
+    if (twoH){ setArmHold('L', -0.7, -1.3); setArmHold('R', -0.6, -1.3); }
     RIG.head.rotation.y = Math.sin(walkPhase*0.5)*0.05;
   }
 
   if (RIG.cape){
-    const sway = (S.anim==='walk'? 0.25:0.06);
-    RIG.cape.rotation.x = 0.15 + Math.sin(walkPhase*2)*sway*0.3;
+    const sway = (S.anim==='run'?0.4:S.anim==='walk'?0.2:0.05);
+    RIG.cape.rotation.x = 0.12 + Math.sin(walkPhase*2)*sway*0.3;
   }
 }
 
@@ -492,26 +623,19 @@ function resize(){
 }
 addEventListener('resize', resize);
 
-/* ============================================================
-   APPLY visual-only changes without full rebuild where possible
-   (we just rebuild — it's cheap and keeps code simple/correct)
-   ============================================================ */
 function refreshScene(){
   scene.background.set(S.bgColor);
   scene.fog.color.set(S.bgColor);
   grid.visible = S.showGrid;
-  ground.visible = S.showGrid ? true : true;
 }
 function rebuild(){ buildCharacter(); refreshScene(); }
 
 /* ============================================================
-   UI — build controls from a schema
+   UI
    ============================================================ */
 const scroll = document.getElementById('scroll');
 function el(tag, cls, html){ const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e; }
-
 function addGroup(title){ const g=el('div','group'); g.appendChild(el('div','gtitle',title)); scroll.appendChild(g); return g; }
-
 function addSlider(g, key, label, min, max, step, fmt){
   const row = el('div','row');
   const lab = el('label'); lab.innerHTML = `<span>${label}</span><span class="val"></span>`;
@@ -520,22 +644,16 @@ function addSlider(g, key, label, min, max, step, fmt){
   const show=()=> val.textContent = fmt ? fmt(S[key]) : S[key];
   show();
   input.addEventListener('input', ()=>{ S[key]=parseFloat(input.value); show();
-    if (key==='walkSpeed'||key==='autoSpin') return; rebuild(); });
-  if (key==='walkSpeed') input.addEventListener('input', ()=>{ /* no rebuild needed */ });
+    if (key==='speed') return; rebuild(); });
   row.appendChild(lab); row.appendChild(input); g.appendChild(row);
-  return input;
 }
-
 function addColor(g, key, label){
   const row = el('div','row');
-  const lab = el('label', null, `<span>${label}</span>`);
+  row.appendChild(el('label', null, `<span>${label}</span>`));
   const input = el('input'); input.type='color'; input.value=S[key];
-  input.addEventListener('input', ()=>{ S[key]=input.value;
-    if(key==='bgColor'){ refreshScene(); } else rebuild(); });
-  row.appendChild(lab); row.appendChild(input); g.appendChild(row);
-  return input;
+  input.addEventListener('input', ()=>{ S[key]=input.value; if(key==='bgColor') refreshScene(); else rebuild(); });
+  row.appendChild(input); g.appendChild(row);
 }
-
 function addButtons(g, key, label, options){
   const row = el('div','row');
   row.appendChild(el('label', null, `<span>${label}</span>`));
@@ -543,40 +661,46 @@ function addButtons(g, key, label, options){
   options.forEach(([val,txt])=>{
     const b=el('button',null,txt);
     if(S[key]===val) b.classList.add('active');
-    b.addEventListener('click', ()=>{
-      S[key]=val;
+    b.addEventListener('click', ()=>{ S[key]=val;
       wrap.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      if(key==='anim') return rebuild(); // safe
-      rebuild();
-    });
+      b.classList.add('active'); rebuild(); });
+    wrap.appendChild(b);
+  });
+  row.appendChild(wrap); g.appendChild(row);
+}
+function addToggle(g, key, label){
+  const t = el('div','toggle'); t.appendChild(el('span',null,label));
+  const sw = el('label','switch');
+  const input=el('input'); input.type='checkbox'; input.checked=!!S[key];
+  sw.appendChild(input); sw.appendChild(el('span','slider')); t.appendChild(sw);
+  input.addEventListener('change', ()=>{ S[key]=input.checked;
+    if(key==='showGrid'||key==='autoSpin') refreshScene(); else rebuild(); });
+  g.appendChild(t);
+}
+function addPresets(g){
+  const row = el('div','row presets');
+  const wrap = el('div','btns');
+  Object.keys(PRESETS).forEach(name=>{
+    const b=el('button',null,name);
+    b.addEventListener('click', ()=>{ Object.assign(S, structuredClone(PRESETS[name])); buildUI(); rebuild(); toast(name+' preset'); });
     wrap.appendChild(b);
   });
   row.appendChild(wrap); g.appendChild(row);
 }
 
-function addToggle(g, key, label){
-  const t = el('div','toggle');
-  t.appendChild(el('span',null,label));
-  const sw = el('label','switch');
-  const input=el('input'); input.type='checkbox'; input.checked=!!S[key];
-  const sl=el('span','slider');
-  sw.appendChild(input); sw.appendChild(sl); t.appendChild(sw);
-  input.addEventListener('change', ()=>{ S[key]=input.checked;
-    if(key==='showGrid'){ refreshScene(); }
-    else if(key==='autoSpin'){ /* loop handles */ }
-    else rebuild();
-  });
-  g.appendChild(t);
-}
-
 function buildUI(){
   scroll.innerHTML='';
+  let g = addGroup('Class Presets'); addPresets(g);
 
-  let g = addGroup('Pose & Equipment');
-  addButtons(g, 'weapon', 'In hand', [['none','None'],['sword','Sword'],['axe','Axe'],['pick','Mining Pick']]);
-  addButtons(g, 'anim', 'Animation', [['idle','Idle'],['walk','Walking']]);
-  addSlider(g, 'walkSpeed', 'Walk speed', 0.4, 3.0, 0.1, v=>v.toFixed(1)+'x');
+  g = addGroup('Pose & Animation');
+  addButtons(g, 'anim', 'Animation', [['idle','Idle'],['walk','Walk'],['run','Run'],['attack','Attack']]);
+  addSlider(g, 'speed', 'Speed', 0.4, 3.0, 0.1, v=>v.toFixed(1)+'x');
+
+  g = addGroup('Weapons & Gear');
+  addButtons(g, 'weapon', 'Main hand', [['none','None'],['sword','Sword'],['axe','Axe'],['pick','Pick'],['mace','Mace'],['spear','Spear'],['bow','Bow'],['staff','Staff'],['dagger','Dagger'],['torch','Torch']]);
+  addButtons(g, 'offhand', 'Off hand', [['none','None'],['shield','Shield'],['torch','Torch'],['dagger','Dagger']]);
+  addButtons(g, 'backpack', 'Backpack', [['none','None'],['pack','Pack'],['satchel','Satchel'],['quiver','Quiver']]);
+  addColor(g, 'backpackColor', 'Pack color');
 
   g = addGroup('Body');
   addSlider(g, 'height', 'Height', 1.4, 2.1, 0.01, v=>v.toFixed(2)+' m');
@@ -586,24 +710,27 @@ function buildUI(){
   addSlider(g, 'headSize', 'Head size', 0.8, 1.25, 0.01, v=>Math.round(v*100)+'%');
   addColor(g, 'skin', 'Skin tone');
 
-  g = addGroup('Hair & Face');
-  addButtons(g, 'hairStyle', 'Hair', [['none','Bald'],['short','Short'],['long','Long'],['mohawk','Mohawk']]);
+  g = addGroup('Head');
+  addButtons(g, 'headgear', 'Headgear', [['none','None'],['helm','Helm'],['hood','Hood'],['horned','Horned'],['cap','Cap']]);
+  addButtons(g, 'hairStyle', 'Hair', [['none','Bald'],['short','Short'],['long','Long'],['ponytail','Ponytail'],['topknot','Topknot'],['mohawk','Mohawk']]);
   addColor(g, 'hairColor', 'Hair color');
   addButtons(g, 'beard', 'Beard', [['none','None'],['stubble','Stubble'],['full','Full']]);
   addColor(g, 'eyeColor', 'Eye color');
 
-  g = addGroup('Clothing');
-  addButtons(g, 'tunicStyle', 'Top', [['tunic','Tunic'],['armor','Armor'],['shirtless','Bare']]);
-  addColor(g, 'tunic', 'Tunic / armor color');
+  g = addGroup('Armor & Clothing');
+  addButtons(g, 'armor', 'Outfit', [['tunic','Tunic'],['leather','Leather'],['chain','Chain'],['plate','Plate'],['robe','Robe'],['bare','Bare']]);
+  addColor(g, 'primary', 'Main color');
+  addColor(g, 'trim', 'Trim / metal');
   addColor(g, 'pants', 'Pants');
   addColor(g, 'boots', 'Boots');
+  addToggle(g, 'gloves', 'Gloves / bracers');
   addToggle(g, 'belt', 'Belt');
   addToggle(g, 'cape', 'Cape');
   addColor(g, 'capeColor', 'Cape color');
 
   g = addGroup('Scene');
   addToggle(g, 'autoSpin', 'Auto-rotate');
-  addToggle(g, 'showGrid', 'Show ground grid');
+  addToggle(g, 'showGrid', 'Ground grid');
   addColor(g, 'bgColor', 'Background');
 }
 
@@ -615,9 +742,7 @@ function toast(msg){
   t.textContent=msg; t.classList.add('show');
   clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove('show'),1600);
 }
-document.getElementById('resetBtn').onclick = ()=>{
-  S = structuredClone(DEFAULTS); buildUI(); rebuild(); toast('Reset to defaults');
-};
+document.getElementById('resetBtn').onclick = ()=>{ S = structuredClone(DEFAULTS); buildUI(); rebuild(); toast('Reset to defaults'); };
 document.getElementById('copyBtn').onclick = async ()=>{
   const json = JSON.stringify(S, null, 2);
   try{ await navigator.clipboard.writeText(json); toast('Config copied to clipboard'); }
@@ -625,8 +750,7 @@ document.getElementById('copyBtn').onclick = async ()=>{
 };
 document.getElementById('shotBtn').onclick = ()=>{
   renderer.render(scene,camera);
-  const url = renderer.domElement.toDataURL('image/png');
-  const a=document.createElement('a'); a.href=url; a.download='aos-character.png'; a.click();
+  const a=document.createElement('a'); a.href=renderer.domElement.toDataURL('image/png'); a.download='aos-character.png'; a.click();
   toast('Snapshot saved');
 };
 
@@ -637,7 +761,7 @@ buildUI();
 rebuild();
 resize();
 tick();
-window.__AOS = { get state(){return S;}, rebuild };  // handy for debugging
+window.__AOS = { get state(){return S;}, rebuild };
 </script>
 </body>
 </html>
