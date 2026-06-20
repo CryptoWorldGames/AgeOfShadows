@@ -108,8 +108,20 @@ const DEFAULTS = {
   weaponScale: 100,                        // %
   // scene
   autoSpin:false, showGrid:true, bgColor:'#1b2330',
+  // per-part colors keyed by material name (so recolors persist across reloads)
+  partColors:{},
 };
 let S = structuredClone(DEFAULTS);
+
+/* ---------------- persistence (auto-save to localStorage) ---------------- */
+const STORAGE_KEY = 'aos_character_v1';
+function saveState(){ try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch(e){} }
+function loadState(){
+  try {
+    const j = localStorage.getItem(STORAGE_KEY);
+    if (j){ S = Object.assign(structuredClone(DEFAULTS), JSON.parse(j)); if (!S.partColors) S.partColors = {}; }
+  } catch(e){}
+}
 
 /* ---------------- scene ---------------- */
 const host = document.getElementById('canvas-host');
@@ -227,11 +239,13 @@ function onModelLoaded(root, animations){
       if (!m || seen.has(m.uuid)) return;
       seen.add(m.uuid);
       if (!m.color) m.color = new THREE.Color(0xffffff);
-      matGroups.push({ label: matLabel(m.name), mats: [m] });
+      matGroups.push({ label: matLabel(m.name), key: (m.name||matLabel(m.name)), mats: [m] });
       const cat = classifyMat(m.name);
       if (cat){ (materials[cat] = materials[cat] || []).push(m); }
     });
   });
+  // re-apply any saved per-part colors for this model
+  matGroups.forEach(grp => { const c = S.partColors && S.partColors[grp.key]; if (c) grp.mats.forEach(m=>m.color.set(c)); });
 
   // normalize: ~1.8m tall, centered, feet on the ground.
   // precise=true measures actual vertices (skinned meshes report wrong cached bounds).
@@ -548,8 +562,8 @@ function buildUI(){
   matGroups.forEach((grp)=>{
     const row=el('div','row'); row.appendChild(el('label',null,`<span>${grp.label}</span>`));
     const inp=el('input'); inp.type='color';
-    inp.value = '#'+grp.mats[0].color.getHexString();
-    inp.oninput=()=>{ grp.mats.forEach(m=>{ m.color.set(inp.value); m.needsUpdate=true; }); };
+    inp.value = (S.partColors && S.partColors[grp.key]) || ('#'+grp.mats[0].color.getHexString());
+    inp.oninput=()=>{ grp.mats.forEach(m=>{ m.color.set(inp.value); m.needsUpdate=true; }); S.partColors[grp.key]=inp.value; saveState(); };
     row.appendChild(inp); g.appendChild(row);
   });
 
@@ -594,13 +608,16 @@ function addColor2(g,key,label,onChange){
 
 /* ---------------- actions ---------------- */
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1600); }
-document.getElementById('resetBtn').onclick=()=>{ S=structuredClone(DEFAULTS); loadModel(); toast('Reset'); };
+document.getElementById('resetBtn').onclick=()=>{ S=structuredClone(DEFAULTS); saveState(); loadModel(); toast('Reset'); };
 document.getElementById('copyBtn').onclick=async()=>{ const j=JSON.stringify(S,null,2); try{await navigator.clipboard.writeText(j);toast('Config copied');}catch(e){console.log(j);toast('Copied to console');} };
 document.getElementById('shotBtn').onclick=()=>{ renderer.render(scene,camera); const a=document.createElement('a'); a.href=renderer.domElement.toDataURL('image/png'); a.download='aos-character.png'; a.click(); toast('Snapshot saved'); };
 
 /* ---------------- boot ---------------- */
+loadState();                                  // restore last session (colors, weapon, height...)
 resize(); refreshScene(); loadModel(); tick();
-window.__AOS = { get state(){return S;}, get bones(){ const b=[]; model && model.traverse(o=>o.isBone&&b.push(o.name)); return b; } };
+setInterval(saveState, 1500);                 // auto-save everything every 1.5s
+addEventListener('beforeunload', saveState);
+window.__AOS = { get state(){return S;}, save:saveState, clear:()=>{ localStorage.removeItem(STORAGE_KEY); location.reload(); }, get bones(){ const b=[]; model && model.traverse(o=>o.isBone&&b.push(o.name)); return b; } };
 </script>
 </body>
 </html>
