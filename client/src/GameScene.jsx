@@ -5,7 +5,7 @@ import { createEnvironment } from './modules/Environment';
 import { createHuman } from './modules/Human';
 import { createTree } from './modules/Tree';
 import { createUI, showChatPanel, showInventoryModal, showHouseModal, showBuildMenu } from './modules/UI';
-import { createControls } from './modules/Controls';
+import { createControls } from './modules/Controls.jsx';
 import { createTownCenter, createHouse, createFence } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
 import { createStone } from './modules/Stone';
