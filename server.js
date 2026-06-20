@@ -55,8 +55,10 @@ function checkRateLimit(ip) {
 }
 
 function createPlayerUnits(socketId, count = 1) {
-  const spawnX = (Math.random() - 0.5) * 20;
-  const spawnZ = (Math.random() - 0.5) * 20;
+  // Spawn OUT IN FRONT of the town center (which sits at the origin), not on top
+  // of it. +z is "in front" where the starting camera looks.
+  const spawnX = (Math.random() - 0.5) * 8;
+  const spawnZ = 20 + Math.random() * 4;
   const units = [];
   for (let i = 0; i < count; i++) {
     units.push({

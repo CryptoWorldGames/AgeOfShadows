@@ -116,6 +116,12 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       for (const k in want) { if (o.name===want[k]) { B[k]=o; rest[k]=o.rotation.clone(); } }
       if (o.name==='hand_r_49') handR=o;
     });
+    // The model ships in a T-pose (arms straight out). Rotate the upper arms DOWN
+    // so they hang at the sides — this becomes the rest pose for idle AND walking,
+    // and walkPose still swings them forward/back on top of this.
+    const ARM_DOWN = 1.15;
+    if (rest.armUL) rest.armUL.z += ARM_DOWN;
+    if (rest.armUR) rest.armUR.z -= ARM_DOWN;
   }, undefined, (err)=>console.error('Failed to load character:',err));
 
   const inventory = {wood:0,stone:0,gold:0,food:0,water:0};
