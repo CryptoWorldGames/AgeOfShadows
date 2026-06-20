@@ -95,7 +95,7 @@ const MODELS = {
 
 const DEFAULTS = {
   model: 'agent',
-  anim: 0,            // clip index, or -1 for T-pose
+  anim: -1,           // clip index, or -1 for T-pose (default: clean bind pose)
   speed: 1.0,
   height: 1.80,
   // colors (applied by matching material names)
@@ -231,6 +231,7 @@ function onModelLoaded(root, animations){
   if (clips.length){ mixer = new THREE.AnimationMixer(model); actions = clips.map(c => mixer.clipAction(c)); }
 
   applyHeight(); applyAnim(); applyColors(); applyWeapon();
+  frameCamera();
   buildUI();
   setStatus(null);
   console.log('Loaded', S.model, '| hand bone:', handBone && handBone.name, '| clips:', clips.map(c=>c.name), '| material groups:', Object.keys(materials));
@@ -238,6 +239,23 @@ function onModelLoaded(root, animations){
 
 /* ---------------- appliers ---------------- */
 function applyHeight(){ const s = S.height/1.8; avatar.scale.setScalar(s); }
+
+// Frame the camera to fit the whole character, whatever scale it loaded at.
+function frameCamera(){
+  if (!model) return;
+  avatar.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  if (box.isEmpty()) return;
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const r = sphere.radius || 1;
+  controls.target.copy(sphere.center);
+  const dir = new THREE.Vector3(0.45, 0.12, 1).normalize();
+  const dist = (r / Math.sin(THREE.MathUtils.degToRad(camera.fov * 0.5))) * 1.15;
+  camera.position.copy(sphere.center).add(dir.multiplyScalar(dist));
+  camera.near = Math.max(0.01, r/100); camera.far = r*100; camera.updateProjectionMatrix();
+  controls.minDistance = r*0.25; controls.maxDistance = r*12;
+  controls.update();
+}
 
 function applyAnim(){
   if (!mixer || !actions.length) return;
@@ -347,7 +365,7 @@ function buildUI(){
   addButtons(g,'model','Base model',[['agent','Operator'],['custom','Custom'],['realistic','Peasant'],['modular','Modular']], ()=>loadModel());
 
   g = addGroup('Animation');
-  const animOpts = [['-1','T-pose']].concat(clips.map((c,i)=>[String(i), c.name.replace(/_/g,' ').slice(0,14)]));
+  const animOpts = [['-1','T-pose']].concat(clips.map((c,i)=>[String(i), (c.name||('clip '+i)).replace(/_/g,' ').slice(0,14)]).slice(0,12));
   // animation uses index; store as number
   const arow=el('div','row'); arow.appendChild(el('label',null,'<span>Clip</span>'));
   const awrap=el('div','btns');
