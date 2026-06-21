@@ -153,7 +153,10 @@ export default function GameScene({ auth }) {
       setTimeout(() => {
         const buttons = gameInfo.querySelectorAll('button');
         buttons.forEach(btn => {
-          btn.addEventListener('click', (e) => { e.stopPropagation(); });
+          // Stop all mouse events from reaching canvas
+          btn.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); });
+          btn.addEventListener('mouseup', (e) => { e.stopPropagation(); e.preventDefault(); });
+          btn.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
         });
       }, 0);
 
