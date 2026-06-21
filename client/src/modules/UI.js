@@ -490,7 +490,7 @@ export function createUI(playerId, gameState, displayName) {
   // Build menu listing what the player can build (cost + time)
   const buildMenu = document.createElement('div');
   buildMenu.id = 'build-menu';
-  buildMenu.style.cssText = `position:absolute;top:150px;left:88px;z-index:101;background:rgba(0,0,0,0.9);border:1px solid #c8a84b;border-radius:10px;padding:10px;width:210px;display:none;font-family:'Segoe UI',sans-serif;color:#fff;`;
+  buildMenu.style.cssText = `position:fixed;top:150px;left:88px;z-index:101;background:rgba(0,0,0,0.9);border:1px solid #c8a84b;border-radius:10px;padding:10px;width:210px;display:none;font-family:'Segoe UI',sans-serif;color:#fff;`;
   const buildables = [
     { key: 'man' },
     { key: 'house' },
