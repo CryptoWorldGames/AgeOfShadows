@@ -4,7 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerData, createPasswordResetToken, resetPassword, verifyEmail, updateUserProfile, deleteUserAccount } = require('./auth');
+const { registerUser, authenticateUser, getUserById, loadPlayerData, savePlayerData, createPasswordResetToken, resetPassword, verifyEmail, updateUserProfile, updateDisplayName, deleteUserAccount } = require('./auth');
 const { isEmailConfigured } = require('./email');
 const { initializeDatabase } = require('./database');
 const worldsim = require('./worldsim');
@@ -203,7 +203,7 @@ io.on('connection', (socket) => {
       } else if (savedData) {
         resources = savedData.resources;
         buildings = savedData.buildings;
-        units = savedData.units.length > 0 ? savedData.units : createPlayerUnits(socket.id, 1);
+        units = savedData.units && savedData.units.length > 0 ? savedData.units : createPlayerUnits(socket.id, 1);
         buildQueue = savedData.build_queue || [];
       } else {
         units = createPlayerUnits(socket.id, 1);
@@ -211,6 +211,15 @@ io.on('connection', (socket) => {
         buildings = [];
         buildQueue = [];
       }
+
+      // Deduplicate units by id — a previous bug could have saved duplicates to the DB.
+      // Also strip invalid entries so the client never gets a ghost unit.
+      const seenIds = new Set();
+      units = units.filter(u => {
+        if (!u || !u.id || seenIds.has(u.id)) return false;
+        seenIds.add(u.id);
+        return true;
+      });
 
       const player = {
         id: socket.id,
@@ -545,7 +554,7 @@ app.get('/api/profile', async (req, res) => {
     }
     res.json({
       email: user.email,
-      displayName: user.displayName,
+      displayName: user.display_name,
       emailVerified: user.emailVerified,
       profile: user.profile || { age: null, state: null, country: null }
     });
@@ -567,6 +576,22 @@ app.post('/api/profile', async (req, res) => {
     res.json({ success: true, message: 'Profile updated' });
   } catch (err) {
     res.status(500).json({ error: 'Profile update failed' });
+  }
+});
+
+app.post('/api/display-name', async (req, res) => {
+  const { userId, displayName } = req.body;
+  if (!userId || !displayName || !displayName.trim()) {
+    return res.status(400).json({ error: 'userId and displayName required' });
+  }
+  try {
+    await updateDisplayName(userId, displayName);
+    // Also update the live in-memory session so the name shows immediately
+    const liveSid = Object.keys(world.players).find(s => world.players[s].userId === userId);
+    if (liveSid) world.players[liveSid].name = displayName.trim();
+    res.json({ success: true, displayName: displayName.trim() });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update display name' });
   }
 });
 

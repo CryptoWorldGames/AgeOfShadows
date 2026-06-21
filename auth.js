@@ -210,6 +210,16 @@ async function updateUserProfile(userId, age, state, country) {
   }
 }
 
+async function updateDisplayName(userId, displayName) {
+  try {
+    await query(`UPDATE users SET display_name = $2 WHERE id = $1`, [userId, displayName.trim()]);
+    return true;
+  } catch (err) {
+    console.error('[AUTH] Update display name error:', err.message);
+    throw err;
+  }
+}
+
 async function deleteUserAccount(userId) {
   try {
     // Player data will be deleted due to CASCADE
@@ -251,6 +261,7 @@ module.exports = {
   resetPassword,
   verifyEmail,
   updateUserProfile,
+  updateDisplayName,
   deleteUserAccount,
   cleanupUnverifiedAccounts
 };

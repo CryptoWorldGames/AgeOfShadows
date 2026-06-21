@@ -486,13 +486,30 @@ function showSettingsPanel(displayName, email = '') {
     const state = document.getElementById('settings-state').value;
     const country = document.getElementById('settings-country').value;
 
+    const nickname = document.getElementById('settings-nickname').value.trim();
+    // Save display name if changed
+    if (nickname && nickname !== displayName) {
+      const nameRes = await fetch('/api/display-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: auth.userId, displayName: nickname })
+      });
+      const nameData = await nameRes.json();
+      if (nameData.success) {
+        auth.displayName = nickname;
+        localStorage.setItem('auth', JSON.stringify(auth));
+        // Update the top-right panel immediately
+        const nameEl = document.querySelector('#login-panel .player-name');
+        if (nameEl) nameEl.textContent = nickname;
+      }
+    }
     const res = await fetch('/api/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: auth.userId, age: age ? parseInt(age) : null, state, country })
     });
     const data = await res.json();
-    alert(data.message || 'Profile saved!');
+    alert('Settings saved!');
   };
 
   document.getElementById('delete-account-btn').onclick = async () => {

@@ -383,14 +383,27 @@ export default function GameScene({ auth }) {
         }
         if (me && me.units) {
           me.units.forEach(u => {
-            const h = world.units.find(x => x.serverId === u.id);
-            if (h && h.setServerPos) {
+            let h = world.units.find(x => x.serverId === u.id);
+            if (!h) {
+              // Server knows about a unit the client doesn't have a visual for yet — create it
+              h = createHuman(scene, { x: u.x, y: 0, z: u.z }, { team: u.team || 'red' });
+              h.serverId = u.id;
+              world.units.push(h);
+            }
+            if (h.setServerPos) {
               h.setServerPos(u.x, u.z);
-              // Pass chopping state so client can play animation
               if (h.unit) h.unit.chopping = u.chopping || false;
             }
           });
-          // Update unit count display
+          // Remove client visuals for units the server no longer has
+          const serverIds = new Set(me.units.map(u => u.id));
+          for (let i = world.units.length - 1; i >= 0; i--) {
+            const h = world.units[i];
+            if (h.serverId && !serverIds.has(h.serverId)) {
+              scene.remove(h.group);
+              world.units.splice(i, 1);
+            }
+          }
           const countEl = document.getElementById('unit-total-count');
           if (countEl) countEl.textContent = `${me.units.length} men`;
         }
