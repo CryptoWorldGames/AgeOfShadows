@@ -191,7 +191,7 @@ export default function GameScene({ auth }) {
         world.trees.push(t);
       });
 
-      attempts = 0;
+      let attempts = 0;
       while (world.stones.length < 8 && attempts < 300) {
         attempts++;
         const x = (Math.random()-0.5)*120; const z = (Math.random()-0.5)*120;
