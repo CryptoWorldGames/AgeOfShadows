@@ -157,9 +157,10 @@ export default function GameScene({ auth }) {
       const invBtn = document.getElementById('inv-btn-inline');
       if (invBtn) {
         invBtn.onclick = () => {
-          console.log('[Inventory Click] Triggered');
+          console.log('[Inventory Click] Triggered with resources:', world.resources, 'and townCenterStorage:', townCenterStorage);
           showInventoryModal(world.resources, townCenterStorage);
         };
+        console.log('[GameScene] inv-btn-inline onclick set successfully');
       } else {
         console.warn('[GameScene] inv-btn-inline not found!');
       }
