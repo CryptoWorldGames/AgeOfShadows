@@ -136,8 +136,8 @@ export default function GameScene({ auth }) {
       gameInfo.id = 'game-info-panel';
       gameInfo.style.cssText = `position:fixed;top:90px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:10001;backdrop-filter:blur(4px);min-width:130px;pointer-events:auto;`;
       gameInfo.innerHTML = `
-        <button id="inv-btn-inline" style="width:100%;padding:5px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;pointer-events:auto;position:relative;z-index:10002;">📦 Inventory</button>
-        <button id="game-logout-btn" style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;pointer-events:auto;position:relative;z-index:10002;">Logout</button>
+        <button style="width:100%;padding:5px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;pointer-events:auto;position:relative;z-index:10002;" onclick="window.gameActions.openInventory();">📦 Inventory</button>
+        <button style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;pointer-events:auto;position:relative;z-index:10002;" onclick="window.gameActions.logout();">Logout</button>
       `;
       document.body.appendChild(gameInfo);
 
@@ -152,30 +152,20 @@ export default function GameScene({ auth }) {
         serverDriven: true   // workers are simulated on the server; client just renders them
       };
 
-      const invBtn = document.getElementById('inv-btn-inline');
-      const logoutBtn = document.getElementById('game-logout-btn');
-
-      if (invBtn) {
-        invBtn.addEventListener('click', () => {
-          showInventoryModal(world.resources, townCenterStorage);
-        });
-      }
-
-      if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
+      // Set up global game actions for button clicks
+      window.gameActions = {
+        openInventory: () => showInventoryModal(world.resources, townCenterStorage),
+        logout: () => {
           if (confirm('Logout?')) {
-            const btn = document.getElementById('game-logout-btn');
-            btn.disabled = true;
-            btn.textContent = 'Saving...';
             socket.emit('resourceSync', { resources: world.resources });
             setTimeout(() => {
               localStorage.removeItem('auth');
               sessionStorage.removeItem('adminToken');
               window.location.href = '/';
-            }, 4000);
+            }, 1000);
           }
-        });
-      }
+        }
+      };
 
       // Note: the build menu (hammer button) and its selection callback are
       // wired up inside createControls via world.ui.onBuildSelect().
