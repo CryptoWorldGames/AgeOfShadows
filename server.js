@@ -118,7 +118,9 @@ setInterval(() => {
 
 // Periodic autosave: persist every connected player's stockpile/units so progress
 // survives a crash or refresh without relying on a clean disconnect.
+// (Silently skipped in demo mode if database is unavailable)
 setInterval(() => {
+  if (!process.env.DATABASE_URL) return; // Skip autosave in demo mode
   Object.keys(world.players).forEach((sid) => {
     const player = world.players[sid];
     const userId = socketUserMap[sid];
@@ -133,9 +135,16 @@ io.on('connection', (socket) => {
 
   socket.on('join', async (data) => {
     try {
-      // Load saved player data
-      const savedData = await loadPlayerData(data.userId);
-      const user = await getUserById(data.userId);
+      // Load saved player data (with fallback for demo mode)
+      let savedData, user;
+      try {
+        savedData = await loadPlayerData(data.userId);
+        user = await getUserById(data.userId);
+      } catch (dbErr) {
+        console.warn(`[DEMO MODE] Database unavailable for ${data.userId}, using demo defaults:`, dbErr.message);
+        savedData = null;
+        user = null;
+      }
 
       // If this account already has a LIVE in-memory session (e.g. it kept working
       // while logged out), resume that exact state so no offline progress is lost.
@@ -160,7 +169,7 @@ io.on('connection', (socket) => {
       const player = {
         id: socket.id,
         userId: data.userId,
-        name: user?.displayName || `Player${Math.floor(Math.random() * 1000)}`,
+        name: user?.displayName || data.displayName || `Player${Math.floor(Math.random() * 1000)}`,
         color: data.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
         resources,
         units,
@@ -739,17 +748,28 @@ process.title = 'AgeOfShadows_server';
 
 async function startServer() {
   try {
-    console.log('[STARTUP] Initializing database...');
-    await initializeDatabase();
+    if (process.env.DATABASE_URL) {
+      console.log('[STARTUP] Initializing database...');
+      await initializeDatabase();
+      console.log('[STARTUP] Database: ✅ PostgreSQL connected');
+    } else {
+      console.warn('[STARTUP] ⚠️  DATABASE_URL not set! Running in DEMO MODE (no persistence)');
+      console.warn('[STARTUP] To enable persistence, set DATABASE_URL in your environment:');
+      console.warn('[STARTUP]   Example: postgres://user:pass@host:5432/ageofshadows');
+      console.warn('[STARTUP] For Render: https://render.com → Dashboard → AgeOfShadows → Environment');
+    }
 
     server.listen(PORT, '0.0.0.0', () => {
-      console.log(`[AgeOfShadows] Server running on port ${PORT}`);
-      console.log(`[AgeOfShadows] Socket.IO ready`);
-      console.log(`[STARTUP] Database: ${process.env.DATABASE_URL ? 'PostgreSQL (production)' : 'ERROR: DATABASE_URL not set!'}`);
+      console.log(`[✅ AgeOfShadows] Server running on port ${PORT}`);
+      console.log(`[✅ AgeOfShadows] Socket.IO ready`);
     });
   } catch (err) {
     console.error('[STARTUP] Failed to initialize database:', err.message);
-    process.exit(1);
+    console.error('[STARTUP] Attempting to start server anyway in DEMO MODE...');
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`[✅ AgeOfShadows] Server running on port ${PORT} (demo mode)`);
+      console.log(`[⚠️  AgeOfShadows] Database unavailable - player data will not persist`);
+    });
   }
 }
 
