@@ -985,7 +985,7 @@ app.get('/admin', (req, res) => {
       </script>
     </body>
     </html>
-  \`);
+  `);
 });
 
 app.use(express.static(path.join(__dirname, 'client/dist')));
