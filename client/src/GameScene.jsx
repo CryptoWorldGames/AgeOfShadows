@@ -116,6 +116,9 @@ export default function GameScene({ auth }) {
       while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild);
       containerRef.current.appendChild(renderer.domElement);
 
+      // Disable pointer events on canvas so clicks pass through to UI buttons
+      renderer.domElement.style.pointerEvents = 'none';
+
       const env = createEnvironment(scene);
       const displayName = auth.displayName || 'Player';
       sessionStorage.setItem('playerName', displayName);
