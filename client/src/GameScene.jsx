@@ -153,8 +153,12 @@ export default function GameScene({ auth }) {
       };
 
       // Set up global game actions for button clicks
+      window.gameState = { resources: world.resources, townCenterStorage };
       window.gameActions = {
-        openInventory: () => showInventoryModal(world.resources, townCenterStorage),
+        openInventory: () => {
+          console.log('[OPEN INVENTORY]', window.gameState.resources, window.gameState.townCenterStorage);
+          showInventoryModal(window.gameState.resources, window.gameState.townCenterStorage);
+        },
         logout: () => {
           if (confirm('Logout?')) {
             socket.emit('resourceSync', { resources: world.resources });
@@ -349,6 +353,10 @@ export default function GameScene({ auth }) {
       socket.on('worldUpdate', (data) => {
         if (!data.players) return;
         const me = data.players[world.playerId];
+        if (me) {
+          world.resources = me.resources;
+          if (window.gameState) window.gameState.resources = me.resources;
+        }
         if (me && me.buildQueue) {
           updateBuildProgressDisplay(me.buildQueue);
         } else {
