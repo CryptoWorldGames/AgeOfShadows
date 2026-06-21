@@ -9,7 +9,12 @@ const { isEmailConfigured } = require('./email');
 const { initializeDatabase } = require('./database');
 const worldsim = require('./worldsim');
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
+const ADMIN_EMAILS = [
+  'shadowdefense2023@gmail.com',
+  'smartstuff2buy@gmail.com',
+  process.env.ADMIN_EMAIL
+].filter(Boolean); // Remove undefined/null
+const isAdmin = (email) => ADMIN_EMAILS.includes(email);
 
 const app = express();
 
@@ -636,9 +641,7 @@ app.post('/api/market/buy', async (req, res) => {
 });
 
 // ADMIN PANEL - SECURE ACCESS ONLY
-function isAdmin(userEmail) {
-  return userEmail === ADMIN_EMAIL;
-}
+// isAdmin() function already defined above with dual admin support
 
 app.post('/api/admin/login', async (req, res) => {
   const { email, password } = req.body;
@@ -736,6 +739,260 @@ app.get('/health', (req, res) => {
     players: Object.keys(world.players).length,
     timestamp: new Date().toISOString()
   });
+});
+
+// ===== PROTECTED ADMIN DASHBOARD =====
+app.get('/admin', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Age of Shadows - Admin Dashboard</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          background: linear-gradient(135deg, #0a0a0a 0%, #1a0a00 50%, #0a0a1a 100%);
+          color: #c8a84b;
+          min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header {
+          text-align: center;
+          margin-bottom: 40px;
+          border-bottom: 2px solid rgba(200,168,75,0.3);
+          padding-bottom: 20px;
+        }
+        h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .subtitle { opacity: 0.7; font-size: 0.9em; }
+        .login-form {
+          background: rgba(0,0,0,0.6);
+          border: 1px solid rgba(200,168,75,0.5);
+          border-radius: 8px;
+          padding: 30px;
+          max-width: 400px;
+          margin: 40px auto;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; }
+        input {
+          width: 100%;
+          padding: 10px;
+          background: rgba(0,0,0,0.8);
+          border: 1px solid rgba(200,168,75,0.3);
+          color: #c8a84b;
+          border-radius: 4px;
+        }
+        button {
+          width: 100%;
+          padding: 12px;
+          background: rgba(200,168,75,0.2);
+          border: 1px solid #c8a84b;
+          color: #c8a84b;
+          cursor: pointer;
+          border-radius: 4px;
+          font-weight: 600;
+          font-size: 1em;
+          transition: all 0.3s;
+        }
+        button:hover { background: rgba(200,168,75,0.4); }
+        .dashboard {
+          display: none;
+          background: rgba(0,0,0,0.6);
+          border: 1px solid rgba(200,168,75,0.5);
+          border-radius: 8px;
+          padding: 30px;
+        }
+        .dashboard.active { display: block; }
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 20px;
+          margin-bottom: 30px;
+        }
+        .stat-box {
+          background: rgba(200,168,75,0.1);
+          border: 1px solid rgba(200,168,75,0.3);
+          padding: 20px;
+          border-radius: 6px;
+        }
+        .stat-label { opacity: 0.7; font-size: 0.9em; margin-bottom: 8px; }
+        .stat-value { font-size: 2em; font-weight: 600; }
+        .error { color: #ff6b6b; margin-top: 10px; }
+        .success { color: #51cf66; margin-top: 10px; }
+        .admin-user {
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          background: rgba(200,168,75,0.15);
+          padding: 10px 15px;
+          border-radius: 4px;
+          border: 1px solid rgba(200,168,75,0.3);
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="admin-user" id="adminUser" style="display:none;">
+          Logged in as: <strong id="adminEmail"></strong>
+          <button onclick="logout()" style="margin-left: 10px; padding: 5px 10px; font-size: 0.9em;">Logout</button>
+        </div>
+
+        <header>
+          <h1>🔐 Age of Shadows - Admin Dashboard</h1>
+          <p class="subtitle">Game Management & Statistics</p>
+        </header>
+
+        <div class="login-form" id="loginForm">
+          <h2 style="margin-bottom: 20px;">Admin Login</h2>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="email" placeholder="Admin Email">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="password" placeholder="••••••••">
+          </div>
+          <button onclick="adminLogin()">Login to Admin Panel</button>
+          <div id="loginError" class="error"></div>
+        </div>
+
+        <div class="dashboard" id="dashboard">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h2>Dashboard</h2>
+            <button onclick="refreshStats()" style="width: 150px;">🔄 Refresh</button>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="stat-label">Players Online</div>
+              <div class="stat-value" id="playerCount">-</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Total Resources</div>
+              <div class="stat-value" id="totalResources">-</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Trees on Map</div>
+              <div class="stat-value" id="treeCount">-</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Buildings</div>
+              <div class="stat-value" id="buildingCount">-</div>
+            </div>
+          </div>
+
+          <div style="background: rgba(200,168,75,0.1); border: 1px solid rgba(200,168,75,0.3); padding: 20px; border-radius: 6px;">
+            <h3 style="margin-bottom: 15px;">Online Players</h3>
+            <div id="playersList" style="max-height: 400px; overflow-y: auto;">Loading...</div>
+          </div>
+
+          <div id="dashboardError" class="error"></div>
+        </div>
+      </div>
+
+      <script>
+        let adminToken = localStorage.getItem('adminToken');
+
+        async function adminLogin() {
+          const email = document.getElementById('email').value;
+          const password = document.getElementById('password').value;
+          const errorDiv = document.getElementById('loginError');
+
+          if (!email || !password) {
+            errorDiv.textContent = 'Email and password required';
+            return;
+          }
+
+          try {
+            const response = await fetch('/api/admin/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password })
+            });
+            const data = await response.json();
+
+            if (!response.ok) {
+              errorDiv.textContent = data.error || 'Login failed';
+              return;
+            }
+
+            adminToken = data.adminToken;
+            localStorage.setItem('adminToken', adminToken);
+            document.getElementById('adminEmail').textContent = email;
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('adminUser').style.display = 'block';
+            document.getElementById('dashboard').classList.add('active');
+            refreshStats();
+          } catch (err) {
+            errorDiv.textContent = 'Network error: ' + err.message;
+          }
+        }
+
+        async function refreshStats() {
+          if (!adminToken) return;
+          try {
+            const response = await fetch('/api/admin/stats', {
+              headers: { 'x-admin-token': adminToken }
+            });
+            const data = await response.json();
+
+            if (!response.ok) {
+              document.getElementById('dashboardError').textContent = data.error || 'Failed to load stats';
+              logout();
+              return;
+            }
+
+            document.getElementById('playerCount').textContent = data.playerCount || 0;
+            document.getElementById('totalResources').textContent = (data.totalResources || 0).toLocaleString();
+            document.getElementById('treeCount').textContent = data.worldState.trees || 0;
+            document.getElementById('buildingCount').textContent = data.worldState.buildings || 0;
+
+            const playersList = document.getElementById('playersList');
+            if (data.onlinePlayers && data.onlinePlayers.length > 0) {
+              playersList.innerHTML = data.onlinePlayers.map(p => \`
+                <div style="padding: 10px; border-bottom: 1px solid rgba(200,168,75,0.2);">
+                  <strong>\${p.name}</strong> - \${p.units || 0} units
+                  <div style="opacity: 0.7; font-size: 0.9em; margin-top: 5px;">
+                    Wood: \${p.resources?.wood || 0} | Stone: \${p.resources?.stone || 0} | Gold: \${p.resources?.gold || 0}
+                  </div>
+                </div>
+              \`).join('');
+            } else {
+              playersList.innerHTML = '<p style="opacity: 0.7;">No players online</p>';
+            }
+          } catch (err) {
+            document.getElementById('dashboardError').textContent = 'Error: ' + err.message;
+          }
+        }
+
+        function logout() {
+          localStorage.removeItem('adminToken');
+          adminToken = null;
+          document.getElementById('loginForm').style.display = 'block';
+          document.getElementById('adminUser').style.display = 'none';
+          document.getElementById('dashboard').classList.remove('active');
+          document.getElementById('email').value = '';
+          document.getElementById('password').value = '';
+          document.getElementById('loginError').textContent = '';
+        }
+
+        // Auto-load if token exists
+        window.addEventListener('load', () => {
+          if (adminToken) {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('adminUser').style.display = 'block';
+            document.getElementById('dashboard').classList.add('active');
+            refreshStats();
+            setInterval(refreshStats, 10000); // Auto-refresh every 10 seconds
+          }
+        });
+      </script>
+    </body>
+    </html>
+  \`);
 });
 
 app.use(express.static(path.join(__dirname, 'client/dist')));
