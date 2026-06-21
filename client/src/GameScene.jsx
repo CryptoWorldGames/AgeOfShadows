@@ -127,10 +127,11 @@ export default function GameScene({ auth }) {
       const ui = createUI(displayName, null, displayName);
       showChatPanel(socket);
 
-      // Add title panel at very top - outside the box
+      // AUDIT FIX #2: Title z-index was below gameInfo box
+      // Title must be on top of ALL UI elements (except modals)
       const titlePanel = document.createElement('div');
       titlePanel.id = 'title-panel';
-      titlePanel.style.cssText = `position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:10000;font-family:'Segoe UI',sans-serif;text-align:center;pointer-events:none;`;
+      titlePanel.style.cssText = `position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:10010;font-family:'Segoe UI',sans-serif;text-align:center;pointer-events:none;`;
       titlePanel.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:28px;letter-spacing:2px;text-shadow:0 0 20px rgba(200,168,75,0.5);">⚔️ AGE OF SHADOWS ⚔️</div><div style="color:#999;font-size:11px;margin-top:2px;">v2.14</div>`;
       document.body.appendChild(titlePanel);
 
@@ -143,6 +144,21 @@ export default function GameScene({ auth }) {
         <button style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;pointer-events:auto;position:relative;z-index:10002;" onclick="window.gameActions.logout();">Logout</button>
       `;
       document.body.appendChild(gameInfo);
+
+      // AUDIT FIX #5: Add online players list from database
+      const onlinePlayersPanel = document.createElement('div');
+      onlinePlayersPanel.id = 'online-players-panel';
+      onlinePlayersPanel.style.cssText = `position:fixed;top:90px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(100,200,100,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:11px;z-index:10001;backdrop-filter:blur(4px);min-width:140px;max-width:200px;pointer-events:auto;`;
+      onlinePlayersPanel.innerHTML = `<div style="color:#7fc97f;font-weight:600;margin-bottom:6px;font-size:10px;">👥 ONLINE PLAYERS</div><div id="players-list" style="font-size:10px;line-height:1.6;color:#9f9;"></div>`;
+      document.body.appendChild(onlinePlayersPanel);
+
+      // Listen for online players updates from server
+      socket.on('onlinePlayers', (players) => {
+        const playersList = document.getElementById('players-list');
+        if (playersList && Array.isArray(players)) {
+          playersList.innerHTML = players.map(p => `<div>🔷 ${p.name || 'Player'}</div>`).join('') || '<div style="opacity:0.5;">None online</div>';
+        }
+      });
 
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
       const townCenterBuilding = joinData.world.buildings?.find(b => b.buildingType === 'townCenter');

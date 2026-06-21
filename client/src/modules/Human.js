@@ -294,14 +294,15 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       }
     });
   }
-  // IMPROVEMENT #1: Optimized walk animation with better speed control
-  // Frame-rate independent animation by using fixed speed instead of multiplying dt
+  // AUDIT FIX #1: Walk animation was decoupled from movement speed
+  // PROBLEM: Animation speed (5.5) != movement speed, causing sync issues
+  // FIX: Sync animation speed to actual character movement speed for smooth appearance
   function walkPose(dt) {
-    walkClock += 5.5; // Fixed speed independent of frame rate for smooth animation
+    // Animation speed must match movement: if char moves at speed 2.4, animation must too
+    walkClock += (speed / 2.4) * dt * 7; // Sync with speed variable, properly dt-adjusted
     const s = Math.sin(walkClock);
     const legSwing = 0.5, armSwing = 0.35;
 
-    // Cache bone references to reduce repeated lookups
     if (B.legUL) B.legUL.rotation.x = rest.legUL.x + s * legSwing;
     if (B.legUR) B.legUR.rotation.x = rest.legUR.x - s * legSwing;
     if (B.legLL) B.legLL.rotation.x = rest.legLL.x + Math.max(0, -s) * 0.6;
@@ -309,8 +310,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     if (B.armUL) B.armUL.rotation.x = rest.armUL.x - s * armSwing;
     if (B.armUR) B.armUR.rotation.x = rest.armUR.x + s * armSwing;
 
-    // IMPROVEMENT #2: Damped bob animation for smoother movement feel
-    const bobAmount = 0.035; // Reduced from 0.04 for less jittery motion
+    const bobAmount = 0.035;
     modelHolder.position.y = Math.abs(s) * bobAmount;
   }
   function swingPose(dt,tgt,soundType,world,onHit) {

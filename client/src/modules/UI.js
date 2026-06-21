@@ -578,11 +578,12 @@ export function createUI(playerId, gameState, displayName) {
   buildBar.style.cssText = `position:absolute;top:150px;left:14px;z-index:100;display:flex;flex-direction:column;gap:10px;`;
 
   // Hammer button
+  // AUDIT FIX #3: Build button had dark negative overlay - removed for clarity
   const hammerBtn = document.createElement('button');
   hammerBtn.id = 'build-hammer';
   hammerBtn.title = 'Build';
   hammerBtn.innerHTML = '🔨<div style="font-size:9px;margin-top:2px;">Build</div>';
-  hammerBtn.style.cssText = `width:64px;height:64px;background:rgba(0,0,0,0.6);color:#fff;border:2px solid rgba(255,255,255,0.2);border-radius:10px;font-size:24px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
+  hammerBtn.style.cssText = `width:64px;height:64px;background:rgba(50,100,50,0.3);color:#fff;border:2px solid rgba(100,200,100,0.4);border-radius:10px;font-size:24px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
   hammerBtn.onmouseenter = () => { hammerBtn.style.borderColor='#00ff88'; };
   hammerBtn.onmouseleave = () => { hammerBtn.style.borderColor='rgba(255,255,255,0.2)'; };
   buildBar.appendChild(hammerBtn);

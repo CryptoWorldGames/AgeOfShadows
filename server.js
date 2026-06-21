@@ -160,6 +160,19 @@ setInterval(() => {
   });
 }, 30000);
 
+// AUDIT FIX #4: Add online players list from database
+function broadcastOnlinePlayers() {
+  const onlinePlayers = Object.entries(world.players)
+    .filter(([_, p]) => p.online !== false)
+    .map(([sid, p]) => ({
+      name: p.name,
+      id: p.userId,
+      team: p.team
+    }));
+
+  io.emit('onlinePlayers', onlinePlayers);
+}
+
 io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
@@ -237,6 +250,8 @@ io.on('connection', (socket) => {
       socket.emit('joined', { playerId: socket.id, player, world });
       // Tell everyone else a new player joined with their units
       socket.broadcast.emit('playerJoined', { playerId: socket.id, player });
+      // Broadcast updated online players list
+      broadcastOnlinePlayers();
       console.log(`${player.name} (userId: ${data.userId}) joined. Players: ${Object.keys(world.players).length}`);
     } catch (err) {
       console.error('Error on join:', err);
@@ -402,6 +417,8 @@ io.on('connection', (socket) => {
       // autosave loop still persists this player. It's cleaned up after 1h offline.
       player.online = false;
       player.offlineSince = Date.now();
+      // Update online players list for all remaining clients
+      broadcastOnlinePlayers();
     }
   });
 });
