@@ -19,7 +19,7 @@ function clearExistingHUD() {
   }
 }
 
-export function showInventoryModal(resources) {
+export function showInventoryModal(playerResources, townCenterResources = {}) {
   const existingModal = document.getElementById('inventory-modal');
   if (existingModal) existingModal.remove();
 
@@ -27,14 +27,24 @@ export function showInventoryModal(resources) {
   modal.id = 'inventory-modal';
   modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
 
-  const resGrid = Object.entries(resources).map(([res, amt]) =>
-    `<div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;"><div style="font-size:11px;opacity:0.7;">${res.toUpperCase()}</div><div style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">${amt}</div></div>`
+  const makeGrid = (res) => Object.entries(res).map(([k, amt]) =>
+    `<div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;"><div style="font-size:11px;opacity:0.7;">${k.toUpperCase()}</div><div style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">${amt || 0}</div></div>`
   ).join('');
+
+  const playerGrid = makeGrid(playerResources);
+  const townGrid = makeGrid(townCenterResources);
 
   modal.innerHTML = `
     <div style="background:rgba(0,0,0,0.9);border:1px solid rgba(200,168,75,0.4);border-radius:12px;padding:24px;width:90%;max-width:500px;color:#fff;font-family:'Segoe UI',sans-serif;">
-      <h2 style="margin:0 0 20px;color:#c8a84b;font-size:20px;">Inventory</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;margin-bottom:20px;">${resGrid}</div>
+      <h2 style="margin:0 0 16px;color:#c8a84b;font-size:20px;">📦 Inventory</h2>
+      <div style="margin-bottom:20px;">
+        <div style="color:#e8c84a;font-size:12px;font-weight:600;margin-bottom:8px;">👤 YOUR INVENTORY</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;">${playerGrid}</div>
+      </div>
+      <div style="margin-bottom:20px;padding-top:16px;border-top:1px solid rgba(200,168,75,0.3);">
+        <div style="color:#e8c84a;font-size:12px;font-weight:600;margin-bottom:8px;">🏛️ TOWN CENTER STORAGE</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;">${townGrid}</div>
+      </div>
       <button id="close-inventory" style="width:100%;padding:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;cursor:pointer;">Close</button>
     </div>
   `;

@@ -117,26 +117,32 @@ export default function GameScene({ auth }) {
       containerRef.current.appendChild(renderer.domElement);
 
       const env = createEnvironment(scene);
-      const playerName = auth.displayName || auth.email.split('@')[0];
-      sessionStorage.setItem('playerName', playerName);
-      sessionStorage.setItem('displayName', auth.displayName || 'Player');
+      const displayName = auth.displayName || 'Player';
+      sessionStorage.setItem('playerName', displayName);
+      sessionStorage.setItem('displayName', displayName);
       sessionStorage.setItem('userEmail', auth.email);
-      const ui = createUI(playerName, null, playerName);
+      const ui = createUI(displayName, null, displayName);
       showChatPanel(socket);
 
-      // Add game info panel (version & title) - top left, with inventory below
+      // Add title panel at very top - outside the box
+      const titlePanel = document.createElement('div');
+      titlePanel.id = 'title-panel';
+      titlePanel.style.cssText = `position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:99;font-family:'Segoe UI',sans-serif;text-align:center;`;
+      titlePanel.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:28px;letter-spacing:2px;text-shadow:0 0 20px rgba(200,168,75,0.5);">⚔️ AGE OF SHADOWS ⚔️</div><div style="color:#999;font-size:11px;margin-top:2px;">v2.14</div>`;
+      document.body.appendChild(titlePanel);
+
+      // Add game info panel - just buttons now
       const gameInfo = document.createElement('div');
       gameInfo.id = 'game-info-panel';
-      gameInfo.style.cssText = `position:absolute;top:14px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);min-width:130px;`;
+      gameInfo.style.cssText = `position:fixed;top:90px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);min-width:130px;`;
       gameInfo.innerHTML = `
-        <div style="color:#c8a84b;font-weight:700;font-size:13px;margin-bottom:2px;letter-spacing:1px;">AGE OF SHADOWS</div>
-        <div style="opacity:0.7;font-size:10px;margin-bottom:8px;">v2.14</div>
         <button id="inv-btn-inline" style="width:100%;padding:5px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">📦 Inventory</button>
         <button id="game-logout-btn" style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">Logout</button>
       `;
       document.body.appendChild(gameInfo);
 
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
+      const townCenterStorage = joinData.townCenterStorage || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
 
       const world = {
         camera, socket, playerId: joinData.playerId,
@@ -145,7 +151,7 @@ export default function GameScene({ auth }) {
         serverDriven: true   // workers are simulated on the server; client just renders them
       };
 
-      document.getElementById('inv-btn-inline').onclick = () => showInventoryModal(world.resources);
+      document.getElementById('inv-btn-inline').onclick = () => showInventoryModal(world.resources, townCenterStorage);
 
       document.getElementById('game-logout-btn').onclick = () => {
         if (confirm('Logout?')) {
