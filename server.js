@@ -952,14 +952,7 @@ app.get('/admin', (req, res) => {
 
             const playersList = document.getElementById('playersList');
             if (data.onlinePlayers && data.onlinePlayers.length > 0) {
-              playersList.innerHTML = data.onlinePlayers.map(p => \`
-                <div style="padding: 10px; border-bottom: 1px solid rgba(200,168,75,0.2);">
-                  <strong>\${p.name}</strong> - \${p.units || 0} units
-                  <div style="opacity: 0.7; font-size: 0.9em; margin-top: 5px;">
-                    Wood: \${p.resources?.wood || 0} | Stone: \${p.resources?.stone || 0} | Gold: \${p.resources?.gold || 0}
-                  </div>
-                </div>
-              \`).join('');
+              playersList.innerHTML = data.onlinePlayers.map(p => '<div style="padding: 10px; border-bottom: 1px solid rgba(200,168,75,0.2);"><strong>' + p.name + '</strong> - ' + (p.units || 0) + ' units<div style="opacity: 0.7; font-size: 0.9em; margin-top: 5px;">Wood: ' + (p.resources?.wood || 0) + ' | Stone: ' + (p.resources?.stone || 0) + ' | Gold: ' + (p.resources?.gold || 0) + '</div></div>').join('');
             } else {
               playersList.innerHTML = '<p style="opacity: 0.7;">No players online</p>';
             }
