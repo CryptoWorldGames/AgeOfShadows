@@ -113,7 +113,7 @@ setInterval(() => {
             if (!player.units) player.units = [];
             const newUnit = {
               id: `unit_${now}_${Math.random()}`,
-              x: 0, z: 20,
+              x: 0, z: 30,
               dx: 0, dz: 0,
               gathering: null,
               depositing: false,
