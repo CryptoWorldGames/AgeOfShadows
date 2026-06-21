@@ -349,11 +349,17 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
       showResourceHighlight(tree.position()); playOk(); return true;
     }
 
-    // Stone / Gold / Animals aren't server-side yet — for now just walk the unit
-    // there so your click still does something (gathering them is the next step).
+    // Animals: hunt/attack them
+    const animal = raycastGroup(cx, cy, (world.animals || []).filter(a => a.type === 'chicken' || a.type === 'deer'));
+    if (animal) {
+      world.socket.emit('commandHunt', { unitIds: ids, animalId: animal.id });
+      const p = animal.position();
+      showResourceHighlight(p); playOk(); return true;
+    }
+
+    // Stone / Gold — walk there (not yet server-side attacking)
     const res = raycastGroup(cx, cy, world.stones || [])
-             || raycastGroup(cx, cy, world.golds || [])
-             || raycastGroup(cx, cy, (world.animals || []).filter(a => a.type === 'chicken' || a.type === 'deer'));
+             || raycastGroup(cx, cy, world.golds || []);
     if (res) {
       const p = res.position();
       world.socket.emit('commandMove', { unitIds: ids, x: p.x, z: p.z });

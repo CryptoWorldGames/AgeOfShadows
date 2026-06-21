@@ -298,6 +298,17 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Right-click on an animal: hunt/attack it
+  socket.on('commandHunt', (data) => {
+    const player = world.players[socket.id];
+    if (!player || !data) return;
+    const ids = data.unitId ? [data.unitId] : (data.unitIds || []);
+    ids.forEach(id => {
+      const u = player.units.find(x => x.id === id);
+      if (u) { u.cmd = null; u.autoTask = 'hunt'; u.huntTargetId = data.animalId; }
+    });
+  });
+
   // A swing at a tree. Server is authoritative: it decrements hp, assigns
   // ownership to the feller, and broadcasts so EVERY player sees it fall.
   socket.on('chopTree', (data) => {
