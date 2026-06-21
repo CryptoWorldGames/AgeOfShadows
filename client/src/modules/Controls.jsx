@@ -446,11 +446,13 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: true });
 
   const keys = {};
+  const isTyping = () => { const t = document.activeElement?.tagName?.toLowerCase(); return t === 'input' || t === 'textarea'; };
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && ghostBuilding) { cancelBuild(); world.ui.showToast('Build cancelled.'); return; }
+    if (isTyping()) return; // don't move camera while typing in chat
     keys[e.key.toLowerCase()] = true;
   });
-  window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+  window.addEventListener('keyup', (e) => { if (!isTyping()) keys[e.key.toLowerCase()] = false; });
   window.addEventListener('blur', () => Object.keys(keys).forEach(k => keys[k] = false));
   document.addEventListener('visibilitychange', () => { if (document.hidden) Object.keys(keys).forEach(k => keys[k] = false); });
 

@@ -169,7 +169,8 @@ export default function GameScene({ auth }) {
       };
 
       // Set up global game actions for button clicks
-      window.gameState = { resources: world.resources, townCenterStorage };
+      // townCenterStorage is updated live via worldUpdate; resources = player's bank
+      window.gameState = { resources: world.resources, townCenterStorage: world.resources };
       window.gameActions = {
         openInventory: () => {
           console.log('[OPEN INVENTORY]', window.gameState.resources, window.gameState.townCenterStorage);
@@ -206,12 +207,11 @@ export default function GameScene({ auth }) {
       };
       document.addEventListener('click', delegatedClickHandler, { useCapture: true });
 
-      // Add keyboard shortcut for inventory (press 'I')
+      // Keyboard shortcut for inventory - ONLY when not typing in a text field
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'i' || e.key === 'I') {
-          console.log('[KEYBOARD: I pressed]');
-          window.gameActions.openInventory();
-        }
+        const tag = document.activeElement?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea') return; // never steal keys from chat
+        if (e.key === 'i' || e.key === 'I') window.gameActions.openInventory();
       });
 
       // Note: the build menu (hammer button) and its selection callback are
@@ -371,7 +371,10 @@ export default function GameScene({ auth }) {
         const me = data.players[world.playerId];
         if (me) {
           world.resources = me.resources;
-          if (window.gameState) window.gameState.resources = me.resources;
+          if (window.gameState) {
+            window.gameState.resources = me.resources;
+            window.gameState.townCenterStorage = me.resources; // same bank
+          }
         }
         if (me && me.buildQueue) {
           updateBuildProgressDisplay(me.buildQueue);
