@@ -116,10 +116,12 @@ export default function GameScene({ auth }) {
       while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild);
       containerRef.current.appendChild(renderer.domElement);
 
-      // AUDIT FIX #6: Canvas pointer-events = 'none' broke ALL game controls
-      // PROBLEM: Disabling pointerEvents stops camera/unit controls (left/right/middle click)
-      // FIX: Keep pointerEvents enabled for game, button handlers use stopPropagation()
-      // RESULT: Game controls work AND button clicks reach UI
+      // AUDIT FIX #6: Proper event handling - canvas captures game controls
+      // Disable browser context menu so right-click works for game (tree selection)
+      renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      // Keep pointer-events enabled so game gets all clicks
+      // Buttons use stopPropagation() to prevent bubbling to canvas
 
       const env = createEnvironment(scene);
       const displayName = auth.displayName || 'Player';
