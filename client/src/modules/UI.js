@@ -492,6 +492,7 @@ export function createUI(playerId, gameState, displayName) {
   buildMenu.id = 'build-menu';
   buildMenu.style.cssText = `position:absolute;top:150px;left:88px;z-index:101;background:rgba(0,0,0,0.9);border:1px solid #c8a84b;border-radius:10px;padding:10px;width:210px;display:none;font-family:'Segoe UI',sans-serif;color:#fff;`;
   const buildables = [
+    { key: 'man' },
     { key: 'house' },
     { key: 'woodFence' },
     { key: 'stoneFence' }
@@ -503,6 +504,7 @@ export function createUI(playerId, gameState, displayName) {
     const b = SETTINGS.building[key];
     if (!b) return;
     const costs = [];
+    if (b.foodCost) costs.push(`${b.foodCost} Food`);
     if (b.woodCost) costs.push(`${b.woodCost} Wood`);
     if (b.stoneCost) costs.push(`${b.stoneCost} Stone`);
     if (b.goldCost) costs.push(`${b.goldCost} Gold`);

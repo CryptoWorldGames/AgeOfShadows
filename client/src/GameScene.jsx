@@ -305,6 +305,13 @@ export default function GameScene({ auth }) {
         removeOtherPlayer(playerId);
       });
 
+      socket.on('unitSpawned', ({ unit }) => {
+        if (!unit) return;
+        const human = createHuman(scene, { x: unit.x, y: 0, z: unit.z }, { team: unit.team || 'red' });
+        human.serverId = unit.id;
+        world.units.push(human);
+      });
+
       socket.on('worldUpdate', (data) => {
         if (!data.players) return;
         // Our OWN workers are server-simulated: feed their server positions to the

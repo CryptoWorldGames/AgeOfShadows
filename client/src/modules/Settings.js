@@ -11,6 +11,7 @@ export const SETTINGS = {
     carryMax: 100, huntRadius: 8
   },
   building: {
+    man: { foodCost: 10, buildTime: 60, label: 'Man', isUnit: true },
     townCenter: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 30, label: 'Town Center', storageMax: 100000 },
     house: { woodCost: 100, stoneCost: 0, goldCost: 0, buildTime: 180, label: 'House', maxUnits: 10, storageMax: 10000, decayInterval: 3600 },
     woodFence: { woodCost: 10, stoneCost: 0, goldCost: 0, buildTime: 10, hitsToDestroy: 25, label: 'Wood Fence' },

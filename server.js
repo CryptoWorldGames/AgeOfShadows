@@ -103,6 +103,31 @@ setInterval(() => {
     }
     // push fresh stockpile to the owner if they're connected
     if (player.online !== false) io.to(sid).emit('resourceUpdate', player.resources);
+
+    // Process build queue (Man units)
+    if (player.buildQueue && player.buildQueue.length > 0) {
+      player.buildQueue = player.buildQueue.filter((build) => {
+        const elapsed = now - build.startedAt;
+        if (elapsed >= build.duration) {
+          if (build.kind === 'man') {
+            if (!player.units) player.units = [];
+            const newUnit = {
+              id: `unit_${now}_${Math.random()}`,
+              x: 0, z: 20,
+              dx: 0, dz: 0,
+              gathering: null,
+              depositing: false,
+              hp: 100, maxHp: 100,
+              team: 'red'
+            };
+            player.units.push(newUnit);
+            io.to(sid).emit('unitSpawned', { unit: newUnit });
+          }
+          return false;
+        }
+        return true;
+      });
+    }
   }
   // Drop players who've been offline for over an hour (after a final save).
   for (const sid in world.players) {
@@ -195,6 +220,15 @@ io.on('connection', (socket) => {
       world.players[socket.id] = player;
       socketUserMap[socket.id] = data.userId;
 
+      // Re-add player's saved buildings to the world so they're visible to all players
+      if (player.buildings && Array.isArray(player.buildings)) {
+        player.buildings.forEach(b => {
+          if (b && b.id && !world.buildings.find(wb => wb && wb.id === b.id)) {
+            world.buildings.push(b);
+          }
+        });
+      }
+
       // Send this player their own data + full world state
       socket.emit('joined', { playerId: socket.id, player, world });
       // Tell everyone else a new player joined with their units
@@ -269,6 +303,27 @@ io.on('connection', (socket) => {
       // Denied — it isn't theirs yet. Tell them whose it is so the client can react.
       socket.emit('gatherDenied', { treeId: tree.id, ownerName: tree.ownerName });
     }
+  });
+
+  socket.on('buildStart', (data) => {
+    const player = world.players[socket.id];
+    if (!player || !data.kind) return;
+
+    const buildDefs = { man: { foodCost: 10, buildTime: 60 } };
+    const buildDef = buildDefs[data.kind];
+    if (!buildDef) return;
+
+    if ((buildDef.foodCost || 0) > (player.resources.food || 0)) return;
+    player.resources.food -= buildDef.foodCost;
+
+    if (!player.buildQueue) player.buildQueue = [];
+    player.buildQueue.push({
+      kind: data.kind,
+      startedAt: Date.now(),
+      duration: buildDef.buildTime * 1000
+    });
+
+    socket.emit('resourceUpdate', player.resources);
   });
 
   socket.on('placeBuilding', (data) => {

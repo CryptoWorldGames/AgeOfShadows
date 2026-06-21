@@ -237,6 +237,14 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
   world.ui.onBuildSelect((kind) => {
     cancelBuild();
     if (!canAfford(kind)) { world.ui.showToast(`Need ${costLabel(kind)} to build ${SETTINGS.building[kind].label}`); return; }
+
+    // Special case: Man units spawn at town center, no placement needed
+    if (kind === 'man') {
+      world.socket.emit('buildStart', { kind: 'man' });
+      world.ui.showToast('Man will spawn in 1 minute...');
+      return;
+    }
+
     currentBuildKind = kind;
     fenceMode = (kind === 'woodFence' || kind === 'stoneFence');
     ghostBuilding = makeGhost(kind);
