@@ -1,9 +1,21 @@
 import { SETTINGS } from './Settings.js';
 
 let globalSocket = null;
-// Track the active music player so a second createUI() can't leave a duplicate
-// audio element playing on top of the first.
 let activeMusicAudio = null;
+
+export function showToast(message, duration = 3000, type = 'info') {
+  const toast = document.createElement('div');
+  const bgColor = type === 'error' ? 'rgba(200, 50, 50, 0.9)' : type === 'success' ? 'rgba(50, 200, 50, 0.9)' : 'rgba(0, 0, 0, 0.8)';
+  toast.style.cssText = `position:fixed;bottom:20px;right:20px;background:${bgColor};color:#fff;padding:12px 20px;border-radius:6px;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:10003;border:1px solid rgba(200,168,75,0.3);box-shadow:0 4px 12px rgba(0,0,0,0.3);`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
 
 // Remove any previously-created HUD panels so building the UI again can never
 // stack a second copy (duplicate Town Center button, music player, etc.).
@@ -23,6 +35,7 @@ export function showInventoryModal(playerResources, townCenterResources = {}) {
   const existingModal = document.getElementById('inventory-modal');
   if (existingModal) existingModal.remove();
 
+  showToast('📦 Opening inventory...', 1500, 'info');
   const modal = document.createElement('div');
   modal.id = 'inventory-modal';
   modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
