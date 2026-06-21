@@ -20,7 +20,6 @@ function clearExistingHUD() {
 }
 
 export function showInventoryModal(playerResources, townCenterResources = {}) {
-  console.log('[showInventoryModal] Called with playerResources:', playerResources, 'townCenterResources:', townCenterResources);
   const existingModal = document.getElementById('inventory-modal');
   if (existingModal) existingModal.remove();
 
