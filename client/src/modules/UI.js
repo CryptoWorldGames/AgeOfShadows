@@ -68,14 +68,23 @@ function clearExistingHUD() {
   }
 }
 
+// IMPROVEMENT #12: Better modal lifecycle management
+let currentModalCloseHandler = null;
+
 export function showInventoryModal(playerResources, townCenterResources = {}) {
+  // Clean up any existing modal and its event handlers first
   const existingModal = document.getElementById('inventory-modal');
-  if (existingModal) existingModal.remove();
+  if (existingModal) {
+    if (currentModalCloseHandler) {
+      document.removeEventListener('keydown', currentModalCloseHandler);
+    }
+    existingModal.remove();
+  }
 
   showToast('📦 Opening inventory...', 1500, 'info');
   const modal = document.createElement('div');
   modal.id = 'inventory-modal';
-  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;`;
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;`;
 
   const makeGrid = (res) => Object.entries(res).map(([k, amt]) =>
     `<div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;"><div style="font-size:11px;opacity:0.7;">${k.toUpperCase()}</div><div style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">${amt || 0}</div></div>`
@@ -84,32 +93,64 @@ export function showInventoryModal(playerResources, townCenterResources = {}) {
   const playerGrid = makeGrid(playerResources);
   const townGrid = makeGrid(townCenterResources);
 
+  // IMPROVEMENT #13: Create closure for proper cleanup
   const closeModal = () => {
     const m = document.getElementById('inventory-modal');
     if (m) m.remove();
+    if (currentModalCloseHandler) {
+      document.removeEventListener('keydown', currentModalCloseHandler);
+      currentModalCloseHandler = null;
+    }
   };
 
-  modal.innerHTML = `
-    <div style="background:rgba(0,0,0,0.95);border:2px solid rgba(200,168,75,0.5);border-radius:12px;padding:24px;width:90%;max-width:600px;color:#fff;font-family:'Segoe UI',sans-serif;max-height:80vh;overflow-y:auto;z-index:10005;pointer-events:auto;cursor:default;" onclick="event.stopPropagation();">
-      <h2 style="margin:0 0 16px;color:#c8a84b;font-size:24px;text-align:center;">📦 INVENTORY</h2>
+  const innerDiv = document.createElement('div');
+  innerDiv.style.cssText = `background:rgba(0,0,0,0.95);border:2px solid rgba(200,168,75,0.5);border-radius:12px;padding:24px;width:90%;max-width:600px;color:#fff;font-family:'Segoe UI',sans-serif;max-height:80vh;overflow-y:auto;z-index:10005;pointer-events:auto;`;
 
-      <div style="margin-bottom:24px;padding:16px;background:rgba(200,168,75,0.1);border-radius:8px;">
-        <div style="color:#c8a84b;font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;">👤 YOUR INVENTORY</div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">${playerGrid}</div>
-      </div>
+  innerDiv.innerHTML = `
+    <h2 style="margin:0 0 16px;color:#c8a84b;font-size:24px;text-align:center;">📦 INVENTORY</h2>
 
-      <div style="margin-bottom:24px;padding:16px;background:rgba(200,168,75,0.1);border-radius:8px;">
-        <div style="color:#c8a84b;font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;">🏛️ TOWN CENTER STORAGE</div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">${townGrid}</div>
-      </div>
-
-      <button id="close-inventory" onclick="window.closeInventoryModal?.(); window.gameActions?.openInventory?.();" style="width:100%;padding:12px;background:rgba(200,168,75,0.2);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-weight:600;pointer-events:auto;">Close Inventory</button>
+    <div style="margin-bottom:24px;padding:16px;background:rgba(200,168,75,0.1);border-radius:8px;">
+      <div style="color:#c8a84b;font-size:14px;font-weight:700;margin-bottom:12px;">👤 YOUR INVENTORY</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">${playerGrid}</div>
     </div>
+
+    <div style="margin-bottom:24px;padding:16px;background:rgba(200,168,75,0.1);border-radius:8px;">
+      <div style="color:#c8a84b;font-size:14px;font-weight:700;margin-bottom:12px;">🏛️ TOWN CENTER STORAGE</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">${townGrid}</div>
+    </div>
+
+    <button id="close-inventory-btn" style="width:100%;padding:12px;background:rgba(200,168,75,0.2);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-weight:600;transition:background 0.2s;">Close Inventory</button>
   `;
+
+  // Add click handlers after DOM is ready
+  setTimeout(() => {
+    const closeBtn = document.getElementById('close-inventory-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeModal);
+      closeBtn.addEventListener('mouseenter', (e) => {
+        e.target.style.background = 'rgba(200,168,75,0.4)';
+      });
+      closeBtn.addEventListener('mouseleave', (e) => {
+        e.target.style.background = 'rgba(200,168,75,0.2)';
+      });
+    }
+  }, 0);
+
+  modal.appendChild(innerDiv);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal(); // Close if clicking backdrop only
+  });
+
+  // Stop event propagation on inner content
+  innerDiv.addEventListener('click', (e) => e.stopPropagation());
+
   document.body.appendChild(modal);
 
-  window.closeInventoryModal = closeModal;
-  modal.onclick = closeModal;
+  // Add Escape key handler
+  currentModalCloseHandler = (e) => {
+    if (e.key === 'Escape') closeModal();
+  };
+  document.addEventListener('keydown', currentModalCloseHandler);
 }
 
 export function showHouseModal(socket, userId) {
