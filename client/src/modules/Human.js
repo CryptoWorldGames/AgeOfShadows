@@ -298,8 +298,8 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
   // PROBLEM: Animation speed (5.5) != movement speed, causing sync issues
   // FIX: Sync animation speed to actual character movement speed for smooth appearance
   function walkPose(dt) {
-    // Animation speed must match movement: if char moves at speed 2.4, animation must too
-    walkClock += (speed / 2.4) * dt * 7; // Sync with speed variable, properly dt-adjusted
+    // Animation speed must match movement: character moves at SETTINGS.speed, animation must too
+    walkClock += (SETTINGS.speed / 2.4) * dt * 7; // Sync with actual movement speed, properly dt-adjusted
     const s = Math.sin(walkClock);
     const legSwing = 0.5, armSwing = 0.35;
 
