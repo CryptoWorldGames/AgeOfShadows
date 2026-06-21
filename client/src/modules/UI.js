@@ -75,7 +75,7 @@ export function showInventoryModal(playerResources, townCenterResources = {}) {
   showToast('📦 Opening inventory...', 1500, 'info');
   const modal = document.createElement('div');
   modal.id = 'inventory-modal';
-  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;`;
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer;`;
 
   const makeGrid = (res) => Object.entries(res).map(([k, amt]) =>
     `<div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;"><div style="font-size:11px;opacity:0.7;">${k.toUpperCase()}</div><div style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">${amt || 0}</div></div>`
@@ -84,8 +84,13 @@ export function showInventoryModal(playerResources, townCenterResources = {}) {
   const playerGrid = makeGrid(playerResources);
   const townGrid = makeGrid(townCenterResources);
 
+  const closeModal = () => {
+    const m = document.getElementById('inventory-modal');
+    if (m) m.remove();
+  };
+
   modal.innerHTML = `
-    <div style="background:rgba(0,0,0,0.95);border:2px solid rgba(200,168,75,0.5);border-radius:12px;padding:24px;width:90%;max-width:600px;color:#fff;font-family:'Segoe UI',sans-serif;max-height:80vh;overflow-y:auto;z-index:10005;">
+    <div style="background:rgba(0,0,0,0.95);border:2px solid rgba(200,168,75,0.5);border-radius:12px;padding:24px;width:90%;max-width:600px;color:#fff;font-family:'Segoe UI',sans-serif;max-height:80vh;overflow-y:auto;z-index:10005;pointer-events:auto;cursor:default;" onclick="event.stopPropagation();">
       <h2 style="margin:0 0 16px;color:#c8a84b;font-size:24px;text-align:center;">📦 INVENTORY</h2>
 
       <div style="margin-bottom:24px;padding:16px;background:rgba(200,168,75,0.1);border-radius:8px;">
@@ -98,11 +103,13 @@ export function showInventoryModal(playerResources, townCenterResources = {}) {
         <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">${townGrid}</div>
       </div>
 
-      <button id="close-inventory" style="width:100%;padding:12px;background:rgba(200,168,75,0.2);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-weight:600;">Close Inventory</button>
+      <button id="close-inventory" onclick="window.closeInventoryModal?.(); window.gameActions?.openInventory?.();" style="width:100%;padding:12px;background:rgba(200,168,75,0.2);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-weight:600;pointer-events:auto;">Close Inventory</button>
     </div>
   `;
   document.body.appendChild(modal);
-  document.getElementById('close-inventory').onclick = () => modal.remove();
+
+  window.closeInventoryModal = closeModal;
+  modal.onclick = closeModal;
 }
 
 export function showHouseModal(socket, userId) {
