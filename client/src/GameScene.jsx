@@ -127,14 +127,14 @@ export default function GameScene({ auth }) {
       // Add title panel at very top - outside the box
       const titlePanel = document.createElement('div');
       titlePanel.id = 'title-panel';
-      titlePanel.style.cssText = `position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:99;font-family:'Segoe UI',sans-serif;text-align:center;`;
+      titlePanel.style.cssText = `position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:10000;font-family:'Segoe UI',sans-serif;text-align:center;pointer-events:none;`;
       titlePanel.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:28px;letter-spacing:2px;text-shadow:0 0 20px rgba(200,168,75,0.5);">⚔️ AGE OF SHADOWS ⚔️</div><div style="color:#999;font-size:11px;margin-top:2px;">v2.14</div>`;
       document.body.appendChild(titlePanel);
 
       // Add game info panel - just buttons now
       const gameInfo = document.createElement('div');
       gameInfo.id = 'game-info-panel';
-      gameInfo.style.cssText = `position:fixed;top:90px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);min-width:130px;`;
+      gameInfo.style.cssText = `position:fixed;top:90px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:10001;backdrop-filter:blur(4px);min-width:130px;`;
       gameInfo.innerHTML = `
         <button id="inv-btn-inline" style="width:100%;padding:5px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;">📦 Inventory</button>
         <button id="game-logout-btn" style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">Logout</button>
