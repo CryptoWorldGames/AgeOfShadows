@@ -142,7 +142,8 @@ export default function GameScene({ auth }) {
       document.body.appendChild(gameInfo);
 
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
-      const townCenterStorage = joinData.townCenterStorage || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
+      const townCenterBuilding = joinData.world.buildings?.find(b => b.buildingType === 'townCenter');
+      const townCenterStorage = townCenterBuilding?.storage || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
 
       const world = {
         camera, socket, playerId: joinData.playerId,
