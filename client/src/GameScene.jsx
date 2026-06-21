@@ -116,8 +116,10 @@ export default function GameScene({ auth }) {
       while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild);
       containerRef.current.appendChild(renderer.domElement);
 
-      // Disable pointer events on canvas so clicks pass through to UI buttons
-      renderer.domElement.style.pointerEvents = 'none';
+      // AUDIT FIX #6: Canvas pointer-events = 'none' broke ALL game controls
+      // PROBLEM: Disabling pointerEvents stops camera/unit controls (left/right/middle click)
+      // FIX: Keep pointerEvents enabled for game, button handlers use stopPropagation()
+      // RESULT: Game controls work AND button clicks reach UI
 
       const env = createEnvironment(scene);
       const displayName = auth.displayName || 'Player';
@@ -144,6 +146,14 @@ export default function GameScene({ auth }) {
         <button style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;pointer-events:auto;position:relative;z-index:10002;" onclick="window.gameActions.logout();">Logout</button>
       `;
       document.body.appendChild(gameInfo);
+
+      // Add stopPropagation to buttons so clicks don't reach canvas
+      setTimeout(() => {
+        const buttons = gameInfo.querySelectorAll('button');
+        buttons.forEach(btn => {
+          btn.addEventListener('click', (e) => { e.stopPropagation(); });
+        });
+      }, 0);
 
       // AUDIT FIX #5: Add online players list from database
       const onlinePlayersPanel = document.createElement('div');
