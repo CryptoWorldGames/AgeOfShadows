@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import { createEnvironment } from './modules/Environment';
 import { createHuman } from './modules/Human';
 import { createTree } from './modules/Tree';
-import { createUI, showChatPanel, showInventoryModal, showHouseModal, showBuildMenu } from './modules/UI';
+import { createUI, showChatPanel, showInventoryModal, showHouseModal, showBuildMenu, showToast } from './modules/UI';
 import { createControls } from './modules/Controls.jsx';
 import { createTownCenter, createHouse, createFence } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
@@ -326,6 +326,7 @@ export default function GameScene({ auth }) {
         const human = createHuman(scene, { x: unit.x, y: 0, z: unit.z }, { team: unit.team || 'red' });
         human.serverId = unit.id;
         world.units.push(human);
+        showToast('👤 Worker spawned at town center!', 2000, 'success');
       });
 
       socket.on('worldUpdate', (data) => {

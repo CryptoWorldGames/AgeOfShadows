@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createTownCenter, createHouse, createFence } from './Building.js';
-import { showTownCenterModal } from './UI.js';
+import { showTownCenterModal, showToast } from './UI.js';
 import { SETTINGS } from './Settings.js';
 
 export function createControls(camera, renderer, scene, world, playerStartPos) {
@@ -241,7 +241,7 @@ export function createControls(camera, renderer, scene, world, playerStartPos) {
     // Special case: Man units spawn at town center, no placement needed
     if (kind === 'man') {
       world.socket.emit('buildStart', { kind: 'man' });
-      world.ui.showToast('Man will spawn in 1 minute...');
+      showToast('👤 Building Man unit... will spawn in 1 minute', 2000, 'info');
       return;
     }
 
