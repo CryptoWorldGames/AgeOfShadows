@@ -17,6 +17,43 @@ export function showToast(message, duration = 3000, type = 'info') {
   }, duration);
 }
 
+export function updateBuildProgressDisplay(buildQueue = []) {
+  let container = document.getElementById('build-progress-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'build-progress-container';
+    container.style.cssText = `position:fixed;left:14px;top:350px;display:flex;flex-direction:column;gap:10px;z-index:1001;`;
+    document.body.appendChild(container);
+  }
+  container.innerHTML = '';
+
+  buildQueue.forEach((build, idx) => {
+    const elapsed = Date.now() - build.startedAt;
+    const progress = Math.min(100, (elapsed / build.duration) * 100);
+
+    const icon = build.kind === 'man' ? '👤' : build.kind === 'house' ? '🏠' : '🔨';
+    const label = build.kind === 'man' ? 'Man' : build.kind === 'house' ? 'House' : build.kind;
+
+    const item = document.createElement('div');
+    item.style.cssText = `background:rgba(0,0,0,0.8);border:1px solid rgba(200,168,75,0.4);border-radius:6px;padding:8px;width:60px;text-align:center;font-family:'Segoe UI',sans-serif;`;
+
+    item.innerHTML = `
+      <div style="font-size:20px;margin-bottom:4px;opacity:${progress < 100 ? 0.5 : 1};">${icon}</div>
+      <div style="width:100%;height:4px;background:rgba(100,100,100,0.5);border-radius:2px;overflow:hidden;margin-bottom:2px;">
+        <div style="width:${progress}%;height:100%;background:linear-gradient(90deg,#c8a84b,#ffd700);transition:width 0.3s;"></div>
+      </div>
+      <div style="font-size:10px;color:#c8a84b;">${Math.ceil((build.duration - elapsed) / 1000)}s</div>
+    `;
+    container.appendChild(item);
+  });
+
+  if (buildQueue.length === 0) {
+    container.style.display = 'none';
+  } else {
+    container.style.display = 'flex';
+  }
+}
+
 // Remove any previously-created HUD panels so building the UI again can never
 // stack a second copy (duplicate Town Center button, music player, etc.).
 function clearExistingHUD() {
@@ -38,7 +75,7 @@ export function showInventoryModal(playerResources, townCenterResources = {}) {
   showToast('📦 Opening inventory...', 1500, 'info');
   const modal = document.createElement('div');
   modal.id = 'inventory-modal';
-  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;`;
+  modal.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;`;
 
   const makeGrid = (res) => Object.entries(res).map(([k, amt]) =>
     `<div style="padding:12px;background:rgba(200,168,75,0.15);border-radius:6px;text-align:center;"><div style="font-size:11px;opacity:0.7;">${k.toUpperCase()}</div><div style="font-size:18px;font-weight:600;color:#c8a84b;margin-top:4px;">${amt || 0}</div></div>`
@@ -48,17 +85,20 @@ export function showInventoryModal(playerResources, townCenterResources = {}) {
   const townGrid = makeGrid(townCenterResources);
 
   modal.innerHTML = `
-    <div style="background:rgba(0,0,0,0.9);border:1px solid rgba(200,168,75,0.4);border-radius:12px;padding:24px;width:90%;max-width:500px;color:#fff;font-family:'Segoe UI',sans-serif;">
-      <h2 style="margin:0 0 16px;color:#c8a84b;font-size:20px;">📦 Inventory</h2>
-      <div style="margin-bottom:20px;">
-        <div style="color:#e8c84a;font-size:12px;font-weight:600;margin-bottom:8px;">👤 YOUR INVENTORY</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;">${playerGrid}</div>
+    <div style="background:rgba(0,0,0,0.95);border:2px solid rgba(200,168,75,0.5);border-radius:12px;padding:24px;width:90%;max-width:600px;color:#fff;font-family:'Segoe UI',sans-serif;max-height:80vh;overflow-y:auto;z-index:10005;">
+      <h2 style="margin:0 0 16px;color:#c8a84b;font-size:24px;text-align:center;">📦 INVENTORY</h2>
+
+      <div style="margin-bottom:24px;padding:16px;background:rgba(200,168,75,0.1);border-radius:8px;">
+        <div style="color:#c8a84b;font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;">👤 YOUR INVENTORY</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">${playerGrid}</div>
       </div>
-      <div style="margin-bottom:20px;padding-top:16px;border-top:1px solid rgba(200,168,75,0.3);">
-        <div style="color:#e8c84a;font-size:12px;font-weight:600;margin-bottom:8px;">🏛️ TOWN CENTER STORAGE</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;">${townGrid}</div>
+
+      <div style="margin-bottom:24px;padding:16px;background:rgba(200,168,75,0.1);border-radius:8px;">
+        <div style="color:#c8a84b;font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;">🏛️ TOWN CENTER STORAGE</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">${townGrid}</div>
       </div>
-      <button id="close-inventory" style="width:100%;padding:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;cursor:pointer;">Close</button>
+
+      <button id="close-inventory" style="width:100%;padding:12px;background:rgba(200,168,75,0.2);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-weight:600;">Close Inventory</button>
     </div>
   `;
   document.body.appendChild(modal);

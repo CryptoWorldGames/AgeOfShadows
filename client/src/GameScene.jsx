@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import { createEnvironment } from './modules/Environment';
 import { createHuman } from './modules/Human';
 import { createTree } from './modules/Tree';
-import { createUI, showChatPanel, showInventoryModal, showHouseModal, showBuildMenu, showToast } from './modules/UI';
+import { createUI, showChatPanel, showInventoryModal, showHouseModal, showBuildMenu, showToast, updateBuildProgressDisplay } from './modules/UI';
 import { createControls } from './modules/Controls.jsx';
 import { createTownCenter, createHouse, createFence } from './modules/Building';
 import { createChicken, createDeer } from './modules/Animal';
@@ -331,9 +331,12 @@ export default function GameScene({ auth }) {
 
       socket.on('worldUpdate', (data) => {
         if (!data.players) return;
-        // Our OWN workers are server-simulated: feed their server positions to the
-        // local avatars so they walk/gather exactly as the server says.
         const me = data.players[world.playerId];
+        if (me && me.buildQueue) {
+          updateBuildProgressDisplay(me.buildQueue);
+        } else {
+          updateBuildProgressDisplay([]);
+        }
         if (me && me.units) {
           me.units.forEach(u => {
             const h = world.units.find(x => x.serverId === u.id);
