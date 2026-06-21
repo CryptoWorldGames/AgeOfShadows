@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import GameScene from './GameScene.jsx';
 
 function AdminPanel({ email }) {
-  const isAdmin = email === 'shadowdefense2023@gmail.com';
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL;
+  const isAdmin = adminEmail && email === adminEmail;
   if (!isAdmin) return null;
 
   const [stats, setStats] = useState(null);
