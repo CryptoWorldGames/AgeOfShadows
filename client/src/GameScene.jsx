@@ -169,18 +169,30 @@ export default function GameScene({ auth }) {
 
       // Use event delegation on document for buttons that might be recreated
       const delegatedClickHandler = (e) => {
+        console.log('[BUTTON CLICK]', e.target, e.target.closest('button'));
         const btn = e.target.closest('button');
         if (!btn) return;
+        console.log('[BUTTON HIT]', btn.textContent);
         e.preventDefault();
         e.stopImmediatePropagation();
 
         if (btn.textContent.includes('📦') || btn.textContent.includes('Inventory')) {
+          console.log('[OPENING INVENTORY]');
           window.gameActions.openInventory();
         } else if (btn.textContent.includes('Logout')) {
+          console.log('[LOGOUT]');
           window.gameActions.logout();
         }
       };
       document.addEventListener('click', delegatedClickHandler, { useCapture: true });
+
+      // Add keyboard shortcut for inventory (press 'I')
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'i' || e.key === 'I') {
+          console.log('[KEYBOARD: I pressed]');
+          window.gameActions.openInventory();
+        }
+      });
 
       // Note: the build menu (hammer button) and its selection callback are
       // wired up inside createControls via world.ui.onBuildSelect().
