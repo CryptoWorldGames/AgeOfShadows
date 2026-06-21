@@ -37,9 +37,15 @@ async function initializeDatabase() {
         resources JSONB DEFAULT '{"wood":0,"food":0,"water":0,"gold":0,"stone":0}',
         units JSONB DEFAULT '[]',
         buildings JSONB DEFAULT '[]',
+        build_queue JSONB DEFAULT '[]',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_saved TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // Add build_queue column if it doesn't exist (for existing databases)
+    await pool.query(`
+      ALTER TABLE players ADD COLUMN IF NOT EXISTS build_queue JSONB DEFAULT '[]';
     `);
 
     console.log('[DB] Schema initialized successfully');

@@ -155,7 +155,7 @@ setInterval(() => {
     const player = world.players[sid];
     const userId = socketUserMap[sid];
     if (!player || !userId) return;
-    savePlayerData(userId, player.resources, player.units, player.buildings || [])
+    savePlayerData(userId, player.resources, player.units, player.buildings || [], player.buildQueue || [])
       .catch((err) => console.error(`[AUTOSAVE] ${player.name}:`, err.message));
   });
 }, 30000);
@@ -181,19 +181,22 @@ io.on('connection', (socket) => {
       const liveSid = Object.keys(world.players).find(sid => world.players[sid].userId === data.userId);
       const live = liveSid ? world.players[liveSid] : null;
 
-      let units, resources, buildings;
+      let units, resources, buildings, buildQueue;
       if (live) {
         resources = live.resources;
         units = live.units;
         buildings = live.buildings || [];
+        buildQueue = live.buildQueue || [];
       } else if (savedData) {
         resources = savedData.resources;
         buildings = savedData.buildings;
         units = savedData.units.length > 0 ? savedData.units : createPlayerUnits(socket.id, 1);
+        buildQueue = savedData.build_queue || [];
       } else {
         units = createPlayerUnits(socket.id, 1);
         resources = { wood: 100, food: 50, water: 20, gold: 0, stone: 20 };
         buildings = [];
+        buildQueue = [];
       }
 
       const player = {
@@ -204,6 +207,7 @@ io.on('connection', (socket) => {
         resources,
         units,
         buildings,
+        buildQueue,
         online: true
       };
 

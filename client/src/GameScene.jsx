@@ -167,6 +167,21 @@ export default function GameScene({ auth }) {
         }
       };
 
+      // Use event delegation on document for buttons that might be recreated
+      const delegatedClickHandler = (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        if (btn.textContent.includes('📦') || btn.textContent.includes('Inventory')) {
+          window.gameActions.openInventory();
+        } else if (btn.textContent.includes('Logout')) {
+          window.gameActions.logout();
+        }
+      };
+      document.addEventListener('click', delegatedClickHandler, { useCapture: true });
+
       // Note: the build menu (hammer button) and its selection callback are
       // wired up inside createControls via world.ui.onBuildSelect().
 

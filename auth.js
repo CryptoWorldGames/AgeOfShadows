@@ -82,7 +82,7 @@ async function getUserById(userId) {
 async function loadPlayerData(userId) {
   try {
     const result = await query(`
-      SELECT user_id, resources, units, buildings, last_saved
+      SELECT user_id, resources, units, buildings, build_queue, last_saved
       FROM players WHERE user_id = $1
     `, [userId]);
 
@@ -93,13 +93,13 @@ async function loadPlayerData(userId) {
   }
 }
 
-async function savePlayerData(userId, resources, units, buildings) {
+async function savePlayerData(userId, resources, units, buildings, buildQueue = []) {
   try {
     await query(`
       UPDATE players
-      SET resources = $2, units = $3, buildings = $4, last_saved = NOW()
+      SET resources = $2, units = $3, buildings = $4, build_queue = $5, last_saved = NOW()
       WHERE user_id = $1
-    `, [userId, JSON.stringify(resources), JSON.stringify(units), JSON.stringify(buildings)]);
+    `, [userId, JSON.stringify(resources), JSON.stringify(units), JSON.stringify(buildings), JSON.stringify(buildQueue)]);
   } catch (err) {
     console.error('[AUTH] Save player error:', err.message);
     throw err;
