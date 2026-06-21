@@ -168,6 +168,36 @@ function stepUnit(unit, trees, stockpile, player, dt, tNow = nowMs()) {
     return;
   }
 
+  // --- HUNT COMMAND: player right-clicked an animal ---
+  if (unit.autoTask === 'hunt' && unit.huntTargetId) {
+    const animal = (unit._worldAnimals || []).find(a => a.id === unit.huntTargetId);
+    if (!animal || animal.state === 'dead' || animal.state === 'respawning') {
+      // Target gone — resume wood gathering
+      unit.autoTask = null; unit.huntTargetId = null;
+    } else {
+      const ax = animal.x || 0, az = animal.z || 0;
+      const dist = Math.hypot(ax - unit.x, az - unit.z);
+      if (dist > REACH) {
+        moveToward(unit, ax, az, step);
+        unit.moving = true;
+      } else {
+        unit.moving = false;
+        unit.attacking = true;
+        unit._t = (unit._t || 0) + dt;
+        if (unit._t >= 0.7) {
+          unit._t = 0;
+          animal.hp = (animal.hp || 3) - 1;
+          if (animal.hp <= 0) {
+            animal.state = 'dead';
+            stockpile.food = (stockpile.food || 0) + 5;
+            unit.autoTask = null; unit.huntTargetId = null;
+          }
+        }
+      }
+      return;
+    }
+  }
+
   // Returning to the town centre to deposit.
   if (unit.phase === 'returning') {
     if (moveToward(unit, TOWN_CENTER.x, TOWN_CENTER.z, step)) {

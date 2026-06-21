@@ -200,115 +200,50 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     faceToward(me.x+dx*10,me.z+dz*10);
     return false;
   }
-  // IMPROVEMENT #3: Optimized spatial collision with distance culling
-  // Only check objects within reasonable range instead of all objects
-  const SEPARATION_RANGE = 15; // Only check objects within 15 units
-  let lastSeparationCheck = 0;
-
   function separate(world) {
-    const me = group.position;
-    // IMPROVEMENT #4: Reduce collision checks frequency - not every frame
-    // Check every other frame for soft collisions (still every frame for hard)
-    const checkFrequency = moving ? 1 : 2; // More frequent when moving
-    lastSeparationCheck++;
-    const shouldCheckSoft = (lastSeparationCheck % checkFrequency) === 0;
-
-    const softPush = (ox, oz, or) => {
-      let dx = me.x - ox, dz = me.z - oz;
-      const distSq = dx * dx + dz * dz;
-      const minD = radius + or;
-      const minDSq = minD * minD;
-
-      // IMPROVEMENT #5: Use squared distances to avoid expensive sqrt
-      if (distSq > 1e-8 && distSq < minDSq) {
-        const dist = Math.sqrt(distSq);
-        const p = (minD - dist) * 0.5;
-        me.x += (dx / dist) * p;
-        me.z += (dz / dist) * p;
-      }
+    const me=group.position;
+    // Soft circular separation from movable things. Skipped while frozen
+    // (actively gathering) so harvesters can stand close without jitter.
+    const softPush=(ox,oz,or)=>{
+      let dx=me.x-ox,dz=me.z-oz;
+      const dist=Math.sqrt(dx*dx+dz*dz);
+      const minD=radius+or;
+      if (dist>1e-4&&dist<minD){const p=(minD-dist)*0.5;me.x+=(dx/dist)*p;me.z+=(dz/dist)*p;}
     };
-
-    if (!frozen && shouldCheckSoft) {
-      // IMPROVEMENT #6: Spatial culling - only check nearby units
-      const unitsInRange = (world.units || []).filter(o => {
-        if (o === unit) return false;
-        const dx = o.group.position.x - me.x;
-        const dz = o.group.position.z - me.z;
-        return dx * dx + dz * dz < SEPARATION_RANGE * SEPARATION_RANGE;
-      });
-      unitsInRange.forEach(o => softPush(o.group.position.x, o.group.position.z, o.radius));
-
-      // Reduce iterations for trees/stones/gold/animals by filtering first
-      const treesInRange = (world.trees || []).filter(t => {
-        if (t === chopTarget) return false;
-        const p = t.position();
-        const dx = p.x - me.x, dz = p.z - me.z;
-        return dx * dx + dz * dz < SEPARATION_RANGE * SEPARATION_RANGE;
-      });
-      treesInRange.forEach(t => { const p = t.position(); softPush(p.x, p.z, 0.9); });
-
-      const stonesInRange = (world.stones || []).filter(s => {
-        if (s === stoneTarget) return false;
-        const p = s.position();
-        const dx = p.x - me.x, dz = p.z - me.z;
-        return dx * dx + dz * dz < SEPARATION_RANGE * SEPARATION_RANGE;
-      });
-      stonesInRange.forEach(s => { const p = s.position(); softPush(p.x, p.z, 1.0); });
-
-      const goldsInRange = (world.golds || []).filter(g => {
-        if (g === goldTarget) return false;
-        const p = g.position();
-        const dx = p.x - me.x, dz = p.z - me.z;
-        return dx * dx + dz * dz < SEPARATION_RANGE * SEPARATION_RANGE;
-      });
-      goldsInRange.forEach(g => { const p = g.position(); softPush(p.x, p.z, 1.0); });
-
-      const animalsInRange = (world.animals || []).filter(a => {
-        if (a === animalTarget) return false;
-        const p = a.position();
-        const dx = p.x - me.x, dz = p.z - me.z;
-        return dx * dx + dz * dz < SEPARATION_RANGE * SEPARATION_RANGE;
-      });
-      animalsInRange.forEach(a => { const p = a.position(); softPush(p.x, p.z, 0.5); });
+    if (!frozen) {
+      world.units.forEach((o)=>{ if(o===unit)return; softPush(o.group.position.x,o.group.position.z,o.radius); });
+      // Trees / stones / gold / animals are solid too — but never block the
+      // resource this unit is actively going to harvest, or it could never reach it.
+      (world.trees||[]).forEach((t)=>{ if(t===chopTarget)return; const p=t.position(); softPush(p.x,p.z,0.9); });
+      (world.stones||[]).forEach((s)=>{ if(s===stoneTarget)return; const p=s.position(); softPush(p.x,p.z,1.0); });
+      (world.golds||[]).forEach((g)=>{ if(g===goldTarget)return; const p=g.position(); softPush(p.x,p.z,1.0); });
+      (world.animals||[]).forEach((a)=>{ if(a===animalTarget)return; const p=a.position(); softPush(p.x,p.z,0.5); });
     }
-
-    // IMPROVEMENT #7: Hard building collision still runs every frame (important for pathfinding)
-    const buildingsNearby = (world.buildings || []).filter(b => {
-      if (b.isGhost) return true;
-      const bp = resolvePos(b);
-      if (!bp) return false;
-      const dx = bp.x - me.x, dz = bp.z - me.z;
-      return dx * dx + dz * dz < (SEPARATION_RANGE + 5) * (SEPARATION_RANGE + 5);
-    });
-
-    buildingsNearby.forEach(b => {
+    // HARD building collision (Town Center / houses are big SQUARES, not circles).
+    // Clamp the unit to the outside of the box so it can never enter the walls.
+    // Runs even while frozen.
+    (world.buildings||[]).forEach((b)=>{
       if (b.isGhost) return;
-      const bp = resolvePos(b);
+      const bp=resolvePos(b);
       if (!bp) return;
-      const ext = (b.radius || 3) * 0.75 + radius;
-      let dx = me.x - bp.x, dz = me.z - bp.z;
-      if (Math.abs(dx) < ext && Math.abs(dz) < ext) {
-        const penX = ext - Math.abs(dx), penZ = ext - Math.abs(dz);
-        if (penX < penZ) { me.x = bp.x + (dx >= 0 ? ext : -ext); }
-        else { me.z = bp.z + (dz >= 0 ? ext : -ext); }
+      const ext=(b.radius||3)*0.75+radius; // box half-width + unit radius
+      let dx=me.x-bp.x,dz=me.z-bp.z;
+      if (Math.abs(dx)<ext && Math.abs(dz)<ext) {
+        const penX=ext-Math.abs(dx), penZ=ext-Math.abs(dz);
+        if (penX<penZ) { me.x=bp.x+(dx>=0?ext:-ext); }
+        else { me.z=bp.z+(dz>=0?ext:-ext); }
       }
     });
   }
-  // Walk animation with frame-independent speed
   function walkPose(dt) {
-    walkClock += dt * 7; // Frame-rate independent: dt already normalized by browser
-    const s = Math.sin(walkClock);
-    const legSwing = 0.5, armSwing = 0.35;
-
-    if (B.legUL) B.legUL.rotation.x = rest.legUL.x + s * legSwing;
-    if (B.legUR) B.legUR.rotation.x = rest.legUR.x - s * legSwing;
-    if (B.legLL) B.legLL.rotation.x = rest.legLL.x + Math.max(0, -s) * 0.6;
-    if (B.legLR) B.legLR.rotation.x = rest.legLR.x + Math.max(0, s) * 0.6;
-    if (B.armUL) B.armUL.rotation.x = rest.armUL.x - s * armSwing;
-    if (B.armUR) B.armUR.rotation.x = rest.armUR.x + s * armSwing;
-
-    const bobAmount = 0.035;
-    modelHolder.position.y = Math.abs(s) * bobAmount;
+    walkClock+=dt*7; const s=Math.sin(walkClock);
+    if (B.legUL) B.legUL.rotation.x=rest.legUL.x+s*0.5;
+    if (B.legUR) B.legUR.rotation.x=rest.legUR.x-s*0.5;
+    if (B.legLL) B.legLL.rotation.x=rest.legLL.x+Math.max(0,-s)*0.6;
+    if (B.legLR) B.legLR.rotation.x=rest.legLR.x+Math.max(0,s)*0.6;
+    if (B.armUL) B.armUL.rotation.x=rest.armUL.x-s*0.35;
+    if (B.armUR) B.armUR.rotation.x=rest.armUR.x+s*0.35;
+    modelHolder.position.y=Math.abs(Math.sin(walkClock))*0.04;
   }
   function swingPose(dt,tgt,soundType,world,onHit) {
     chopActive=true;
@@ -635,7 +570,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
         } else if (st==='wandering') {
           const d=distTo(ap.x,ap.z);
           if (d<=chopRange) {
-            frozen=true; moving=false; faceToward(ap.x,ap.z);
+            frozen=true; faceToward(ap.x,ap.z);
             swingPose(dt,animalTarget,'chop',world,()=>{});
           } else {
             moveToward(ap,dt,chopRange*0.8);
@@ -678,7 +613,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
           }
         } else {
           if (dTree<=chopRange) {
-            frozen=true; moving=false; faceToward(tp.x,tp.z);
+            frozen=true; faceToward(tp.x,tp.z);
             if (st==='standing') {
               swingPose(dt,chopTarget,'chop',world,()=>{
                 woodHitCount++;
@@ -709,7 +644,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
           }
         } else {
           if (dStone<=chopRange) {
-            frozen=true; moving=false; faceToward(sp.x,sp.z);
+            frozen=true; faceToward(sp.x,sp.z);
             if (st==='standing') {
               swingPose(dt,stoneTarget,'mine',world,()=>{
                 stoneHitCount++;
@@ -740,7 +675,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
           }
         } else {
           if (dGold<=chopRange) {
-            frozen=true; moving=false; faceToward(gp.x,gp.z);
+            frozen=true; faceToward(gp.x,gp.z);
             if (st==='standing') {
               swingPose(dt,goldTarget,'mine',world,()=>{
                 goldHitCount++;
@@ -780,49 +715,12 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       if (next) animalTarget=next;
     }
 
-    if (moving) walkPose(dt); else modelHolder.position.y *= 0.7;
-
-    // IMPROVEMENT #8 & #9: Optimized axe rotation and hand position sync
-    if (!chopActive) {
-      // Use smaller interpolation factor (0.2 instead of 0.3) for faster settling
-      const lerpFactor = 0.2;
-      axeRot.x += (axeRestRot.x - axeRot.x) * lerpFactor;
-      axeRot.y += (axeRestRot.y - axeRot.y) * lerpFactor;
-      axeRot.z += (axeRestRot.z - axeRot.z) * lerpFactor;
-    }
-
+    if (moving) walkPose(dt); else modelHolder.position.y*=0.7;
+    if (!chopActive) { axeRot.x+=(axeRestRot.x-axeRot.x)*0.3; axeRot.y+=(axeRestRot.y-axeRot.y)*0.3; axeRot.z+=(axeRestRot.z-axeRot.z)*0.3; }
     separate(world);
-
-    // IMPROVEMENT #10: Only update axe position if hand exists and model is loaded
-    // Cache the parent to reduce lookups
-    if (handR && axeHolder.parent) {
-      handR.getWorldPosition(handWorld);
-      axeHolder.parent.worldToLocal(axeHolder.position.copy(handWorld));
-      axeHolder.rotation.set(axeRot.x, axeRot.y, axeRot.z);
-    }
-
-    // Optimize health bar updates - only update when needed
-    if (world.camera) {
-      healthBar.group.quaternion.copy(world.camera.quaternion);
-    }
-    healthBar.update(unit.health / unit.maxHealth);
-  }
-
-  // IMPROVEMENT #11: Add proper cleanup function for memory leak prevention
-  function dispose() {
-    if (group.parent) group.parent.remove(group);
-    if (healthBar && healthBar.group.parent) healthBar.group.parent.remove(healthBar.group);
-    // Clean up Three.js resources
-    group.traverse((obj) => {
-      if (obj.geometry) obj.geometry.dispose();
-      if (obj.material) {
-        if (Array.isArray(obj.material)) {
-          obj.material.forEach(m => m.dispose());
-        } else {
-          obj.material.dispose();
-        }
-      }
-    });
+    if (handR) { handR.getWorldPosition(handWorld); axeHolder.parent.worldToLocal(axeHolder.position.copy(handWorld)); axeHolder.rotation.set(axeRot.x,axeRot.y,axeRot.z); }
+    if (world.camera) healthBar.group.quaternion.copy(world.camera.quaternion);
+    healthBar.update(unit.health/unit.maxHealth);
   }
 
   const unit = {
@@ -843,9 +741,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
     stop(){target=null;chopTarget=null;animalTarget=null;stoneTarget=null;goldTarget=null;autoTask=null;returning=false;depositTarget=null;lastKillPos=null;},
     // Player-commanded deposit: drop everything off at this building, then idle.
     depositAt(building){chopTarget=null;animalTarget=null;stoneTarget=null;goldTarget=null;target=null;autoTask=null;depositTarget=building;returning=true;lastKillPos=null;},
-    update,
-    dispose, // IMPROVEMENT #11: Expose dispose for cleanup
-    animate(){}
+    update, animate(){}
   };
 
   return unit;

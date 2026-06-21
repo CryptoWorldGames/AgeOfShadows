@@ -60,7 +60,7 @@ export default function GameScene({ auth }) {
 
     socket.on('connect', () => {
       console.log('Connected:', socket.id);
-      socket.emit('join', { userId: auth.userId, email: auth.email });
+      socket.emit('join', { userId: auth.userId, email: auth.email, displayName: auth.displayName || auth.email?.split('@')[0] || 'Player' });
     });
 
     socket.on('joined', (data) => {
@@ -135,7 +135,9 @@ export default function GameScene({ auth }) {
       // Title must be on top of ALL UI elements (except modals)
       const titlePanel = document.createElement('div');
       titlePanel.id = 'title-panel';
-      titlePanel.style.cssText = `position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:10010;font-family:'Segoe UI',sans-serif;text-align:center;pointer-events:none;`;
+      // Title goes ABOVE the resource bar (resource bar is at top:14px, ~40px tall)
+      // Title is positioned below resources so it never covers them
+      titlePanel.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:200;font-family:'Segoe UI',sans-serif;text-align:center;pointer-events:none;`;
       titlePanel.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:28px;letter-spacing:2px;text-shadow:0 0 20px rgba(200,168,75,0.5);">⚔️ AGE OF SHADOWS ⚔️</div><div style="color:#999;font-size:11px;margin-top:2px;">v2.14</div>`;
       document.body.appendChild(titlePanel);
 
@@ -163,7 +165,9 @@ export default function GameScene({ auth }) {
       // AUDIT FIX #5: Add online players list from database
       const onlinePlayersPanel = document.createElement('div');
       onlinePlayersPanel.id = 'online-players-panel';
-      onlinePlayersPanel.style.cssText = `position:fixed;top:90px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(100,200,100,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:11px;z-index:10001;backdrop-filter:blur(4px);min-width:140px;max-width:200px;pointer-events:auto;`;
+      // Online players panel goes below the music tab (music tab is at top:110px)
+      // Position it below music panel to avoid overlapping
+      onlinePlayersPanel.style.cssText = `position:fixed;top:200px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(100,200,100,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:11px;z-index:200;backdrop-filter:blur(4px);min-width:140px;max-width:200px;pointer-events:none;`;
       onlinePlayersPanel.innerHTML = `<div style="color:#7fc97f;font-weight:600;margin-bottom:6px;font-size:10px;">👥 ONLINE PLAYERS</div><div id="players-list" style="font-size:10px;line-height:1.6;color:#9f9;"></div>`;
       document.body.appendChild(onlinePlayersPanel);
 
