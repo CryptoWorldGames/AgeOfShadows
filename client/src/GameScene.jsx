@@ -144,6 +144,8 @@ export default function GameScene({ auth }) {
       const resources = joinData.player.resources || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
       const townCenterBuilding = joinData.world.buildings?.find(b => b.buildingType === 'townCenter');
       const townCenterStorage = townCenterBuilding?.storage || { wood: 0, food: 0, water: 0, gold: 0, stone: 0 };
+      console.log('[GameScene] townCenterBuilding:', townCenterBuilding);
+      console.log('[GameScene] townCenterStorage:', townCenterStorage);
 
       const world = {
         camera, socket, playerId: joinData.playerId,
@@ -152,7 +154,15 @@ export default function GameScene({ auth }) {
         serverDriven: true   // workers are simulated on the server; client just renders them
       };
 
-      document.getElementById('inv-btn-inline').onclick = () => showInventoryModal(world.resources, townCenterStorage);
+      const invBtn = document.getElementById('inv-btn-inline');
+      if (invBtn) {
+        invBtn.onclick = () => {
+          console.log('[Inventory Click] Triggered');
+          showInventoryModal(world.resources, townCenterStorage);
+        };
+      } else {
+        console.warn('[GameScene] inv-btn-inline not found!');
+      }
 
       document.getElementById('game-logout-btn').onclick = () => {
         if (confirm('Logout?')) {
