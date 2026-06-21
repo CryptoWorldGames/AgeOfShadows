@@ -168,6 +168,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
   let huntAngle=0;
 
   let moving=false; let walkClock=0; let chopPhase=0;
+  let moveTimer=0; // persistence: keep walking for 300ms after moving flag drops (bridges server tick gaps)
   let serverPos=null;   // when set + world.serverDriven, this worker follows the server
   let stoneHitCount=0; let goldHitCount=0; let woodHitCount=0;
   let gatherTimer=0; let chopActive=false; let frozen=false;
@@ -399,8 +400,10 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
         resetPose(); chopActive=false;
         // Always lerp toward serverPos (3x speed = smooth, no jitter)
         if (d>0.02) { const step=Math.min(d,speed*dt*3.0); me.x+=dx/d*step; me.z+=dz/d*step; faceToward(serverPos.x,serverPos.z); }
-        // Use server's moving flag so walk animation plays even between position ticks
-        if (unit.moving||d>0.12) { walkPose(dt); moving=true; }
+        // Persist walk animation for 300ms after moving flag drops so server tick gaps don't stutter
+        if (unit.moving||d>0.12) { moveTimer=0.30; }
+        moveTimer=Math.max(0,moveTimer-dt);
+        if (moveTimer>0) { walkPose(dt); moving=true; }
         else { moving=false; modelHolder.position.y*=0.7; }
       }
       axeRot.x+=(axeRestRot.x-axeRot.x)*0.3; axeRot.y+=(axeRestRot.y-axeRot.y)*0.3; axeRot.z+=(axeRestRot.z-axeRot.z)*0.3;

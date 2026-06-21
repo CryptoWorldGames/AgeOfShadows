@@ -137,7 +137,7 @@ export default function GameScene({ auth }) {
       const titlePanel = document.createElement('div');
       titlePanel.id = 'title-panel';
       titlePanel.style.cssText = `position:fixed;top:6px;left:50%;transform:translateX(-50%);z-index:500;font-family:'Segoe UI',sans-serif;text-align:center;pointer-events:none;white-space:nowrap;`;
-      titlePanel.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:20px;letter-spacing:2px;text-shadow:0 0 12px rgba(200,168,75,0.7);">⚔️ AGE OF SHADOWS ⚔️ <span style="font-size:10px;opacity:0.6;">v2.14</span></div>`;
+      titlePanel.innerHTML = `<div style="color:#000;font-weight:700;font-size:20px;letter-spacing:2px;">⚔️ AGE OF SHADOWS ⚔️ <span style="font-size:10px;opacity:0.7;color:#000;">v2.14</span></div>`;
       document.body.appendChild(titlePanel);
 
       // AUDIT FIX #5: Add online players list from database
@@ -145,7 +145,7 @@ export default function GameScene({ auth }) {
       onlinePlayersPanel.id = 'online-players-panel';
       // Online players panel goes below the music tab (music tab is at top:110px)
       // Position it below music panel to avoid overlapping
-      onlinePlayersPanel.style.cssText = `position:fixed;top:200px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(100,200,100,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:11px;z-index:200;backdrop-filter:blur(4px);min-width:140px;max-width:200px;pointer-events:none;`;
+      onlinePlayersPanel.style.cssText = `position:fixed;bottom:20px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(100,200,100,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:11px;z-index:99;backdrop-filter:blur(4px);min-width:140px;max-width:200px;pointer-events:none;`;
       onlinePlayersPanel.innerHTML = `<div style="color:#7fc97f;font-weight:600;margin-bottom:6px;font-size:10px;">👥 ONLINE PLAYERS</div><div id="players-list" style="font-size:10px;line-height:1.6;color:#9f9;"></div>`;
       document.body.appendChild(onlinePlayersPanel);
 
