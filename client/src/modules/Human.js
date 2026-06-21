@@ -294,12 +294,9 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       }
     });
   }
-  // AUDIT FIX #1: Walk animation was decoupled from movement speed
-  // PROBLEM: Animation speed (5.5) != movement speed, causing sync issues
-  // FIX: Sync animation speed to actual character movement speed for smooth appearance
+  // Walk animation with frame-independent speed
   function walkPose(dt) {
-    // Animation speed must match movement: character moves at SETTINGS.unit.speed (2.4), animation must too
-    walkClock += (SETTINGS.unit.speed / 2.4) * dt * 7; // Sync with actual movement speed, properly dt-adjusted
+    walkClock += dt * 7; // Frame-rate independent: dt already normalized by browser
     const s = Math.sin(walkClock);
     const legSwing = 0.5, armSwing = 0.35;
 
