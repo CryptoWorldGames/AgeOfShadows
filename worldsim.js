@@ -252,6 +252,28 @@ function stepUnit(unit, trees, stockpile, player, dt, tNow = nowMs()) {
   }
 }
 
+const UNIT_RADIUS = 0.9; // collision radius per unit (metres)
+
+// Push apart any overlapping units so they don't merge/clip through each other.
+// Called once per sim tick AFTER all stepUnit calls.
+function separateUnits(allUnits) {
+  const n = allUnits.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const a = allUnits[i], b = allUnits[j];
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const d = Math.hypot(dx, dz);
+      const minD = UNIT_RADIUS * 2;
+      if (d < minD && d > 1e-6) {
+        const push = (minD - d) * 0.5;
+        const nx = dx / d, nz = dz / d;
+        a.x -= nx * push; a.z -= nz * push;
+        b.x += nx * push; b.z += nz * push;
+      }
+    }
+  }
+}
+
 // Apply a deposit of carried resources into a player's persistent stockpile.
 // Town Center charges TC_TAX; a player's own house is tax-free. Mutates
 // stockpile in place and returns the net amounts actually banked.
@@ -275,5 +297,5 @@ module.exports = {
   // functions
   nowMs, freshTree, generateTrees, resetTree, tickTrees,
   chopTree, canGather, gatherWood, applyDeposit,
-  moveToward, nearestWorkTree, stepUnit,
+  moveToward, nearestWorkTree, stepUnit, separateUnits,
 };

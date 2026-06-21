@@ -93,6 +93,7 @@ setInterval(() => {
   const now = Date.now();
   let dt = (now - lastSim) / 1000; lastSim = now;
   if (dt > 0.5) dt = 0.5;
+  // Step all units
   for (const sid in world.players) {
     const player = world.players[sid];
     if (!player.units) continue;
@@ -101,6 +102,15 @@ setInterval(() => {
       try { worldsim.stepUnit(unit, world.trees, player.resources, ref, dt, now); }
       catch (e) { /* never let one unit break the whole tick */ }
     }
+  }
+  // Separate overlapping units (prevents merging/clipping through each other)
+  const allUnits = [];
+  for (const sid in world.players) { if (world.players[sid].units) allUnits.push(...world.players[sid].units); }
+  worldsim.separateUnits(allUnits);
+
+  for (const sid in world.players) {
+    const player = world.players[sid];
+    if (!player.units) continue;
     // push fresh stockpile to the owner if they're connected
     if (player.online !== false) io.to(sid).emit('resourceUpdate', player.resources);
 
