@@ -635,7 +635,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
         } else if (st==='wandering') {
           const d=distTo(ap.x,ap.z);
           if (d<=chopRange) {
-            frozen=true; faceToward(ap.x,ap.z);
+            frozen=true; moving=false; faceToward(ap.x,ap.z);
             swingPose(dt,animalTarget,'chop',world,()=>{});
           } else {
             moveToward(ap,dt,chopRange*0.8);
@@ -678,7 +678,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
           }
         } else {
           if (dTree<=chopRange) {
-            frozen=true; faceToward(tp.x,tp.z);
+            frozen=true; moving=false; faceToward(tp.x,tp.z);
             if (st==='standing') {
               swingPose(dt,chopTarget,'chop',world,()=>{
                 woodHitCount++;
@@ -709,7 +709,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
           }
         } else {
           if (dStone<=chopRange) {
-            frozen=true; faceToward(sp.x,sp.z);
+            frozen=true; moving=false; faceToward(sp.x,sp.z);
             if (st==='standing') {
               swingPose(dt,stoneTarget,'mine',world,()=>{
                 stoneHitCount++;
@@ -740,7 +740,7 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
           }
         } else {
           if (dGold<=chopRange) {
-            frozen=true; faceToward(gp.x,gp.z);
+            frozen=true; moving=false; faceToward(gp.x,gp.z);
             if (st==='standing') {
               swingPose(dt,goldTarget,'mine',world,()=>{
                 goldHitCount++;
