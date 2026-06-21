@@ -392,7 +392,10 @@ export default function GameScene({ auth }) {
             }
             if (h.setServerPos) {
               h.setServerPos(u.x, u.z);
-              if (h.unit) h.unit.chopping = u.chopping || false;
+              if (h.unit) {
+                h.unit.chopping = u.chopping || false;
+                h.unit.moving = u.moving || false;
+              }
             }
           });
           // Remove client visuals for units the server no longer has

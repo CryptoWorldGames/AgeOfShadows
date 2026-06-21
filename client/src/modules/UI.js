@@ -615,7 +615,7 @@ export function createUI(playerId, gameState, displayName) {
   const charButton = document.createElement('button');
   charButton.id = 'char-button';
   charButton.innerHTML = '👤<div style="font-size:8px;margin-top:2px;font-weight:600;">UNIT</div><div id="unit-total-count" style="font-size:9px;color:#00ff88;font-weight:700;">0 men</div>';
-  charButton.style.cssText = `width:64px;height:64px;background:rgba(0,0,0,0.6);color:#fff;border:2px solid rgba(255,255,255,0.2);border-radius:10px;font-size:22px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
+  charButton.style.cssText = `width:64px;height:64px;background:rgba(30,60,30,0.5);color:#fff;border:2px solid rgba(100,200,100,0.4);border-radius:10px;font-size:22px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
   charButton.onmouseenter = () => { charButton.style.borderColor='#00ff88'; };
   charButton.onmouseleave = () => { charButton.style.borderColor='rgba(255,255,255,0.2)'; };
   buildBar.appendChild(charButton);

@@ -165,9 +165,18 @@ export function createTree(scene, position = { x: 0, y: 0, z: 0 }) {
     if (typeof s.wood === 'number') { wood = s.wood; pile.scale.setScalar(Math.max(0.05, wood / 10)); }
     if (typeof s.hp === 'number') hp = s.hp;
     if (s.state && s.state !== state) {
-      if (s.state === 'falling') { if (state === 'standing') state = 'falling'; }   // play the fall anim
-      else if (s.state === 'woodpile') { state = 'woodpile'; pivot.rotation.x = -Math.PI/2; pivot.visible = false; pile.visible = true; }
-      else if (s.state === 'standing') { reset(); }
+      if (s.state === 'falling') {
+        if (state === 'standing') state = 'falling'; // play the fall animation
+      } else if (s.state === 'woodpile') {
+        if (state === 'standing') {
+          // Missed the 'falling' update — play fall animation before showing woodpile
+          state = 'falling';
+        } else if (state !== 'falling' && state !== 'sinking') {
+          // Already past fall — jump straight to woodpile
+          state = 'woodpile'; pivot.rotation.x = -Math.PI/2; pivot.visible = false; pile.visible = true;
+        }
+        // if falling/sinking, let update() finish the animation naturally → woodpile
+      } else if (s.state === 'standing') { reset(); }
       else if (s.state === 'respawning') { state = 'respawning'; pile.visible = false; pivot.visible = false; }
     }
   }
