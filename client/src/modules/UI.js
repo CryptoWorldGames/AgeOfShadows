@@ -520,15 +520,20 @@ export function createUI(playerId, gameState, displayName) {
     loginPanel.id = 'login-panel';
     loginPanel.style.cssText = `position:absolute;top:14px;right:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:100;backdrop-filter:blur(4px);min-width:120px;`;
     loginPanel.innerHTML = `
-      <div style="opacity:0.7;font-size:10px;margin-bottom:4px;">👤 Playing as</div>
-      <div style="color:#c8a84b;font-weight:600;margin-bottom:8px;word-break:break-all;font-size:11px;">${displayName}</div>
-      <button id="settings-btn" style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;">⚙️ Settings</button>
+      <div style="opacity:0.7;font-size:10px;margin-bottom:2px;">👤 Playing as</div>
+      <div style="color:#c8a84b;font-weight:600;margin-bottom:6px;word-break:break-all;font-size:11px;">${displayName}</div>
+      <button id="settings-btn" style="width:100%;padding:4px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:4px;">⚙️ Settings</button>
+      <button id="logout-btn" style="width:100%;padding:4px;background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.4);border-radius:4px;color:#ff8080;cursor:pointer;font-size:10px;font-weight:600;">🚪 Logout</button>
     `;
     document.body.appendChild(loginPanel);
 
     document.getElementById('settings-btn').onclick = () => {
       const auth = JSON.parse(localStorage.getItem('auth') || '{}');
       showSettingsPanel(displayName, auth.email || '');
+    };
+    // Logout button wired to global action
+    document.getElementById('logout-btn').onclick = () => {
+      if (window.gameActions && window.gameActions.logout) window.gameActions.logout();
     };
   }
 
@@ -547,7 +552,8 @@ export function createUI(playerId, gameState, displayName) {
   ];
   const resourceBar = document.createElement('div');
   resourceBar.id = 'resource-bar';
-  resourceBar.style.cssText = `position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:16px;align-items:center;color:#fff;font-family:'Segoe UI',sans-serif;font-size:16px;font-weight:600;background:rgba(0,0,0,0.6);padding:8px 18px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);z-index:100;white-space:nowrap;`;
+  // Sits below the title (title is ~26px tall at top:6px, so resources start at 34px)
+  resourceBar.style.cssText = `position:absolute;top:34px;left:50%;transform:translateX(-50%);display:flex;gap:16px;align-items:center;color:#fff;font-family:'Segoe UI',sans-serif;font-size:16px;font-weight:600;background:rgba(0,0,0,0.6);padding:8px 18px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);z-index:100;white-space:nowrap;`;
   resDefs.forEach((r) => {
     const span = document.createElement('span');
     span.style.cssText = 'display:flex;align-items:center;gap:6px;';
@@ -591,7 +597,7 @@ export function createUI(playerId, gameState, displayName) {
   // Character selection button
   const charButton = document.createElement('button');
   charButton.id = 'char-button';
-  charButton.innerHTML = '👤<div style="font-size:8px;margin-top:2px;font-weight:600;">UNIT</div>';
+  charButton.innerHTML = '👤<div style="font-size:8px;margin-top:2px;font-weight:600;">UNIT</div><div id="unit-total-count" style="font-size:9px;color:#00ff88;font-weight:700;">0 men</div>';
   charButton.style.cssText = `width:64px;height:64px;background:rgba(0,0,0,0.6);color:#fff;border:2px solid rgba(255,255,255,0.2);border-radius:10px;font-size:22px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all 0.12s;`;
   charButton.onmouseenter = () => { charButton.style.borderColor='#00ff88'; };
   charButton.onmouseleave = () => { charButton.style.borderColor='rgba(255,255,255,0.2)'; };

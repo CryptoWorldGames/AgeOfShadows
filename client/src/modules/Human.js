@@ -391,7 +391,12 @@ export function createHuman(scene, position={x:0,y:0,z:0}, options={}) {
       const me=group.position;
       const dx=serverPos.x-me.x, dz=serverPos.z-me.z;
       const d=Math.sqrt(dx*dx+dz*dz);
-      if (d>0.06) {
+      if (unit.chopping) {
+        // Play chop animation when server says unit is chopping
+        frozen=true;
+        if (serverPos) faceToward(serverPos.x, serverPos.z);
+        swingPose(dt, {takeDamage:()=>{}}, 'chop', world, ()=>{});
+      } else if (d>0.06) {
         const step=Math.min(d, speed*dt*1.6);
         me.x+=dx/d*step; me.z+=dz/d*step;
         faceToward(serverPos.x, serverPos.z);

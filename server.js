@@ -215,7 +215,7 @@ io.on('connection', (socket) => {
       const player = {
         id: socket.id,
         userId: data.userId,
-        name: user?.displayName || data.displayName || `Player${Math.floor(Math.random() * 1000)}`,
+        name: user?.display_name || data.displayName || `Player${Math.floor(Math.random() * 1000)}`,
         color: data.color || `hsl(${Math.random() * 360}, 70%, 50%)`,
         resources,
         units,
@@ -490,7 +490,7 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const user = await getUserById(userId);
-    const response = { success: true, userId, email, displayName: user?.displayName, message: 'Logged in' };
+    const response = { success: true, userId, email, displayName: user?.display_name, message: 'Logged in' };
     if (isAdmin(email)) {
       response.adminToken = Buffer.from(email).toString('base64');
     }

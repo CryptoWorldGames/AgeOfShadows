@@ -133,34 +133,12 @@ export default function GameScene({ auth }) {
 
       // AUDIT FIX #2: Title z-index was below gameInfo box
       // Title must be on top of ALL UI elements (except modals)
+      // Title at very top center, above resource bar
       const titlePanel = document.createElement('div');
       titlePanel.id = 'title-panel';
-      // Title goes ABOVE the resource bar (resource bar is at top:14px, ~40px tall)
-      // Title is positioned below resources so it never covers them
-      titlePanel.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:200;font-family:'Segoe UI',sans-serif;text-align:center;pointer-events:none;`;
-      titlePanel.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:28px;letter-spacing:2px;text-shadow:0 0 20px rgba(200,168,75,0.5);">⚔️ AGE OF SHADOWS ⚔️</div><div style="color:#999;font-size:11px;margin-top:2px;">v2.14</div>`;
+      titlePanel.style.cssText = `position:fixed;top:6px;left:50%;transform:translateX(-50%);z-index:500;font-family:'Segoe UI',sans-serif;text-align:center;pointer-events:none;white-space:nowrap;`;
+      titlePanel.innerHTML = `<div style="color:#c8a84b;font-weight:700;font-size:20px;letter-spacing:2px;text-shadow:0 0 12px rgba(200,168,75,0.7);">⚔️ AGE OF SHADOWS ⚔️ <span style="font-size:10px;opacity:0.6;">v2.14</span></div>`;
       document.body.appendChild(titlePanel);
-
-      // Add game info panel - just buttons now
-      const gameInfo = document.createElement('div');
-      gameInfo.id = 'game-info-panel';
-      gameInfo.style.cssText = `position:fixed;top:90px;left:14px;background:rgba(0,0,0,0.7);border:1px solid rgba(200,168,75,0.4);border-radius:8px;padding:10px 14px;color:#fff;font-family:'Segoe UI',sans-serif;font-size:12px;z-index:10001;backdrop-filter:blur(4px);min-width:130px;pointer-events:auto;`;
-      gameInfo.innerHTML = `
-        <button style="width:100%;padding:5px;background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.5);border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;margin-bottom:5px;pointer-events:auto;position:relative;z-index:10002;" onclick="window.gameActions.openInventory();">📦 Inventory</button>
-        <button style="width:100%;padding:5px;background:rgba(200,168,75,0.2);border:1px solid #c8a84b;border-radius:4px;color:#c8a84b;cursor:pointer;font-size:10px;font-weight:600;pointer-events:auto;position:relative;z-index:10002;" onclick="window.gameActions.logout();">Logout</button>
-      `;
-      document.body.appendChild(gameInfo);
-
-      // Add stopPropagation to buttons so clicks don't reach canvas
-      setTimeout(() => {
-        const buttons = gameInfo.querySelectorAll('button');
-        buttons.forEach(btn => {
-          // Stop all mouse events from reaching canvas
-          btn.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); });
-          btn.addEventListener('mouseup', (e) => { e.stopPropagation(); e.preventDefault(); });
-          btn.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
-        });
-      }, 0);
 
       // AUDIT FIX #5: Add online players list from database
       const onlinePlayersPanel = document.createElement('div');
@@ -403,8 +381,15 @@ export default function GameScene({ auth }) {
         if (me && me.units) {
           me.units.forEach(u => {
             const h = world.units.find(x => x.serverId === u.id);
-            if (h && h.setServerPos) h.setServerPos(u.x, u.z);
+            if (h && h.setServerPos) {
+              h.setServerPos(u.x, u.z);
+              // Pass chopping state so client can play animation
+              if (h.unit) h.unit.chopping = u.chopping || false;
+            }
           });
+          // Update unit count display
+          const countEl = document.getElementById('unit-total-count');
+          if (countEl) countEl.textContent = `${me.units.length} men`;
         }
         Object.entries(data.players).forEach(([pId, player]) => {
           if (pId === world.playerId) return;

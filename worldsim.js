@@ -127,7 +127,7 @@ function gatherWood(tree, player, tNow = nowMs()) {
    mutate the unit/trees/stockpile in place so they can be unit-tested.
    ============================================================ */
 const UNIT_SPEED   = 3.0;   // metres / second
-const CARRY_MAX    = 10;    // wood carried before returning to deposit
+const CARRY_MAX    = 100;   // wood carried before returning to deposit
 const REACH        = 2.2;   // how close to a tree/town centre counts as "arrived"
 const CHOP_EVERY   = 0.5;   // seconds between chop hits
 const GATHER_EVERY = 0.5;   // seconds between picking up 1 wood
@@ -237,9 +237,11 @@ function stepUnit(unit, trees, stockpile, player, dt, tNow = nowMs()) {
 
   // In range — stand still and work.
   unit.moving = false;
+  unit.chopping = false;
   if (tree.state === 'falling') return;                 // wait for it to hit the ground
   unit._t = (unit._t || 0) + dt;
   if (tree.state === 'standing') {
+    unit.chopping = true; // tell client to play chop animation
     if (unit._t >= CHOP_EVERY) { unit._t = 0; chopTree(tree, player, tNow); }
   } else if (tree.state === 'woodpile') {
     if (unit._t >= GATHER_EVERY) {
