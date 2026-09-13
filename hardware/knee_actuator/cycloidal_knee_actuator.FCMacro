@@ -1,0 +1,395 @@
+# -*- coding: utf-8 -*-
+"""
+Cycloidal Knee Actuator - parametric FreeCAD generator
+======================================================
+Target: 6 ft humanoid, ~100 lb, 2 knees.
+Envelope: 100 mm OD x 80 mm tall housing (hollow, FDM PLA).
+Drive:    1000KV BLDC inside -> single-stage cycloidal reducer -> 6 mm output shaft.
+Mount:    4x M4 clearance holes in the base flange.
+
+Run from the FreeCAD GUI:  Macro -> Macros... -> select -> Execute.
+Everything is driven by the P dict below; edit and re-run.
+"""
+
+import math
+import os
+import time
+
+import FreeCAD as App
+import Part
+from FreeCAD import Vector, Placement, Rotation
+
+try:
+    import FreeCADGui as Gui
+    HAS_GUI = bool(App.GuiUp)
+except ImportError:
+    Gui = None
+    HAS_GUI = False
+
+
+# ---------------------------------------------------------------------------
+# PARAMETERS - everything below is derived from these
+# ---------------------------------------------------------------------------
+P = {
+    # --- envelope ---------------------------------------------------------
+    "housing_od":      100.0,   # mm, outer diameter of the can
+    "housing_h":        80.0,   # mm, base plate bottom -> top rim
+    "bore_r":           40.0,   # mm, inner bore radius (== ring pin circle)
+    "base_t":            5.0,   # mm, base / mounting flange thickness
+
+    # --- mounting ---------------------------------------------------------
+    "mount_bolts":       4,     # M4
+    "mount_bcd_r":      44.0,   # mm, bolt circle radius
+    "mount_hole_r":      2.2,   # mm, M4 clearance (4.4 mm dia)
+    "cable_hole_r":      8.0,   # mm, wiring pass-through in the base
+
+    # --- motor bay --------------------------------------------------------
+    "motor_h":          40.0,   # mm, axial space reserved for the BLDC
+    "motor_od":         28.0,   # mm, 2212-class 1000KV can
+    "motor_shaft_r":     1.7,   # mm, 3.4 mm motor shaft
+
+    # --- cycloidal stage --------------------------------------------------
+    "lobes":            50,     # cycloid disc lobes -> reduction = lobes:1
+    "pin_r":             1.6,   # mm, ring pin radius
+    "ecc":               0.6,   # mm, eccentricity  (must satisfy ecc < bore_r/n_pins)
+    "disc_t":            6.0,   # mm, one cycloid disc
+    "disc_gap":          1.0,   # mm, axial clearance between the two discs
+    "n_discs":           2,     # 2 = counterbalanced (180 deg apart)
+    "profile_steps":  1200,     # polyline resolution of the cycloid profile
+
+    # --- eccentric input shaft -------------------------------------------
+    "ecc_shaft_r":       4.0,   # mm, 8 mm input shaft
+    "cam_r":            12.0,   # mm, eccentric cam radius == disc bore radius
+
+    # --- output stage -----------------------------------------------------
+    "out_plate_r":      30.0,   # mm
+    "out_plate_t":       8.0,   # mm
+    "out_pins":          6,     # roller pins / bearings
+    "out_pin_r":         3.0,   # mm, 6 mm roller bearing OD/2
+    "out_pin_bcd_r":    22.0,   # mm, roller bolt circle radius
+    "out_shaft_r":       3.0,   # mm, 6 mm output shaft
+    "out_shaft_stick":  18.0,   # mm, protrusion above the housing rim
+
+    "plate_t":           3.0,   # mm, gearbox floor plate
+
+    # --- run behaviour ----------------------------------------------------
+    "view_pause":        1.6,   # s, hold on each camera angle
+    "save_images":    True,     # write a PNG per angle
+    "export_stl":    False,     # write STLs of the printable parts
+    "export_dir":       "",     # "" -> ~/Documents/knee_actuator_out
+}
+
+DOC_NAME = "CycloidalKneeActuator"
+
+
+# ---------------------------------------------------------------------------
+# derived geometry
+# ---------------------------------------------------------------------------
+def derive(p):
+    d = dict(p)
+    d["n_pins"] = p["lobes"] + 1              # ring pins = lobes + 1 -> ratio = lobes:1
+    d["ratio"] = float(p["lobes"])
+
+    z = 0.0
+    d["z_base"] = z                            # base flange bottom
+    z += p["base_t"]
+    d["z_motor"] = z                           # motor bay floor
+    z += p["motor_h"]
+    d["z_floor"] = z                           # gearbox floor plate bottom
+    z += p["plate_t"]
+    d["z_disc0"] = z                           # first cycloid disc bottom
+    stack = p["n_discs"] * p["disc_t"] + (p["n_discs"] - 1) * p["disc_gap"]
+    d["z_out"] = z + stack + p["disc_gap"]     # output plate bottom
+    d["z_top"] = d["z_out"] + p["out_plate_t"]
+    d["disc_stack"] = stack
+    return d
+
+
+def check(d):
+    """Sanity checks. Warn loudly instead of silently making bad geometry."""
+    warn = []
+    # undercut guard: R / (E * N) must be > 1, comfortably
+    k = d["bore_r"] / (d["ecc"] * d["n_pins"])
+    if k <= 1.0:
+        warn.append("UNDERCUT: bore_r/(ecc*n_pins) = %.3f <= 1.0 - reduce ecc or lobes" % k)
+    elif k < 1.15:
+        warn.append("TIGHT: bore_r/(ecc*n_pins) = %.3f - profile will be near-undercut" % k)
+    # ring pin spacing
+    pitch = 2.0 * math.pi * d["bore_r"] / d["n_pins"]
+    web = pitch - 2.0 * d["pin_r"]
+    if web < 1.2:
+        warn.append("PIN WEB: only %.2f mm of wall between ring pins - hard to print" % web)
+    # roller pin holes must fit inside the disc annulus
+    inner = d["out_pin_bcd_r"] - (d["out_pin_r"] + d["ecc"])
+    if inner <= d["cam_r"]:
+        warn.append("ROLLER HOLES collide with the cam bore (%.2f <= %.2f)" % (inner, d["cam_r"]))
+    if d["z_top"] > d["housing_h"] + 1e-6:
+        warn.append("STACKUP %.1f mm exceeds housing_h %.1f mm" % (d["z_top"], d["housing_h"]))
+    if d["ecc"] < 0.8:
+        warn.append("NOTE: ecc = %.2f mm is below typical FDM tolerance - consider fewer lobes"
+                    % d["ecc"])
+    return warn
+
+
+# ---------------------------------------------------------------------------
+# cycloid profile
+# ---------------------------------------------------------------------------
+def cycloid_points(R, Rr, E, N, steps):
+    """Classic hypocycloid disc profile.
+
+    R  = ring pin circle radius
+    Rr = ring pin radius
+    E  = eccentricity
+    N  = number of ring pins (lobes = N - 1)
+    """
+    pts = []
+    for i in range(steps):
+        t = 2.0 * math.pi * i / steps
+        num = math.sin((1 - N) * t)
+        den = (R / (E * N)) - math.cos((1 - N) * t)
+        psi = math.atan2(num, den)
+        x = R * math.cos(t) - Rr * math.cos(t + psi) - E * math.cos(N * t)
+        y = -R * math.sin(t) + Rr * math.sin(t + psi) + E * math.sin(N * t)
+        pts.append(Vector(x, y, 0.0))
+    pts.append(pts[0])
+    return pts
+
+
+# ---------------------------------------------------------------------------
+# part builders - each returns a Part.Shape
+# ---------------------------------------------------------------------------
+def build_housing(d):
+    outer = Part.makeCylinder(d["housing_od"] / 2.0, d["housing_h"],
+                              Vector(0, 0, d["z_base"]))
+    # main bore (motor bay + gearbox), leaves the base flange solid
+    bore = Part.makeCylinder(d["bore_r"], d["housing_h"] - d["base_t"] + 1.0,
+                             Vector(0, 0, d["z_motor"]))
+    shape = outer.cut(bore)
+
+    # semicircular seats for the ring pins over the gear stack
+    seat_z = d["z_floor"] - 1.0
+    seat_h = (d["z_out"] + d["out_plate_t"]) - seat_z + 1.0
+    tools = []
+    for i in range(d["n_pins"]):
+        a = 2.0 * math.pi * i / d["n_pins"]
+        c = Vector(d["bore_r"] * math.cos(a), d["bore_r"] * math.sin(a), seat_z)
+        tools.append(Part.makeCylinder(d["pin_r"] + 0.12, seat_h, c))
+
+    # mounting holes + cable pass-through in the base flange
+    for i in range(d["mount_bolts"]):
+        a = 2.0 * math.pi * i / d["mount_bolts"] + math.pi / d["mount_bolts"]
+        c = Vector(d["mount_bcd_r"] * math.cos(a), d["mount_bcd_r"] * math.sin(a),
+                   d["z_base"] - 1.0)
+        tools.append(Part.makeCylinder(d["mount_hole_r"], d["base_t"] + 2.0, c))
+    tools.append(Part.makeCylinder(d["cable_hole_r"], d["base_t"] + 2.0,
+                                   Vector(0, 0, d["z_base"] - 1.0)))
+    return shape.cut(Part.makeCompound(tools))
+
+
+def build_ring_pins(d):
+    z = d["z_floor"] - 0.5
+    h = (d["z_out"] + d["out_plate_t"]) - z
+    pins = []
+    for i in range(d["n_pins"]):
+        a = 2.0 * math.pi * i / d["n_pins"]
+        c = Vector(d["bore_r"] * math.cos(a), d["bore_r"] * math.sin(a), z)
+        pins.append(Part.makeCylinder(d["pin_r"], h, c))
+    return Part.makeCompound(pins)
+
+
+def build_floor_plate(d):
+    plate = Part.makeCylinder(d["bore_r"] - 0.25, d["plate_t"], Vector(0, 0, d["z_floor"]))
+    plate = plate.cut(Part.makeCylinder(d["ecc_shaft_r"] + 3.0, d["plate_t"] + 2.0,
+                                        Vector(0, 0, d["z_floor"] - 1.0)))
+    return plate
+
+
+def build_disc(d, index):
+    """One cycloid disc, already placed at its z level and eccentric offset."""
+    pts = cycloid_points(d["bore_r"], d["pin_r"], d["ecc"], d["n_pins"], d["profile_steps"])
+    face = Part.Face(Part.Wire(Part.makePolygon(pts)))
+    solid = face.extrude(Vector(0, 0, d["disc_t"]))
+
+    # cam bore + roller pin holes (hole dia = pin dia + 2*ecc), cut in one pass
+    tools = [Part.makeCylinder(d["cam_r"], d["disc_t"] + 2.0, Vector(0, 0, -1.0))]
+    hr = d["out_pin_r"] + d["ecc"]
+    for i in range(d["out_pins"]):
+        a = 2.0 * math.pi * i / d["out_pins"]
+        c = Vector(d["out_pin_bcd_r"] * math.cos(a), d["out_pin_bcd_r"] * math.sin(a), -1.0)
+        tools.append(Part.makeCylinder(hr, d["disc_t"] + 2.0, c))
+    solid = solid.cut(Part.makeCompound(tools))
+
+    # phase: discs are spaced evenly around the crank (2 discs -> 180 deg)
+    phase = 2.0 * math.pi * index / d["n_discs"]
+    z = d["z_disc0"] + index * (d["disc_t"] + d["disc_gap"])
+    # rotate the lobe pattern with the crank, then translate by the eccentric offset
+    solid.Placement = Placement(
+        Vector(d["ecc"] * math.cos(phase), d["ecc"] * math.sin(phase), z),
+        Rotation(Vector(0, 0, 1), math.degrees(phase / d["lobes"])),
+    )
+    return solid
+
+
+def build_ecc_shaft(d):
+    z0 = d["z_motor"]
+    top = d["z_out"] - 0.4            # stop short of the output plate underside
+    shaft = Part.makeCylinder(d["ecc_shaft_r"], top - z0, Vector(0, 0, z0))
+    cams = []
+    for i in range(d["n_discs"]):
+        phase = 2.0 * math.pi * i / d["n_discs"]
+        z = d["z_disc0"] + i * (d["disc_t"] + d["disc_gap"])
+        c = Vector(d["ecc"] * math.cos(phase), d["ecc"] * math.sin(phase), z)
+        cams.append(Part.makeCylinder(d["cam_r"] - 0.25, d["disc_t"], c))
+    return shaft.fuse(Part.makeCompound(cams)).removeSplitter()
+
+
+def build_output(d):
+    plate = Part.makeCylinder(d["out_plate_r"], d["out_plate_t"], Vector(0, 0, d["z_out"]))
+    # output shaft
+    shaft_h = (d["housing_h"] + d["out_shaft_stick"]) - d["z_out"]
+    plate = plate.fuse(Part.makeCylinder(d["out_shaft_r"], shaft_h, Vector(0, 0, d["z_out"])))
+    # roller pins reaching down through every disc
+    pin_len = d["z_out"] - d["z_disc0"]
+    pins = []
+    for i in range(d["out_pins"]):
+        a = 2.0 * math.pi * i / d["out_pins"]
+        c = Vector(d["out_pin_bcd_r"] * math.cos(a), d["out_pin_bcd_r"] * math.sin(a),
+                   d["z_disc0"])
+        pins.append(Part.makeCylinder(d["out_pin_r"], pin_len, c))
+    return plate.fuse(Part.makeCompound(pins)).removeSplitter()
+
+
+def build_motor_mock(d):
+    can = Part.makeCylinder(d["motor_od"] / 2.0, d["motor_h"] - 2.0, Vector(0, 0, d["z_motor"]))
+    sh = Part.makeCylinder(d["motor_shaft_r"], d["motor_h"], Vector(0, 0, d["z_motor"]))
+    return can.fuse(sh)
+
+
+# ---------------------------------------------------------------------------
+# document assembly
+# ---------------------------------------------------------------------------
+COLORS = {
+    "Housing":     (0.72, 0.72, 0.76),
+    "RingPins":    (0.85, 0.85, 0.30),
+    "FloorPlate":  (0.60, 0.60, 0.66),
+    "EccShaft":    (0.90, 0.45, 0.10),
+    "OutputStage": (0.15, 0.55, 0.90),
+    "Motor":       (0.20, 0.20, 0.22),
+}
+
+
+def add(doc, name, shape, transparency=0):
+    obj = doc.addObject("Part::Feature", name)
+    obj.Shape = shape
+    if HAS_GUI:
+        base = name.rstrip("0123456789")
+        col = COLORS.get(base, (0.20, 0.75, 0.45))
+        obj.ViewObject.ShapeColor = col
+        obj.ViewObject.Transparency = transparency
+    return obj
+
+
+def build_document(d):
+    if DOC_NAME in App.listDocuments():
+        App.closeDocument(DOC_NAME)
+    doc = App.newDocument(DOC_NAME)
+
+    add(doc, "Housing", build_housing(d), transparency=60)
+    add(doc, "RingPins", build_ring_pins(d))
+    add(doc, "FloorPlate", build_floor_plate(d))
+    for i in range(d["n_discs"]):
+        add(doc, "CycloidDisc%d" % (i + 1), build_disc(d, i))
+    add(doc, "EccShaft", build_ecc_shaft(d))
+    add(doc, "OutputStage", build_output(d))
+    add(doc, "Motor", build_motor_mock(d))
+
+    doc.recompute()
+    return doc
+
+
+# ---------------------------------------------------------------------------
+# camera tour
+# ---------------------------------------------------------------------------
+VIEWS = [
+    ("top",       "viewTop"),
+    ("front",     "viewFront"),
+    ("side",      "viewRight"),
+    ("isometric", "viewIsometric"),
+    ("bottom",    "viewBottom"),
+]
+
+
+def out_dir(d):
+    path = d["export_dir"] or os.path.join(os.path.expanduser("~"), "Documents",
+                                           "knee_actuator_out")
+    if not os.path.isdir(path):
+        os.makedirs(path)
+    return path
+
+
+def tour(doc, d):
+    if not HAS_GUI:
+        App.Console.PrintMessage("No GUI - skipping the camera tour.\n")
+        return
+    view = Gui.activeDocument().activeView
+    Gui.SendMsgToActiveView("ViewFit")
+    folder = out_dir(d) if d["save_images"] else None
+
+    for label, fn in VIEWS:
+        getattr(view, fn)()
+        Gui.SendMsgToActiveView("ViewFit")
+        Gui.updateGui()
+        App.Console.PrintMessage("view: %s\n" % label)
+        if folder:
+            png = os.path.join(folder, "knee_actuator_%s.png" % label)
+            view.saveImage(png, 1600, 1200, "Current")
+        end = time.time() + d["view_pause"]
+        while time.time() < end:
+            Gui.updateGui()
+            time.sleep(0.02)
+
+    view.viewIsometric()
+    Gui.SendMsgToActiveView("ViewFit")
+    Gui.updateGui()
+
+
+def export_stl(doc, d):
+    import Mesh
+    folder = out_dir(d)
+    for obj in doc.Objects:
+        if obj.Name == "Motor":
+            continue
+        Mesh.export([obj], os.path.join(folder, "%s.stl" % obj.Name))
+    App.Console.PrintMessage("STLs written to %s\n" % folder)
+
+
+# ---------------------------------------------------------------------------
+def main():
+    d = derive(P)
+    App.Console.PrintMessage(
+        "\n=== Cycloidal Knee Actuator ===\n"
+        "  reduction      : %.0f:1  (%d lobes / %d ring pins)\n"
+        "  envelope       : %.0f mm OD x %.0f mm tall\n"
+        "  stack height   : %.1f mm used of %.1f mm\n"
+        "  eccentricity   : %.2f mm\n"
+        "  output shaft   : %.0f mm dia, %.0f mm proud of the rim\n"
+        % (d["ratio"], d["lobes"], d["n_pins"], d["housing_od"], d["housing_h"],
+           d["z_top"], d["housing_h"], d["ecc"], d["out_shaft_r"] * 2.0,
+           d["out_shaft_stick"]))
+    for w in check(d):
+        App.Console.PrintWarning("  ! %s\n" % w)
+
+    t0 = time.time()
+    doc = build_document(d)
+    App.Console.PrintMessage("  built in %.1f s\n" % (time.time() - t0))
+
+    if d["export_stl"]:
+        export_stl(doc, d)
+    tour(doc, d)
+    return doc
+
+
+if __name__ == "__main__":
+    main()
+else:
+    main()
